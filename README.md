@@ -128,6 +128,8 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
   - Sessions expire after `SESSION_HOURS` (default 12).
   - Logout, a password reset or suspending a user revokes that user's sessions immediately.
 - **Lockout:** after `LOGIN_MAX_FAILURES` wrong passwords (default 5) within `LOGIN_LOCKOUT_MINUTES` (default 15), the account is locked temporarily with HTTP 429.
+  - Wrong passwords are counted in a separate `login_failures` table. They never appear in the activity log.
+  - A successful login clears that user's failures, and expired attempts are purged automatically.
 - **Protected endpoints:** every data endpoint requires a valid session, and `X-User-Id` headers are no longer trusted. These stay public:
   - The WhatsApp webhook.
   - The login-screen user list, which has no e-mails.
@@ -136,17 +138,20 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
 
 ### Activity log (יומן פעילות)
 
-The `activity_log` table records who did what, when, and from which IP:
+The `activity_log` table records real operational events only: who did what, when, and from which IP.
 
-- Logins, failed logins and logouts.
-- Requests sent and invoices approved, closed or reopened.
-- OCR corrections.
-- Client changes.
-- Template and settings changes, including old and new values.
-- User management and password changes.
-- Bulk broadcasts, scheduler runs and simulator receipts.
+| Group | Events (label in the tab) |
+| --- | --- |
+| Session | **התחברות למערכת** and **התנתקות מהמערכת** |
+| Sending | **שליחת בקשה ללקוח** from שליחת בקשה, with the request type and the client's name, e.g. `נשלחה בקשה מסוג ”חשבונית ספק חסרה“ ללקוח …` |
+| | **שליחת תזכורות**: manual reminder runs (by the worker) and automatic 48h cycles (shown as **מערכת**), with a count per reminder type |
+| | **שליחת דיווח מס בתפוצה** for bulk "הדיווח מוכן" broadcasts |
+| Invoices and tickets | **אישור חשבונית**, **דחיית חשבונית** (with the reason), **סגירת פנייה**, **פתיחת פנייה מחדש**, **תיקון שדות חשבונית** |
+| Management | Client added, edited or deactivated; template and office settings changes, with old and new values (e.g. the VAT rate); worker accounts added, edited or reset; password changes |
 
 Each row is written in the same database transaction as the change it describes.
+
+**Not logged:** failed logins and mistyped passwords, phone-simulator demo receipts, and automatic cycles that sent nothing. On startup, older `LOGIN_FAILED` and `SIMULATOR_RECEIPT` rows are deleted, and older `SCHEDULER_RUN` rows are renamed to **שליחת תזכורות**. The cleanup is idempotent.
 
 **Who can see it:**
 - `GET /api/activity` (filters: `user_id`, `action`, `date_from`, `date_to`, `q`) is manager-only; workers get 403.
@@ -159,19 +164,19 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 | Action | Manager (מנהל משרד) | Worker (עובד משרד) |
 | --- | --- | --- |
 | Send messages, bulk tax broadcasts, WhatsApp simulator | ✅ | ✅ |
-| Live chasing board, approve or close tickets, correct OCR fields | ✅ | ✅ |
+| Live chasing board, approve, reject or close tickets, correct OCR fields | ✅ | ✅ |
 | Add, edit or deactivate clients (buttons and the actions column) | ✅ | hidden |
 | Edit message templates | ✅ | hidden; workers see the Hebrew text only |
-| **הגדרות** tab: VAT rate, thresholds, bot rules, firm name, auto-approve | ✅ | tab hidden |
-| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | hidden (inside הגדרות) |
+| **הגדרות** tab: VAT rate, allocation threshold, reminder interval, max reminders, firm name, auto-approve | ✅ edit | 👁 read-only: inputs disabled, no שמירת הגדרות / ביטול שינויים buttons |
+| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | hidden: the whole **עובדי המשרד** section is not rendered |
 | Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | tab hidden |
 | Auto-approve switch on the chasing board | ✅ | hidden |
 
-"Hidden" means the control is not rendered at all, not merely disabled or marked with a lock. A worker who opens `#settings` or `#activity` directly is sent back to **שליחת בקשה**. The API enforces the same rules: endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
+"Hidden" means the control is not rendered at all, not merely disabled or marked with a lock. Workers can view and search clients and templates and read the office rules in הגדרות, but every management action is hidden. A worker who opens `#activity` directly is sent back to **שליחת בקשה**. The API enforces the same rules: endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
 
 ### Sidebar and dark mode
 
-- **Navigation order:** שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, then for managers only יומן פעילות and הגדרות. הגדרות is always last.
+- **Navigation order:** שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות. הגדרות is always last and visible to everyone.
 - **Profile card:** the logged-in user's avatar, name, role badge, **שינוי סיסמה** and **התנתקות** sit at the bottom of the sidebar, under the phone-simulator button.
 - **Dark mode:** click the blue robot logo at the top to switch between light and dark mode. Hovering it shows the tooltip "מעבר למצב כהה / בהיר".
   - The choice is saved in `localStorage` as `accountflow.theme`. Without a saved choice, the app follows the system setting.
@@ -241,7 +246,7 @@ Managers set the frequency in the client form. The clients table shows it next t
    - The six Vision AI and Tax Authority checks.
    - **אישור החשבונית וסגירה**.
 5. **Roles.**
-   1. Switch to ראמי חדאד from the profile card at the bottom of the sidebar. The client and template editing buttons disappear, and so do the הגדרות and יומן פעילות tabs.
+   1. Switch to ראמי חדאד from the profile card at the bottom of the sidebar. The client and template editing buttons disappear, and so does the יומן פעילות tab. הגדרות stays, read-only, without the team section.
    2. Switch back to מאיה כהן and change the VAT rate to 17%. New invoice checks now use 17%.
 
 ## Architecture
@@ -319,6 +324,7 @@ Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify 
 | POST / PUT / DELETE | `/api/clients…` | manager | Client management (soft delete) |
 | POST | `/api/tickets/quick-send` | any user | Render in the client's language, create the ticket, dispatch |
 | POST | `/api/tickets/{id}/approve` | any user | Approve a verified invoice |
+| POST | `/api/tickets/{id}/reject` | any user | Reject the invoice `{reason}`: the client gets the Hebrew re-prompt with the reason, and the ticket returns to NEEDS_CORRECTION |
 | POST | `/api/webhook/whatsapp-inbound` | public (webhook) | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
 | POST | `/api/simulator/demo-receipt` | public | `clear`, `blurry`, `missing_number`, `wrong_supplier`, `bad_math`, `missing_allocation`, `invalid_tax_id` |
 | POST | `/api/scheduler/simulate-time-jump?hours=48` | public | Move pending reminders back, run the cycle (demo) |

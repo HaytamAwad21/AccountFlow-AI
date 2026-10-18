@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDashed, ExternalLink, Pencil, RotateCcw, Smartphone, ThumbsUp, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, ExternalLink, Pencil, RotateCcw, Smartphone, ThumbsDown, ThumbsUp, XCircle } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, mediaUrl } from "../lib/api";
 import { cx, fullDateTime, ils, relativeTime } from "../lib/format";
@@ -84,11 +84,15 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   useEffect(() => {
     if (!ticketId) {
       setTicket(null);
       setEditing(false);
+      setRejecting(false);
+      setRejectReason("");
       return;
     }
     api.ticket(ticketId).then(setTicket).catch(() => undefined);
@@ -135,6 +139,15 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
     }
     const t = await act("ocr", () => api.editOcr(ticket.id, body), "שדות החשבונית נשמרו ונבדקו מחדש");
     if (t) setEditing(false);
+  };
+
+  const reject = async () => {
+    if (!ticket || rejectReason.trim().length < 3) return;
+    const t = await act("reject", () => api.rejectTicket(ticket.id, rejectReason.trim()), "החשבונית נדחתה — הלקוח התבקש לשלוח צילום חדש");
+    if (t) {
+      setRejecting(false);
+      setRejectReason("");
+    }
   };
 
   const ctxEntries = ticket
@@ -215,6 +228,11 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   אישור החשבונית וסגירה
                 </Button>
               )}
+              {ticket.status !== "RESOLVED" && ocr && (
+                <Button variant="secondary" icon={<ThumbsDown className="h-4 w-4" />} onClick={() => setRejecting((v) => !v)}>
+                  דחיית החשבונית
+                </Button>
+              )}
               {ticket.status === "RESOLVED" ? (
                 <Button icon={<RotateCcw className="h-4 w-4" />} loading={busy === "reopen"} onClick={() => act("reopen", () => api.reopenTicket(ticket.id), "הפנייה נפתחה מחדש")}>
                   פתיחה מחדש
@@ -235,6 +253,32 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 פתיחת השיחה
               </Button>
             </div>
+            {rejecting && ticket.status !== "RESOLVED" && (
+              <div className="space-y-2 rounded-lg bg-red-50 p-3 ring-1 ring-inset ring-red-200">
+                <label className="block text-xs font-semibold text-red-800" htmlFor="reject-reason">
+                  סיבת הדחייה (תישלח ללקוח בוואטסאפ)
+                </label>
+                <input
+                  id="reject-reason"
+                  autoFocus
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && reject()}
+                  placeholder="לדוגמה: חסר מספר הקצאה בחשבונית"
+                  maxLength={300}
+                  className={inputClass}
+                  dir="auto"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
+                    ביטול
+                  </Button>
+                  <Button size="sm" variant="danger" loading={busy === "reject"} disabled={rejectReason.trim().length < 3} onClick={reject}>
+                    דחייה ושליחה ללקוח
+                  </Button>
+                </div>
+              </div>
+            )}
             {ticket.resolution_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">📝 {ticket.resolution_note}</p>}
 
             <section>

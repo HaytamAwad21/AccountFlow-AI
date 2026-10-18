@@ -207,6 +207,7 @@ export const api = {
   },
   ticket: (id: number) => request<TicketDetail>(`/api/tickets/${id}`),
   approveTicket: (id: number, note = "") => request<TicketDetail>(`/api/tickets/${id}/approve`, { method: "POST", ...json({ note }) }),
+  rejectTicket: (id: number, reason: string) => request<TicketDetail>(`/api/tickets/${id}/reject`, { method: "POST", ...json({ reason }) }),
   resolveTicket: (id: number, note = "") => request<TicketDetail>(`/api/tickets/${id}/resolve`, { method: "POST", ...json({ note }) }),
   reopenTicket: (id: number) => request<TicketDetail>(`/api/tickets/${id}/reopen`, { method: "POST" }),
   editOcr: (id: number, body: Record<string, string | number | null>) =>

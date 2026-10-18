@@ -17,10 +17,9 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import SessionLocal, get_db
 from models import ChasingTicket, Client, DeliveryStatus, MessageDirection, User, WhatsAppMessageLog
-from routers.deps import client_ip, get_client_or_404, require_user
+from routers.deps import get_client_or_404, require_user
 from schemas import DemoReceiptRequest, InboundMessage, InboundResult, ticket_out
 from services.demo_invoices import generate_invoice_image, parse_amount
-from services.activity import log_activity
 from services.events import broker, queue_event
 from services.system_settings import get_system_settings
 from services.ticket_engine import (
@@ -185,18 +184,7 @@ async def whatsapp_inbound(request: Request):
 
 # ── simulator helpers ────────────────────────────────────────────────────────
 
-SCENARIO_LABELS = {
-    "clear": "חשבונית תקינה",
-    "blurry": "קבלה מטושטשת",
-    "missing_number": "חשבונית ללא מספר",
-    "wrong_supplier": "ספק שגוי",
-    "bad_math": "סכומים שגויים",
-    "missing_allocation": "ללא מספר הקצאה",
-    "invalid_tax_id": "ח.פ לא תקין",
-}
-
-
-def _demo_receipt(body: DemoReceiptRequest, user_id: int, ip: str) -> InboundResult:
+def _demo_receipt(body: DemoReceiptRequest) -> InboundResult:
     started = time.perf_counter()
     with SessionLocal() as db:
         client = get_client_or_404(db, body.client_id)
@@ -216,17 +204,14 @@ def _demo_receipt(body: DemoReceiptRequest, user_id: int, ip: str) -> InboundRes
         )
         url = f"/uploads/{path.name}"
         out = handle_media(db, client, path, url, "image/png", ticket.id if ticket else None, "📸")
-        log_activity(db, db.get(User, user_id), "SIMULATOR_RECEIPT",
-                     f"הדמיית ”{SCENARIO_LABELS[body.scenario]}“ בסימולטור עבור {client.full_name}",
-                     entity_type="ticket", entity_id=ticket.id if ticket else None, ip_address=ip)
         db.commit()
         return _result(out, started)
 
 
 @router.post("/simulator/demo-receipt", response_model=InboundResult)
-async def simulator_demo_receipt(body: DemoReceiptRequest, request: Request, user: User = Depends(require_user)):
+async def simulator_demo_receipt(body: DemoReceiptRequest, _user: User = Depends(require_user)):
     try:
-        return await run_in_threadpool(_demo_receipt, body, user.id, client_ip(request))
+        return await run_in_threadpool(_demo_receipt, body)
     except EngineError as exc:
         raise HTTPException(exc.status_code, str(exc)) from exc
 

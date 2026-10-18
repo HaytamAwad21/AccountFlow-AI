@@ -23,7 +23,7 @@ const TABS: { key: Tab; label: string; sub: string; icon: ReactNode; managerOnly
   { key: "bulk", label: "הדיווח מוכן", sub: "הודעות מס בתפוצה", icon: <Megaphone className="h-4 w-4" /> },
   { key: "clients", label: "לקוחות ותבניות", sub: "לקוחות ונוסחי הודעות", icon: <Users className="h-4 w-4" /> },
   { key: "activity", label: "יומן פעילות", sub: "פעולות צוות המשרד", icon: <History className="h-4 w-4" />, managerOnly: true },
-  { key: "settings", label: "הגדרות", sub: "הגדרות המשרד", icon: <SettingsIcon className="h-4 w-4" />, managerOnly: true },
+  { key: "settings", label: "הגדרות", sub: "הגדרות המשרד", icon: <SettingsIcon className="h-4 w-4" /> },
 ];
 
 const MANAGER_ONLY_TABS = new Set<Tab>(TABS.filter((t) => t.managerOnly).map((t) => t.key));
@@ -204,7 +204,7 @@ export default function App() {
         {tab === "bulk" && <BulkTax />}
         {tab === "clients" && <ClientsTemplates />}
         {tab === "activity" && isManager && <ActivityLog />}
-        {tab === "settings" && isManager && <Settings />}
+        {tab === "settings" && <Settings />}
       </main>
 
       <PhoneSimulator />

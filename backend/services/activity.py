@@ -1,6 +1,12 @@
-"""Office activity log (audit trail). Written by the API routers, read by managers only."""
+"""Office activity log (audit trail). Written by the API routers, read by managers only.
+
+Only meaningful operational events are recorded: sessions (login / logout), requests and
+reminders sent to clients, tax broadcasts, invoice / ticket decisions and management changes.
+Failed logins are NOT activity: they are tracked separately (models.LoginFailure) for lockout.
+"""
 from __future__ import annotations
 
+from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
 from models import ActivityLog, User
@@ -9,11 +15,13 @@ from services.events import queue_event
 
 # action code -> Hebrew label shown in the "יומן פעילות" tab
 ACTION_LABELS: dict[str, str] = {
-    "LOGIN": "התחברות",
-    "LOGIN_FAILED": "ניסיון התחברות כושל",
-    "LOGOUT": "התנתקות",
+    "LOGIN": "התחברות למערכת",
+    "LOGOUT": "התנתקות מהמערכת",
     "TICKET_SENT": "שליחת בקשה ללקוח",
+    "REMINDERS_SENT": "שליחת תזכורות",
+    "CAMPAIGN_SENT": "שליחת דיווח מס בתפוצה",
     "TICKET_APPROVED": "אישור חשבונית",
+    "TICKET_REJECTED": "דחיית חשבונית",
     "TICKET_RESOLVED": "סגירת פנייה",
     "TICKET_REOPENED": "פתיחת פנייה מחדש",
     "OCR_EDITED": "תיקון שדות חשבונית",
@@ -26,10 +34,11 @@ ACTION_LABELS: dict[str, str] = {
     "USER_UPDATED": "עדכון עובד",
     "PASSWORD_RESET": "איפוס סיסמה",
     "PASSWORD_CHANGED": "שינוי סיסמה אישית",
-    "CAMPAIGN_SENT": "שליחת דיווח מס בתפוצה",
-    "SCHEDULER_RUN": "הרצת מחזור תזכורות",
-    "SIMULATOR_RECEIPT": "הדמיית קבלה בסימולטור",
 }
+
+# Action codes written by older releases that are no longer activity events.
+REMOVED_ACTIONS = ("LOGIN_FAILED", "SIMULATOR_RECEIPT")
+RENAMED_ACTIONS = {"SCHEDULER_RUN": "REMINDERS_SENT"}
 
 
 def log_activity(
@@ -57,3 +66,14 @@ def log_activity(
     db.add(entry)
     queue_event(db, {"type": "activity"})
     return entry
+
+
+def cleanup_legacy_activity(db: Session) -> int:
+    """Delete failed-login / simulator rows and rename old action codes. Idempotent; returns rows changed."""
+    removed = db.execute(delete(ActivityLog).where(ActivityLog.action.in_(REMOVED_ACTIONS))).rowcount or 0
+    renamed = 0
+    for old, new in RENAMED_ACTIONS.items():
+        renamed += db.execute(update(ActivityLog).where(ActivityLog.action == old).values(action=new)).rowcount or 0
+    if removed or renamed:
+        db.commit()
+    return removed + renamed

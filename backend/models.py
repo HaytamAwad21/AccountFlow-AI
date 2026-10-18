@@ -306,3 +306,18 @@ class ActivityLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
     user: Mapped[User | None] = relationship()
+
+
+class LoginFailure(Base):
+    """Wrong-password attempts, kept only to enforce the temporary lockout.
+
+    Not part of the activity log (which records operational events only). Rows for a user are
+    deleted on their next successful login, and rows older than the lockout window are purged.
+    """
+
+    __tablename__ = "login_failures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    ip_address: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

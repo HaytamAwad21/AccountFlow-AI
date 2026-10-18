@@ -11,7 +11,11 @@ const PAGE = 100;
 const ACTION_TONE: Record<string, string> = {
   LOGIN: "bg-emerald-50 text-emerald-800",
   LOGOUT: "bg-slate-100 text-slate-700",
-  LOGIN_FAILED: "bg-red-100 text-red-700",
+  TICKET_SENT: "bg-sky-50 text-sky-800",
+  REMINDERS_SENT: "bg-sky-50 text-sky-800",
+  CAMPAIGN_SENT: "bg-sky-50 text-sky-800",
+  TICKET_APPROVED: "bg-emerald-50 text-emerald-800",
+  TICKET_REJECTED: "bg-red-50 text-red-700",
   PASSWORD_RESET: "bg-amber-100 text-amber-800",
   PASSWORD_CHANGED: "bg-amber-100 text-amber-800",
   SETTINGS_UPDATED: "bg-violet-100 text-violet-800",
@@ -20,7 +24,8 @@ const ACTION_TONE: Record<string, string> = {
   CLIENT_DEACTIVATED: "bg-red-50 text-red-700",
 };
 
-/** Manager-only audit trail of everything office staff did in the dashboard. */
+/** Manager-only audit trail of operational events: sessions, requests and reminders sent,
+ *  broadcasts, invoice decisions and management changes. Failed logins are never shown. */
 export function ActivityLog() {
   const { isManager, users, tick, tickTypes } = useApp();
   const [items, setItems] = useState<ActivityEntry[]>([]);
@@ -144,7 +149,7 @@ export function ActivityLog() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {items.map((e) => (
-                  <tr key={e.id} className={cx("align-top hover:bg-slate-50", e.action === "LOGIN_FAILED" && "bg-red-50/40")}>
+                  <tr key={e.id} className="align-top hover:bg-slate-50">
                     <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-600">{fullDateTime(e.created_at)}</td>
                     <td className="whitespace-nowrap px-3 py-2.5">
                       {e.user_name ? (

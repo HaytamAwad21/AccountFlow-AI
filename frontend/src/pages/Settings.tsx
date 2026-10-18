@@ -49,11 +49,13 @@ function NumberInput({
   onChange,
   suffix,
   limits,
+  disabled = false,
 }: {
   value: number;
   onChange: (v: number) => void;
   suffix: string;
   limits: { min: number; max: number; step: number };
+  disabled?: boolean;
 }) {
   return (
     <div className="relative">
@@ -65,7 +67,9 @@ function NumberInput({
         step={limits.step}
         value={Number.isFinite(value) ? value : ""}
         onChange={(e) => onChange(e.target.value === "" ? NaN : Number(e.target.value))}
-        className={cx(inputClass, "pl-14 pr-3 text-right tabular-nums")}
+        disabled={disabled}
+        readOnly={disabled}
+        className={cx(inputClass, "pl-14 pr-3 text-right tabular-nums", disabled && "cursor-not-allowed bg-slate-50 text-slate-600")}
       />
       {/* physical sides: the LTR number sits on the right, the unit on the left — never overlapping */}
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">{suffix}</span>
@@ -109,8 +113,9 @@ export function Settings() {
     return (Object.keys(draft) as (keyof EditableSettings)[]).some((k) => draft[k] !== settings[k]);
   }, [draft, settings]);
 
-  // Manager-only page: nothing is rendered for workers (the sidebar also hides the tab).
-  if (!isManager) return null;
+  // Workers see the firm's current rules read-only: disabled inputs, no save / cancel and
+  // no team management. Managers edit everything.
+  const readOnly = !isManager;
   if (!settings || !draft) {
     return <div className="p-6 text-sm text-slate-500">טוען הגדרות…</div>;
   }
@@ -118,7 +123,7 @@ export function Settings() {
   const set = <K extends keyof EditableSettings>(k: K, v: EditableSettings[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
 
   const save = async () => {
-    if (invalid.length) return;
+    if (readOnly || invalid.length) return;
     setSaving(true);
     try {
       const body: Partial<EditableSettings> = {};
@@ -154,7 +159,9 @@ export function Settings() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">⚙️ הגדרות המשרד</h1>
           <p className="text-sm text-slate-500">
-            הערכים כאן משפיעים מיידית על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ.
+            {readOnly
+              ? "הכללים שהמשרד מפעיל כרגע על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ. רק מנהל/ת המשרד יכול/ה לשנות אותם."
+              : "הערכים כאן משפיעים מיידית על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ."}
             {settings.updated_by_name && (
               <span className="ms-1 text-slate-400">
                 עודכן לאחרונה ע״י {splitUserName(settings.updated_by_name).name} · {fullDateTime(settings.updated_at)}
@@ -162,7 +169,8 @@ export function Settings() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {!readOnly && (
+          <div className="flex items-center gap-2">
             {dirty && <span className="text-xs text-amber-600">יש שינויים שלא נשמרו</span>}
             <Button
               variant="ghost"
@@ -184,22 +192,23 @@ export function Settings() {
               שמירת הגדרות
             </Button>
           </div>
+        )}
       </header>
 
-      {invalid.length > 0 && (
+      {!readOnly && invalid.length > 0 && (
         <p className="rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700">ערכים לא תקינים: {invalid.join(" · ")}</p>
       )}
 
       <Section icon={<Landmark className="h-5 w-5" />} title="הגדרות מס ורגולציה" hint="כללי רשות המסים שהבוט ו-Vision AI אוכפים על כל חשבונית">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="שיעור מע״מ נוכחי (%)" hint="משמש לבדיקת התאמת המע״מ בכל חשבונית ובתצוגות המס">
-            <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} suffix="%" limits={LIMITS.vat_rate} />
+            <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} suffix="%" limits={LIMITS.vat_rate} disabled={readOnly} />
           </Field>
           <Field label="סף חובת מספר הקצאה (₪ לפני מע״מ)" hint="חשבונית בסכום זה ומעלה חייבת מספר הקצאה בן 9 ספרות">
             <NumberInput
               value={draft.allocation_number_threshold_nis}
               onChange={(v) => set("allocation_number_threshold_nis", v)}
-             
+              disabled={readOnly}
               suffix="₪"
               limits={LIMITS.allocation_number_threshold_nis}
             />
@@ -228,29 +237,41 @@ export function Settings() {
       <Section icon={<BellRing className="h-5 w-5" />} title="הגדרות בוט ותזכורות" hint="קצב המעקב האוטומטי אחרי לקוחות שלא השיבו">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="מרווח זמן בין תזכורות אוטומטיות (שעות)" hint="חל על פניות חדשות ועל התזכורת הבאה בפניות פתוחות">
-            <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} />
+            <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} disabled={readOnly} />
           </Field>
           <Field label="מספר תזכורות מקסימלי לפני התראה אדומה" hint="לאחר מכן הפנייה מסומנת 🚨 הוסלם לשיחת טלפון; מתעדכן גם בפניות פתוחות">
-            <NumberInput value={draft.max_reminders} onChange={(v) => set("max_reminders", v)} suffix="פעמים" limits={LIMITS.max_reminders} />
+            <NumberInput value={draft.max_reminders} onChange={(v) => set("max_reminders", v)} suffix="פעמים" limits={LIMITS.max_reminders} disabled={readOnly} />
           </Field>
         </div>
         <div className="mt-4">
           <Toggle
             checked={draft.auto_approve_verified}
             onChange={(v) => set("auto_approve_verified", v)}
-           
+            disabled={readOnly}
             label="אישור אוטומטי לחשבוניות שעברו את כל בדיקות Vision AI (ללא בדיקת פקיד)"
           />
         </div>
       </Section>
 
-      <Section icon={<Building2 className="h-5 w-5" />} title="פרטי המשרד וניהול צוות" hint="שם המשרד מוצג ללקוחות בכותרת הוואטסאפ ובכל הודעה">
+      <Section
+        icon={<Building2 className="h-5 w-5" />}
+        title={readOnly ? "פרטי המשרד" : "פרטי המשרד וניהול צוות"}
+        hint="שם המשרד מוצג ללקוחות בכותרת הוואטסאפ ובכל הודעה"
+      >
         <div className="max-w-md">
           <Field label="שם המשרד">
-            <input value={draft.firm_name} onChange={(e) => set("firm_name", e.target.value)} className={inputClass} dir="auto" />
+            <input
+              value={draft.firm_name}
+              onChange={(e) => set("firm_name", e.target.value)}
+              disabled={readOnly}
+              readOnly={readOnly}
+              className={cx(inputClass, readOnly && "cursor-not-allowed bg-slate-50 text-slate-600")}
+              dir="auto"
+            />
           </Field>
         </div>
 
+        {isManager && (
         <div className="mt-6">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
             <Users className="h-4 w-4" /> עובדי המשרד
@@ -305,6 +326,7 @@ export function Settings() {
             הוספת עובד/ת
           </Button>
         </div>
+        )}
       </Section>
 
       <Section icon={<Cpu className="h-5 w-5" />} title="מצב המערכת" hint="מידע לקריאה בלבד">
@@ -326,8 +348,12 @@ export function Settings() {
           </div>
         </dl>
       </Section>
-      <EditWorkerModal worker={editingWorker} onClose={() => setEditingWorker(null)} />
-      <AddWorkerModal open={addingWorker} onClose={() => setAddingWorker(false)} />
+      {isManager && (
+        <>
+          <EditWorkerModal worker={editingWorker} onClose={() => setEditingWorker(null)} />
+          <AddWorkerModal open={addingWorker} onClose={() => setAddingWorker(false)} />
+        </>
+      )}
     </div>
   );
 }

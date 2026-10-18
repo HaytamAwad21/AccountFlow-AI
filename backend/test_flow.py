@@ -37,6 +37,10 @@ from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 import services.clock as clock  # noqa: E402
 from main import app  # noqa: E402
 from services.vision_ocr import validate_extraction  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
+from models import ActivityLog, LoginFailure  # noqa: E402
+from services.activity import cleanup_legacy_activity  # noqa: E402
+from services.scheduler import describe_reminder_actions  # noqa: E402
 
 _real_local_today = clock.local_today
 
@@ -370,6 +374,16 @@ def main() -> None:
         check(esc["reminder_count"] == 3 and esc["status"] == "ESCALATED", "3 reminders then ESCALATED")
         r = c.post(f"/api/tickets/{tickets['he']['id']}/approve", headers=W, json={"note": ""})
         check(r.status_code == 200 and r.json()["status"] == "RESOLVED", "worker approves a verified invoice")
+        r = c.post(f"/api/tickets/{tickets['he']['id']}/reject", headers=W, json={"reason": "חסר מספר הקצאה"})
+        check(r.status_code == 409, "a resolved ticket cannot be rejected before reopening (409)")
+        r = c.post(f"/api/tickets/{tickets['he2']['id']}/reject", headers=W, json={"reason": "הסכום בחשבונית לא תואם לתשלום"})
+        rj = r.json()
+        check(r.status_code == 200 and rj["status"] == "NEEDS_CORRECTION" and rj["context_variables_json"].get("awaiting_media") is True,
+              "worker rejects an invoice → NEEDS_CORRECTION, waiting for a new photo")
+        check("הסכום בחשבונית לא תואם לתשלום" in rj["messages"][-1]["content_text"] and rj["messages"][-1]["direction"] == "OUTBOUND",
+              "the client gets the rejection reason in Hebrew on WhatsApp")
+        check(c.post(f"/api/tickets/{tickets['he2']['id']}/reject", headers=W, json={"reason": ""}).status_code == 422,
+              "a rejection needs a reason")
         check("exported_to_erp" not in r.json(), "ERP export fields removed")
         check(c.get("/api/exports/erp-csv").status_code == 404, "ERP export endpoint removed")
 
@@ -420,12 +434,20 @@ def main() -> None:
         check(c.get("/api/activity", headers=W).status_code == 403, "worker cannot read the activity log (403)")
         log = c.get("/api/activity?limit=500", headers=M).json()
         actions = {e["action"] for e in log["items"]}
-        for a in ("LOGIN", "LOGIN_FAILED", "LOGOUT", "TICKET_SENT", "TICKET_APPROVED", "CLIENT_CREATED", "CLIENT_UPDATED",
-                  "SETTINGS_UPDATED", "USER_CREATED", "USER_UPDATED", "PASSWORD_RESET", "PASSWORD_CHANGED", "SCHEDULER_RUN",
-                  "SIMULATOR_RECEIPT", "CAMPAIGN_SENT"):
+        for a in ("LOGIN", "LOGOUT", "TICKET_SENT", "REMINDERS_SENT", "CAMPAIGN_SENT", "TICKET_APPROVED", "TICKET_REJECTED",
+                  "CLIENT_CREATED", "CLIENT_UPDATED", "SETTINGS_UPDATED", "USER_CREATED", "USER_UPDATED", "PASSWORD_RESET",
+                  "PASSWORD_CHANGED"):
             check(a in actions, f"activity log records {a} ({log['actions'][a]})")
+        check(log["actions"]["LOGIN"] == "התחברות למערכת" and log["actions"]["LOGOUT"] == "התנתקות מהמערכת", "session events use the Hebrew labels")
+        check(not actions & {"LOGIN_FAILED", "SIMULATOR_RECEIPT", "SCHEDULER_RUN"} and "LOGIN_FAILED" not in log["actions"],
+              "no failed-login, simulator or scheduler-debug entries")
+        rem = next(e for e in log["items"] if e["action"] == "REMINDERS_SENT")
+        check(rem["user_name"] == worker["full_name"] and "תזכורות" in rem["description"], f"reminders entry: {rem['description']}")
+        rej = next(e for e in log["items"] if e["action"] == "TICKET_REJECTED")
+        check("הסכום בחשבונית לא תואם לתשלום" in rej["description"], "rejection entry keeps the reason")
         sent = next(e for e in log["items"] if e["action"] == "TICKET_SENT")
-        check(sent["user_name"] == worker["full_name"] and "נשלחה בקשה" in sent["description"], "entries name the worker who acted")
+        check(sent["user_name"] == worker["full_name"] and "נשלחה בקשה מסוג" in sent["description"] and "ללקוח" in sent["description"],
+              f"request entries name the worker, the request type and the client: {sent['description']}")
         vat = [e for e in log["items"] if e["action"] == "SETTINGS_UPDATED" and "vat_rate" in (e["details"] or {})]
         check([18.0, 17] in [e["details"]["vat_rate"] for e in vat] and [17.0, 18] in [e["details"]["vat_rate"] for e in vat]
               and all(e["user_name"] == manager["full_name"] for e in vat), "settings changes keep old → new values")
@@ -433,7 +455,19 @@ def main() -> None:
         check(mine["total"] > 0 and all(e["user_id"] == worker["id"] and e["action"] == "TICKET_SENT" for e in mine["items"]),
               "filter by user and action")
         failed = c.get(f"/api/activity?user_id={dana['id']}&action=LOGIN_FAILED", headers=M).json()
-        check(failed["total"] >= 5 and failed["items"][0]["ip_address"] != "", "failed logins logged with IP")
+        check(failed["total"] == 0, "failed logins are not in the activity log")
+        with SessionLocal() as db:
+            check(db.scalar(select(func.count(LoginFailure.id)).where(LoginFailure.user_id == dana["id"])) >= 5,
+                  "failed logins kept separately (login_failures) for the lockout")
+            db.add_all([ActivityLog(user_id=dana["id"], action="LOGIN_FAILED", description="legacy", created_at=clock.utcnow()),
+                        ActivityLog(user_id=None, action="SIMULATOR_RECEIPT", description="legacy", created_at=clock.utcnow()),
+                        ActivityLog(user_id=None, action="SCHEDULER_RUN", description="legacy", created_at=clock.utcnow())])
+            db.commit()
+            check(cleanup_legacy_activity(db) == 3 and cleanup_legacy_activity(db) == 0, "startup cleanup deletes legacy rows (idempotent)")
+            check(db.scalar(select(func.count(ActivityLog.id)).where(ActivityLog.action.in_(("LOGIN_FAILED", "SIMULATOR_RECEIPT", "SCHEDULER_RUN")))) == 0,
+                  "no legacy action codes left")
+        check(describe_reminder_actions([{"kind": "FRIENDLY_REMINDER"}, {"kind": "FRIENDLY_REMINDER"}, {"kind": "ESCALATED"}])
+              == "2 תזכורות ידידותיות, 1 פניות שהוסלמו לשיחה", "reminder summary in Hebrew")
 
         section("Deactivate client (manager) + Meta webhook + dashboard")
         r = c.delete(f"/api/clients/{new_clients['en']['id']}", headers=M).json()

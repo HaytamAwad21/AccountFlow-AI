@@ -6,20 +6,21 @@ GET  /api/auth/me      the user behind the token
 GET  /api/auth/users   public list of user cards for the login screen (no e-mails)
 POST /api/auth/change-password  the logged-in user changes their own password
 
-Failed attempts are written to the activity log; after LOGIN_MAX_FAILURES failures within
-LOGIN_LOCKOUT_MINUTES the user is temporarily locked (HTTP 429).
+Wrong passwords are NOT written to the activity log. They are counted in `login_failures`;
+after LOGIN_MAX_FAILURES failures within LOGIN_LOCKOUT_MINUTES the user is temporarily locked
+(HTTP 429). A successful login clears the user's failures.
 """
 from __future__ import annotations
 
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from config import settings
 from database import get_db
-from models import ActivityLog, User, UserRole, UserSession
+from models import LoginFailure, User, UserRole, UserSession
 from routers.deps import bearer_token, client_ip, current_session, require_user
 from schemas import ChangePasswordRequest, LoginRequest, LoginResponse, LoginUser, UserOut, user_out
 from services.activity import log_activity
@@ -37,15 +38,9 @@ def login_users(db: Session = Depends(get_db)):
 
 def _recent_failures(db: Session, user_id: int) -> int:
     since = utcnow() - timedelta(minutes=settings.login_lockout_minutes)
-    last_success = db.scalar(
-        select(func.max(ActivityLog.created_at)).where(ActivityLog.user_id == user_id, ActivityLog.action == "LOGIN")
-    )
-    if last_success and last_success > since:
-        since = last_success
+    db.execute(delete(LoginFailure).where(LoginFailure.created_at <= since))  # purge expired attempts
     return db.scalar(
-        select(func.count(ActivityLog.id)).where(
-            ActivityLog.user_id == user_id, ActivityLog.action == "LOGIN_FAILED", ActivityLog.created_at > since
-        )
+        select(func.count(LoginFailure.id)).where(LoginFailure.user_id == user_id, LoginFailure.created_at > since)
     ) or 0
 
 
@@ -60,7 +55,7 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     if _recent_failures(db, user.id) >= settings.login_max_failures:
         raise HTTPException(429, f"יותר מדי ניסיונות כושלים. נסו שוב בעוד {settings.login_lockout_minutes} דקות.")
     if not verify_password(body.password, user.password_hash):
-        log_activity(db, user, "LOGIN_FAILED", f"ניסיון התחברות עם סיסמה שגויה לחשבון של {user.full_name}", ip_address=ip)
+        db.add(LoginFailure(user_id=user.id, ip_address=ip, created_at=utcnow()))
         db.commit()
         raise HTTPException(401, "הסיסמה שגויה")
 
@@ -75,6 +70,7 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
         user_agent=(request.headers.get("user-agent") or "")[:300],
     )
     db.add(session)
+    db.execute(delete(LoginFailure).where(LoginFailure.user_id == user.id))
     log_activity(db, user, "LOGIN", f"{user.full_name} התחבר/ה למערכת", ip_address=ip)
     db.commit()
     return LoginResponse(token=token, expires_at=session.expires_at, user=user_out(user))

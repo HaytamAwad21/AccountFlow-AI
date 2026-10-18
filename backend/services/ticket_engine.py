@@ -541,6 +541,32 @@ def approve_ticket(db: Session, ticket: ChasingTicket, user: User | None = None,
     return ticket
 
 
+def reject_invoice(db: Session, ticket: ChasingTicket, user: User | None, reason: str) -> ChasingTicket:
+    """A clerk rejects the received invoice: the client gets the Hebrew re-prompt with the clerk's
+    reason, the ticket goes back to NEEDS_CORRECTION and the automatic chase restarts."""
+    reason = reason.strip()
+    client = ticket.client
+    now = utcnow()
+    ocr = dict(ticket.ocr_validation_json or {})
+    if ocr:
+        ocr.update(approved=False, rejected_at=now.isoformat(), rejected_by=user.full_name if user else None,
+                   clerk_rejection_reason=reason)
+        ticket.ocr_validation_json = ocr
+    ctx = _set_ctx(ticket, awaiting_media=True, clerk_rejection_reason=reason)
+    ticket.status = TicketStatus.NEEDS_CORRECTION
+    ticket.resolved_at = None
+    ticket.next_reminder_at = now + reminder_interval(db)
+    reprompt = template_by_slug(db, REPROMPT_SLUG)
+    text = render_text(body_for(reprompt), {
+        "client_name": client.full_name,
+        "rejection_reason": reason,
+        "supplier_name": ctx.get("supplier_name") or ocr.get("supplier_name") or t("supplier_fallback"),
+    })
+    send_outbound(db, client, ticket, text, localized_buttons(reprompt, "he"), MessageType.OCR_FEEDBACK)
+    touch(db, ticket)
+    return ticket
+
+
 def resolve_ticket(db: Session, ticket: ChasingTicket, note: str = "") -> ChasingTicket:
     ticket.status = TicketStatus.RESOLVED
     ticket.resolved_at = utcnow()
@@ -575,6 +601,7 @@ __all__ = [
     "handle_media",
     "handle_text",
     "open_items_count",
+    "reject_invoice",
     "reminder_interval",
     "reopen_ticket",
     "resolve_ticket",

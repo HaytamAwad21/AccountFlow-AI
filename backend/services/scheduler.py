@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import SessionLocal
 from models import ChasingTicket, MessageTemplate, MessageType, TemplateCategory, TicketPriority, TicketStatus
+from services.activity import log_activity
 from services.clock import days_until_deadline, utcnow
 from services.events import queue_event
 from services.i18n import t
@@ -145,6 +146,24 @@ def run_reminder_cycle(db: Session, now=None) -> list[dict]:
     return actions
 
 
+REMINDER_KINDS = {
+    "FRIENDLY_REMINDER": "תזכורות ידידותיות",
+    "URGENT_DEADLINE_WARNING": "התראות מועד דיווח",
+    "SNOOZE_PING": "תזכורות ערב (20:00)",
+    "ESCALATED": "פניות שהוסלמו לשיחה",
+}
+
+
+def describe_reminder_actions(actions: list[dict]) -> str:
+    """Hebrew summary for the activity log, e.g. "3 תזכורות ידידותיות, 1 התראות מועד דיווח"."""
+    parts = []
+    for kind, label in REMINDER_KINDS.items():
+        n = sum(1 for a in actions if a["kind"] == kind)
+        if n:
+            parts.append(f"{n} {label}")
+    return ", ".join(parts) or "לא היו תזכורות שהגיע מועדן"
+
+
 def shift_active_tickets(db: Session, hours: int) -> int:
     """Move every pending reminder `hours` into the past (the demo 'time machine')."""
     delta = timedelta(hours=hours)
@@ -183,6 +202,10 @@ def _background_job() -> None:
     try:
         with SessionLocal() as db:
             actions = run_reminder_cycle(db)
+            if actions:
+                # automatic 48h cycle: recorded as a system entry (no worker)
+                log_activity(db, None, "REMINDERS_SENT", f"המערכת שלחה תזכורות אוטומטיות: {describe_reminder_actions(actions)}",
+                             details={"source": "automatic"})
             db.commit()
             if actions:
                 log.info("Reminder cycle sent %d automated actions", len(actions))

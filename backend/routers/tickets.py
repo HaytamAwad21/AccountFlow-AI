@@ -16,6 +16,7 @@ from schemas import (
     QuickSendResponse,
     TicketDetail,
     TicketNote,
+    TicketReject,
     TicketOut,
     message_out,
     ticket_detail,
@@ -26,6 +27,7 @@ from services.system_settings import get_system_settings
 from services.templating import text_direction
 from services.ticket_engine import (
     approve_ticket,
+    reject_invoice,
     create_and_send_ticket,
     reopen_ticket,
     resolve_ticket,
@@ -69,7 +71,7 @@ def quick_send(body: QuickSendRequest, request: Request, db: Session = Depends(g
         db, client=client, template=template, variables=body.context_variables,
         worker_id=user.id, priority=body.priority,
     )
-    log_activity(db, user, "TICKET_SENT", f"נשלחה בקשה ”{template.name_he}“ אל {client.full_name} ({ticket.ticket_ref})",
+    log_activity(db, user, "TICKET_SENT", f"נשלחה בקשה מסוג ”{template.name_he}“ ללקוח {client.full_name} ({client.company_name}) · {ticket.ticket_ref}",
                  entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))
     db.commit()
     return QuickSendResponse(
@@ -114,6 +116,20 @@ def approve(ticket_id: int, request: Request, body: TicketNote | None = None, db
     ticket = get_ticket_or_404(db, ticket_id)
     approve_ticket(db, ticket, user, (body.note if body else ""))
     log_activity(db, user, "TICKET_APPROVED", f"אושרה החשבונית בפנייה {ticket.ticket_ref} של {ticket.client.full_name}",
+                 entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))
+    db.commit()
+    return ticket_detail(ticket)
+
+
+@router.post("/{ticket_id}/reject", response_model=TicketDetail)
+def reject(ticket_id: int, body: TicketReject, request: Request, db: Session = Depends(get_db),
+           user: User = Depends(require_user)):
+    ticket = get_ticket_or_404(db, ticket_id)
+    if ticket.status == TicketStatus.RESOLVED:
+        raise HTTPException(409, "הפנייה כבר טופלה — יש לפתוח אותה מחדש לפני דחיית החשבונית")
+    reject_invoice(db, ticket, user, body.reason)
+    log_activity(db, user, "TICKET_REJECTED",
+                 f"נדחתה החשבונית בפנייה {ticket.ticket_ref} של {ticket.client.full_name}: {body.reason.strip()}",
                  entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))
     db.commit()
     return ticket_detail(ticket)

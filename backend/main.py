@@ -18,6 +18,7 @@ from database import SessionLocal, init_db
 from routers import activity, auth, campaigns, core, scheduler as scheduler_router, tickets, webhook
 from seed import ensure_passwords, seed_if_empty
 from services.events import broker
+from services.activity import cleanup_legacy_activity
 from services.history import hebrewize_message_history
 from services.scheduler import start_scheduler, stop_scheduler
 from services.ticket_engine import EngineError, MissingVariablesError
@@ -35,6 +36,9 @@ async def lifespan(_app: FastAPI):
             log.info("Seeded demo data: %s", result)
     with SessionLocal() as db:
         hebrewize_message_history(db)  # WhatsApp chat is Hebrew-only, also for older history
+        cleaned = cleanup_legacy_activity(db)  # failed logins / simulator demos are not activity
+        if cleaned:
+            log.warning("Activity log cleanup: %d legacy rows removed or renamed", cleaned)
     fixed = ensure_passwords()
     if fixed:
         log.warning("Initial passwords set for users without one: %s (see README › Demo logins)", ", ".join(fixed))

@@ -273,6 +273,10 @@ class TicketNote(BaseModel):
     note: str = ""
 
 
+class TicketReject(BaseModel):
+    reason: str = Field(min_length=3, max_length=300, description="Hebrew reason, sent to the client on WhatsApp")
+
+
 class OcrUpdate(BaseModel):
     invoice_number: str | None = None
     supplier_name: str | None = None
