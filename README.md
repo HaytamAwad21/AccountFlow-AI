@@ -1,0 +1,309 @@
+# AccountFlow AI
+
+Automated client-chasing, missing-invoice collection and monthly tax notifications for Israeli accounting & bookkeeping firms.
+
+- **Office staff** work in a fast web dashboard that is fully in Hebrew and laid out right to left.
+- **End-clients** (garages, contractors, clinics, mini-markets…) never install anything. They get structured WhatsApp messages with quick-reply buttons, **always in Hebrew**. Business and contact names may be Hebrew or English; Arabic names are rejected. Older English or Arabic chat history is rewritten in Hebrew on startup (`services/history.py`).
+- A **nagging engine** follows up automatically. It sends a reminder every 48 hours by default, escalates near the monthly filing deadline, and hands silent clients to a worker for a phone call.
+- A **Vision AI validator** checks every receipt photo within seconds:
+  - Blur.
+  - Tax-invoice header and invoice number.
+  - Supplier match.
+  - Net + VAT = total, at the office's live VAT rate.
+  - **Israel Tax Authority (רשות המסים) rules:** a 9-digit supplier ח.פ / ע.מ, and a 9-digit **מספר הקצאה** (allocation number) on invoices at or above the allocation threshold.
+- **Manager / worker roles.** Managers administer clients, templates, office settings and staff. Workers send messages, work the chasing board and approve invoices.
+
+## Quick start
+
+```bash
+./run_dev.sh
+```
+
+The script creates the Python virtualenv, installs backend and frontend dependencies, then starts both servers:
+
+| Service | URL |
+| --- | --- |
+| Office dashboard (Vite) | http://localhost:5173 |
+| API + Swagger UI | http://localhost:8000/docs |
+
+On first start the backend creates `backend/accountflow.db` and seeds it with the following data:
+
+- The office settings row.
+- 6 Hebrew WhatsApp templates.
+- 3 office users:
+  - מאיה כהן - מנהלת משרד (`MANAGER`).
+  - ראמי חדאד - פקיד הנה״ח (`WORKER`).
+  - דנה לוי - פקידת שכר (`WORKER`).
+- 10 SMB clients, each with a 9-digit ח.פ, an assigned worker and a reporting frequency (monthly or bi-monthly).
+- 12 tickets in every state. One of them is a pending allocation-number request.
+
+The VAT deadline is fixed to the 26th of the reporting month. The urgent-deadline escalation therefore fires when the 26th is 3 days away or less. `test_flow.py` pins the date so this path is tested on any day.
+
+A database created by an older release is detected on startup, rebuilt and reseeded automatically.
+
+Options:
+
+```bash
+./run_dev.sh --test    # run the backend end-to-end checks first
+./run_dev.sh --reset   # wipe and reseed the demo database
+```
+
+### Manual start
+
+```bash
+cd backend
+python -m venv .venv && .venv/bin/pip install -r requirements.txt   # Windows: .venv\Scripts\pip
+.venv/bin/python -m uvicorn main:app --reload --port 8000
+
+cd ../frontend
+npm install
+npm run dev
+```
+
+### Docker (PostgreSQL)
+
+```bash
+docker compose up --build
+```
+
+This runs PostgreSQL 16, the FastAPI backend and an nginx-served production build of the UI on http://localhost:5173. The only change from local mode is `DATABASE_URL`. No code differs.
+
+## Login and activity log
+
+The dashboard requires a **password login**. The login screen, and the "התחברות למערכת" modal behind the sidebar profile button, both work in two steps:
+
+1. Pick your user card.
+2. Type your password.
+
+### Demo logins
+
+| User | Role | Password |
+| --- | --- | --- |
+| מאיה כהן - מנהלת משרד | `MANAGER` | `maya1234` |
+| ראמי חדאד - פקיד הנה״ח | `WORKER` | `rami1234` |
+| דנה לוי - פקידת שכר | `WORKER` | `dana1234` |
+
+Change these after the first login. Each user can change their own password with **שינוי סיסמה** in the sidebar. A manager can reset anyone's password from Settings ▸ עובדי המשרד ▸ **עריכה**.
+
+Upgrading a database from a release without passwords adds the column in place and keeps all data. The seeded accounts get the passwords above. Any other existing user gets `INITIAL_USER_PASSWORD` from `.env` (default `ChangeMe123`).
+
+### How it works
+
+- **Password storage:** passwords are stored as salted PBKDF2-SHA256 hashes (`services/security.py`) and are never returned by the API.
+- **Sessions:**
+  - `POST /api/auth/login` returns a random session token. The browser sends it as `Authorization: Bearer <token>`.
+  - Only the token's SHA-256 digest is stored, in `user_sessions`.
+  - Sessions expire after `SESSION_HOURS` (default 12).
+  - Logout, a password reset or suspending a user revokes that user's sessions immediately.
+- **Lockout:** after `LOGIN_MAX_FAILURES` wrong passwords (default 5) within `LOGIN_LOCKOUT_MINUTES` (default 15), the account is locked temporarily with HTTP 429.
+- **Protected endpoints:** every data endpoint requires a valid session, and `X-User-Id` headers are no longer trusted. These stay public:
+  - The WhatsApp webhook.
+  - The login-screen user list, which has no e-mails.
+  - `/api/health`.
+  - The real-time event stream, which carries only change notifications.
+
+### Activity log (יומן פעילות)
+
+The `activity_log` table records who did what, when, and from which IP:
+
+- Logins, failed logins and logouts.
+- Requests sent and invoices approved, closed or reopened.
+- OCR corrections.
+- Client changes.
+- Template and settings changes, including old and new values.
+- User management and password changes.
+- Bulk broadcasts, scheduler runs and simulator receipts.
+
+Each row is written in the same database transaction as the change it describes.
+
+**Who can see it:**
+- `GET /api/activity` (filters: `user_id`, `action`, `date_from`, `date_to`, `q`) is manager-only; workers get 403.
+- The **יומן פעילות** tab is hidden for workers.
+
+## Roles and permissions
+
+The profile button at the top of the sidebar shows the logged-in user and their role badge (`מנהל משרד` or `עובד משרד`). Clicking it opens the **התחברות למערכת** modal: pick a user and type their password. Suspended users are listed but cannot log in. The API enforces the rules below from the session token, and the UI mirrors them.
+
+| Action | Manager (מנהל משרד) | Worker (עובד משרד) |
+| --- | --- | --- |
+| Send messages, bulk tax broadcasts, WhatsApp simulator | ✅ | ✅ |
+| Live chasing board, approve or close tickets, correct OCR fields | ✅ | ✅ |
+| Add, edit or deactivate clients | ✅ | 🔒 HTTP 403 |
+| Edit message templates | ✅ | 🔒 read-only |
+| Edit office settings (VAT rate, thresholds, bot rules, firm name, auto-approve) | ✅ | 🔒 read-only, with a lock banner |
+| Add workers (with an initial password); **עריכה**: name, role, active / suspended status, password reset (`PUT /api/users/{user_id}`) | ✅ | 🔒 HTTP 403; no Edit buttons |
+| Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | 🔒 HTTP 403; tab hidden |
+
+Endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
+
+## Israel Tax Authority rules
+
+**Typed replies.** Ask a client for a detail with the *פרט חסר* template and put `מספר הקצאה`, or a ח.פ / ע.מ, in the "missing detail" field. The bot then validates the client's typed WhatsApp reply against `^\d{9}$`. Spaces and dashes are ignored, so `123-456-789` is accepted.
+
+- **Invalid reply** (5 digits, 10 digits, letters…): the ticket moves to `NEEDS_CORRECTION`, stays open, and the client immediately gets this reply:
+  > מספר ההקצאה שהזנת אינו תקין. לפי הוראות רשות המסים, מספר הקצאה חייב להכיל בדיוק 9 ספרות. אנא הקלד את המספר המדויק מחדש.
+
+  An invalid ח.פ / ע.מ gets the equivalent message asking for a valid 9-digit ID.
+- **Valid reply:** the value is stored on the ticket, the client gets a confirmation, and the ticket moves to `NEEDS_CLERK_REVIEW`.
+
+**Invoice photos.** Vision AI rejects the following:
+- A supplier ח.פ that isn't 9 digits.
+- A missing or invalid allocation number when the invoice's amount before VAT is at or above `allocation_number_threshold_nis` (default ₪10,000).
+- A VAT amount that doesn't match the current VAT rate.
+
+**Other places.** Client records and bulk tax sheets require a 9-digit ח.פ / ע.מ. Excel's dropped leading zero is restored for 8-digit IDs.
+
+## Office settings (⚙️ הגדרות)
+
+Settings live in a single `system_settings` row. `GET /api/settings` returns it, and `PUT /api/settings` updates it (manager only). Every engine reads the live values.
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `vat_rate` (%) | 18 | Vision AI math check, demo invoices, VAT breakdowns in the UI |
+| `allocation_number_threshold_nis` | 10,000 | Amount before VAT from which an allocation number is mandatory |
+| `reminder_interval_hours` | 48 | Reminder cadence for new reminders |
+| `max_reminders` | 3 | Reminders before 🚨 escalation; also applied to open tickets |
+| `firm_name` | כהן ושות׳ - רואי חשבון | WhatsApp sender name and simulator header |
+| `auto_approve_verified` | false | Resolve fully verified invoices without worker review |
+
+The row also records `updated_at` and `updated_by_user_id`. The values in `.env` are only the initial defaults.
+
+The VAT deadline is not a setting. It is always the **26th** of the reporting month (`VAT_DEADLINE_DAY` in `services/clock.py`), and the API returns it read-only as `vat_deadline_day`.
+
+### Reporting frequency
+
+Each client has a `reporting_frequency`:
+
+- `MONTHLY` (דיווח חד חודשי): the deadline is the 26th of every month.
+- `BIMONTHLY` (דיווח דו חודשי): periods are Jan–Feb, Mar–Apr and so on. Each period is reported on the 26th of the following odd month (Jan, Mar, May, Jul, Sep, Nov).
+
+Managers set the frequency in the client form. The clients table shows it next to the next deadline. Bulk tax sheets may include an optional `reporting_frequency` column for new clients.
+
+## 5-minute demo script
+
+1. **⚡ שליחה ב-3 שניות.**
+   1. Search for a client and press Enter.
+   2. Choose **חשבונית חסרה** and type a supplier and an amount. `1240` becomes `₪1,240.00`, and the VAT breakdown at the live rate appears under the field.
+   3. Press **Enter**. The message appears on the client's phone, with buttons.
+2. **📱 Phone simulator.**
+   1. Tap **🌫️ קבלה מטושטשת**. Vision AI rejects the photo, and the bot answers within a second.
+   2. Tap **📸 חשבונית תקינה**. The ticket moves to *ממתין לבדיקת פקיד*.
+3. **Allocation number.**
+   1. Select יוסי מזרחי in the simulator.
+   2. On the allocation-number request, tap **✍️ הקלדת הפרט החסר** and type `12345`. The Tax Authority rejection arrives, and the ticket stays open.
+   3. Type `123456789`. The number is accepted.
+4. **📋 לוח מעקב חי.** Click **⏩ הדמיית +48 שעות**. Notifications list every reminder and deadline escalation that was sent. Open a ticket to see the following:
+   - The WhatsApp timeline.
+   - The receipt.
+   - The six Vision AI and Tax Authority checks.
+   - **אישור החשבונית וסגירה**.
+5. **Roles.**
+   1. Switch to ראמי חדאד in the sidebar. The client buttons show `🔒 הרשאת מנהל בלבד`, and Settings becomes read-only.
+   2. Switch back to מאיה כהן and change the VAT rate to 17%. New invoice checks now use 17%.
+
+## Architecture
+
+```
+backend/
+  main.py                 FastAPI app, lifespan (DB init + schema upgrade, seed, SSE loop, APScheduler)
+  config.py               env-driven settings (.env) — initial values for system_settings
+  database.py             SQLAlchemy 2.0 engine/session (SQLite ⇄ PostgreSQL), outdated-schema rebuild
+  models.py               User, Client, SystemSettings, MessageTemplate, ChasingTicket, WhatsAppMessageLog,
+                          BulkTaxCampaign, BulkTaxRecipient
+  schemas.py              Pydantic v2 request/response models + serializers
+  seed.py                 settings, users, Hebrew templates, Hebrew / English-named clients, tickets in every state
+  test_flow.py            end-to-end verification (145 checks)
+  services/
+    system_settings.py    live office configuration accessors
+    ticket_engine.py      quick-send, button/text/media state machine, 9-digit Tax Authority validation
+    scheduler.py          reminders, 20:00 snooze pings, deadline escalation
+    vision_ocr.py         Vision AI: OpenAI gpt-4o-mini | Gemini 2.5 Flash | offline simulator + ITA rules
+    demo_invoices.py      renders realistic invoice PNGs (incl. allocation numbers) for the demo buttons
+    bulk_tax.py           CSV/XLSX tax sheet → personalised broadcast
+    whatsapp.py           Meta Cloud API adapter + E.164 normalisation
+    events.py             commit-aware Server-Sent-Events broker
+    i18n.py               Hebrew engine replies, Hebrew / English name rule (no Arabic)
+  routers/                deps (roles), core (users, clients, templates, settings, KPIs),
+                          tickets, webhook, scheduler, campaigns
+frontend/src/             Hebrew, RTL (dir="rtl", logical Tailwind classes)
+  App.tsx                 sidebar shell, profile switcher, 5 tabs, phone simulator
+  context/AppContext.tsx  shared state, signed-in user, SSE stream with polling fallback, toasts
+  pages/                  QuickDispatch, ChasingBoard, BulkTax, ClientsTemplates, Settings
+  components/             PhoneSimulator, WaBubble, TicketModal, ui kit (LockBadge, RoleBadge…)
+```
+
+### Ticket state machine
+
+```
+quick-send ──► WAITING_FOR_CLIENT ──(interval, ≤ max)──► reminder ──(no reply)──► ESCALATED
+                 │   ▲                 └─ deadline ≤3 days → URGENT_DEADLINE warning (24h cadence)
+   "Remind 8PM" ─┘   └── 20:00 ping ── SNOOZED_TONIGHT
+                 │
+   photo/PDF ──► Vision AI ──fail──► NEEDS_CORRECTION (instant re-prompt, chase continues)
+                     └──pass──► NEEDS_CLERK_REVIEW ──Approve──► RESOLVED
+   typed מספר הקצאה / ח.פ ──not 9 digits──► NEEDS_CORRECTION (Tax Authority reply)
+                          └──9 digits────► NEEDS_CLERK_REVIEW
+   buttons: Paid ✅ / Business / Personal expense ──► RESOLVED     Call me 📞 ──► ESCALATED
+```
+
+### Vision AI
+
+The provider depends on the API keys you set:
+
+- **`OPENAI_API_KEY` set:** OpenAI `gpt-4o-mini` reads images and PDFs and returns JSON. The JSON includes the allocation number.
+- **`GEMINI_API_KEY` set:** Gemini `gemini-2.5-flash` does the same.
+- **No key:** the deterministic offline simulator runs.
+  - It runs the real Laplacian blur detector on any photo.
+  - It reads the embedded text layer of the simulator's demo invoices.
+  - A sharp real photo it cannot read goes to worker review, where the worker can type the fields. The fields are then re-validated.
+
+A network or quota failure in a provider falls back to offline mode automatically.
+
+### WhatsApp
+
+Every outbound message goes to the in-app simulator over SSE. When `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are set, it is also sent through the Meta Cloud API as an interactive reply-button message.
+
+Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify token is `WHATSAPP_VERIFY_TOKEN`. Business-initiated messages outside the 24-hour window need Meta-approved templates. Meta also limits reply-button titles to 20 characters.
+
+## Key API endpoints
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET / POST / PUT | `/api/users`, `/api/users/{id}` | read: all · write: manager | Office staff and roles |
+| GET / PUT | `/api/settings` | read: all · write: manager | Office configuration |
+| POST / PUT / DELETE | `/api/clients…` | manager | Client management (soft delete) |
+| POST | `/api/tickets/quick-send` | any user | Render in the client's language, create the ticket, dispatch |
+| POST | `/api/tickets/{id}/approve` | any user | Approve a verified invoice |
+| POST | `/api/webhook/whatsapp-inbound` | public (webhook) | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
+| POST | `/api/simulator/demo-receipt` | public | `clear`, `blurry`, `missing_number`, `wrong_supplier`, `bad_math`, `missing_allocation`, `invalid_tax_id` |
+| POST | `/api/scheduler/simulate-time-jump?hours=48` | public | Move pending reminders back, run the cycle (demo) |
+| POST | `/api/campaigns/bulk-tax-upload`, `/api/campaigns/demo-batch` | any user | Bulk "tax is ready" broadcast |
+| GET | `/api/events/stream` | public | Server-Sent Events for real-time UI updates |
+
+Full interactive docs are at `/docs`.
+
+## Tests
+
+```bash
+cd backend && python test_flow.py
+```
+
+The test runs against a temporary database through the real HTTP API. It covers the following:
+
+- **Seed data:** seeded users and settings.
+- **Permissions:**
+  - A worker gets `403` on clients, settings, templates and users.
+  - An anonymous caller gets `401`.
+  - The last manager is protected.
+- **Messaging:**
+  - Trilingual quick-send.
+  - Reminders and deadline escalation.
+- **Typed-reply rules:** allocation-number and ח.פ validation, including the exact Hebrew reply for 5-digit, 10-digit, alphanumeric and valid inputs.
+- **Vision AI:**
+  - Blurry, missing-number, invalid-ח.פ and missing-allocation invoices.
+  - Live VAT-rate and threshold changes.
+  - Real JPEG uploads.
+- **Other flows:**
+  - Bulk sheet validation.
+  - Client deactivation.
+  - The Meta webhook format.
