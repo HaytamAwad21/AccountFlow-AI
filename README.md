@@ -30,10 +30,10 @@ On first start the backend creates `backend/accountflow.db` and seeds it with th
 
 - The office settings row.
 - 6 Hebrew WhatsApp templates.
-- 3 office users:
-  - מאיה כהן - מנהלת משרד (`MANAGER`).
-  - ראמי חדאד - פקיד הנה״ח (`WORKER`).
-  - דנה לוי - פקידת שכר (`WORKER`).
+- 3 office users (name, job title and permission are separate fields):
+  - מאיה כהן, מנהלת משרד (`MANAGER`).
+  - ראמי חדאד, פקיד הנה״ח (`WORKER`).
+  - דנה לוי, פקידת שכר (`WORKER`).
 - 10 SMB clients, each with a 9-digit ח.פ, an assigned worker and a reporting frequency (monthly or bi-monthly).
 - 12 tickets in every state. One of them is a pending allocation-number request.
 
@@ -77,15 +77,47 @@ The dashboard requires a **password login**. The login screen, and the "התחב
 
 ### Demo logins
 
-| User | Role | Password |
-| --- | --- | --- |
-| מאיה כהן - מנהלת משרד | `MANAGER` | `maya1234` |
-| ראמי חדאד - פקיד הנה״ח | `WORKER` | `rami1234` |
-| דנה לוי - פקידת שכר | `WORKER` | `dana1234` |
+These accounts exist only in a freshly seeded demo database. They are not the accounts of a running office.
 
-Change these after the first login. Each user can change their own password with **שינוי סיסמה** in the sidebar. A manager can reset anyone's password from Settings ▸ עובדי המשרד ▸ **עריכה**.
+| Name (`full_name`) | Job title (`job_title`) | Permission (`role`) | E-mail | Password |
+| --- | --- | --- | --- | --- |
+| מאיה כהן | מנהלת משרד | `MANAGER` (מנהל משרד) | `maya@cohen-cpa.co.il` | `maya1234` |
+| ראמי חדאד | פקיד הנה״ח | `WORKER` (עובד משרד) | `rami@cohen-cpa.co.il` | `rami1234` |
+| דנה לוי | פקידת שכר | `WORKER` (עובד משרד) | `dana@cohen-cpa.co.il` | `dana1234` |
+
+Change these after the first login:
+- Each user can change their own password with **שינוי סיסמה** under the profile button in the sidebar.
+- A manager can reset anyone's password from Settings ▸ עובדי המשרד ▸ **עריכה**.
+
+Every password field has an eye button that shows or hides the text.
 
 Upgrading a database from a release without passwords adds the column in place and keeps all data. The seeded accounts get the passwords above. Any other existing user gets `INITIAL_USER_PASSWORD` from `.env` (default `ChangeMe123`).
+
+### Office users (עובדי המשרד)
+
+Each user has three separate fields, plus a status:
+
+| Field | Shown as | Example |
+| --- | --- | --- |
+| `full_name` (**שם מלא**) | The name on the profile button, login cards and activity log | יעל לוי |
+| `job_title` (**תפקיד במשרד**) | A small line under the name; optional | פקידת הנה״ח |
+| `role` (**הרשאה**) | A badge: 👑 מנהל משרד or 🧑‍💼 עובד משרד; this is what decides permissions | `WORKER` |
+| `is_active` (**סטטוס**) | פעיל / הושעה; a suspended user cannot log in and is signed out at once | `true` |
+
+Managers manage users in **הגדרות ▸ עובדי המשרד**:
+
+- **הוספת עובד/ת** opens a popup with these fields:
+  - Full name.
+  - Job title, with suggestions such as פקיד/ת הנה״ח or פקיד/ת שכר.
+  - E-mail.
+  - Permission: two cards, one for manager and one for worker.
+  - An initial password and its confirmation, at least 6 characters.
+  - Status.
+- **עריכה** on each row opens the edit popup. It changes the same fields and can set a new password. Leave the password empty to keep the current one. A reset signs the user out of every open session.
+- Workers see `🔒 הרשאת מנהל בלבד` instead of these buttons, and the API refuses them with HTTP 403.
+- The last active manager cannot be demoted or suspended.
+
+Older databases stored the name and title together, as `"שם - תפקיד"` in `full_name`. On startup they are split into `full_name` and `job_title` automatically, and no data is lost.
 
 ### How it works
 
@@ -131,7 +163,7 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 | Add, edit or deactivate clients | ✅ | 🔒 HTTP 403 |
 | Edit message templates | ✅ | 🔒 read-only |
 | Edit office settings (VAT rate, thresholds, bot rules, firm name, auto-approve) | ✅ | 🔒 read-only, with a lock banner |
-| Add workers (with an initial password); **עריכה**: name, role, active / suspended status, password reset (`PUT /api/users/{user_id}`) | ✅ | 🔒 HTTP 403; no Edit buttons |
+| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | 🔒 HTTP 403; no Add / Edit buttons |
 | Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | 🔒 HTTP 403; tab hidden |
 
 Endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
@@ -269,7 +301,9 @@ Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify 
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
-| GET / POST / PUT | `/api/users`, `/api/users/{id}` | read: all · write: manager | Office staff and roles |
+| GET / POST / PUT | `/api/users`, `/api/users/{id}` | read: logged-in · write: manager | Office staff: `full_name`, `job_title`, `role`, `is_active`, password |
+| GET / POST | `/api/auth/users`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/change-password` | login list: public · rest: session | Password login and sessions |
+| GET | `/api/activity` | manager | Activity log (יומן פעילות) |
 | GET / PUT | `/api/settings` | read: all · write: manager | Office configuration |
 | POST / PUT / DELETE | `/api/clients…` | manager | Client management (soft delete) |
 | POST | `/api/tickets/quick-send` | any user | Render in the client's language, create the ticket, dispatch |
