@@ -18,6 +18,7 @@ import {
   VAT_DEADLINE_DAY,
 } from "../lib/format";
 import type { Client } from "../lib/types";
+import { DateInput } from "../components/DateInput";
 import { WaBubble } from "../components/WaBubble";
 import { Button, Card, Empty, Field, inputClass, Ltr, SectionTitle } from "../components/ui";
 
@@ -293,6 +294,18 @@ export function QuickDispatch() {
                     const isMissing = missing.includes(v);
                     return (
                       <Field key={v} label={meta.label}>
+                        {DATE_VARS.has(v) ? (
+                          <DateInput
+                            ref={idx === 0 ? firstInputRef : undefined}
+                            value={vars[v] ?? ""}
+                            onChange={(val) => {
+                              setVars((p) => ({ ...p, [v]: val }));
+                              setMissing((m) => m.filter((x) => x !== v));
+                            }}
+                            placeholder={meta.placeholder}
+                            className={cx(isMissing && "ring-2 ring-red-400")}
+                          />
+                        ) : (
                         <input
                           ref={idx === 0 ? firstInputRef : undefined}
                           value={vars[v] ?? ""}
@@ -303,10 +316,11 @@ export function QuickDispatch() {
                           onBlur={() => AMOUNT_VARS.has(v) && setVars((p) => ({ ...p, [v]: formatAmountInput(p[v] ?? "") }))}
                           placeholder={meta.placeholder}
                           list={v === "supplier_name" ? "supplier-suggestions" : undefined}
-                          dir={AMOUNT_VARS.has(v) || DATE_VARS.has(v) ? "ltr" : "auto"}
+                          dir={AMOUNT_VARS.has(v) ? "ltr" : "auto"}
                           inputMode={AMOUNT_VARS.has(v) ? "decimal" : undefined}
-                          className={cx(inputClass, (AMOUNT_VARS.has(v) || DATE_VARS.has(v)) && "text-end", isMissing && "ring-2 ring-red-400")}
+                          className={cx(inputClass, AMOUNT_VARS.has(v) && "text-end", isMissing && "ring-2 ring-red-400")}
                         />
+                        )}
                         {GROSS_AMOUNT_VARS.has(v) && vatBreakdown(v)}
                         {DATE_VARS.has(v) && (
                           <div className="mt-1 flex gap-1">

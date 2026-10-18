@@ -5,6 +5,8 @@ import { api, mediaUrl } from "../lib/api";
 import { cx, fullDateTime, ils, relativeTime } from "../lib/format";
 import type { OcrResult, TicketDetail } from "../lib/types";
 import { Button, inputClass, Ltr, Modal, PriorityLabel, Spinner, StatusBadge } from "./ui";
+import { maskDate } from "../lib/date";
+import { DateInput } from "./DateInput";
 import { WaBubble } from "./WaBubble";
 
 const CHECKS: { key: keyof OcrResult["checks"]; label: string; hint: string }[] = [
@@ -110,6 +112,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
     if (!f.supplier_name && ctx.supplier_name) f.supplier_name = String(ctx.supplier_name);
     if (!f.allocation_number && ctx.allocation_number) f.allocation_number = String(ctx.allocation_number);
     if (!f.business_id && ctx.tax_id) f.business_id = String(ctx.tax_id);
+    if (f.invoice_date) f.invoice_date = maskDate(f.invoice_date, ""); // OCR may return YYYY-MM-DD
     setForm(f);
     setEditing(true);
   };
@@ -348,13 +351,17 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                       {EDIT_FIELDS.map((f) => (
                         <label key={f.key} className={cx("block", f.key === "supplier_name" && "col-span-2")}>
                           <span className="mb-0.5 block text-[11px] text-slate-500">{f.label}</span>
-                          <input
-                            dir={f.ltr || f.numeric ? "ltr" : "auto"}
-                            value={form[f.key] ?? ""}
-                            onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                            className={cx(inputClass, "py-1.5")}
-                            inputMode={f.numeric ? "decimal" : undefined}
-                          />
+                          {f.key === "invoice_date" ? (
+                            <DateInput value={form[f.key] ?? ""} onChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))} className="py-1.5" />
+                          ) : (
+                            <input
+                              dir={f.ltr || f.numeric ? "ltr" : "auto"}
+                              value={form[f.key] ?? ""}
+                              onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                              className={cx(inputClass, "py-1.5")}
+                              inputMode={f.numeric ? "decimal" : undefined}
+                            />
+                          )}
                         </label>
                       ))}
                       <div className="col-span-2 flex gap-2 pt-1">
