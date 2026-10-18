@@ -6,7 +6,7 @@ import { cx, formatNumber, fullDateTime, splitUserName, VAT_DEADLINE_DAY } from 
 import type { EditableSettings, User } from "../lib/types";
 import { EditWorkerModal } from "../components/EditWorkerModal";
 import { AddWorkerModal } from "../components/AddWorkerModal";
-import { Button, Card, Field, inputClass, LockBadge, LockBanner, RoleBadge, Toggle } from "../components/ui";
+import { Button, Card, Field, inputClass, RoleBadge, Toggle } from "../components/ui";
 
 type NumericKey = "vat_rate" | "allocation_number_threshold_nis" | "reminder_interval_hours" | "max_reminders";
 
@@ -47,13 +47,11 @@ function Section({ icon, title, hint, children }: { icon: ReactNode; title: stri
 function NumberInput({
   value,
   onChange,
-  disabled,
   suffix,
   limits,
 }: {
   value: number;
   onChange: (v: number) => void;
-  disabled: boolean;
   suffix: string;
   limits: { min: number; max: number; step: number };
 }) {
@@ -66,7 +64,6 @@ function NumberInput({
         max={limits.max}
         step={limits.step}
         value={Number.isFinite(value) ? value : ""}
-        disabled={disabled}
         onChange={(e) => onChange(e.target.value === "" ? NaN : Number(e.target.value))}
         className={cx(inputClass, "pl-14 pr-3 text-right tabular-nums")}
       />
@@ -112,12 +109,13 @@ export function Settings() {
     return (Object.keys(draft) as (keyof EditableSettings)[]).some((k) => draft[k] !== settings[k]);
   }, [draft, settings]);
 
+  // Manager-only page: nothing is rendered for workers (the sidebar also hides the tab).
+  if (!isManager) return null;
   if (!settings || !draft) {
     return <div className="p-6 text-sm text-slate-500">טוען הגדרות…</div>;
   }
 
   const set = <K extends keyof EditableSettings>(k: K, v: EditableSettings[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
-  const locked = !isManager;
 
   const save = async () => {
     if (invalid.length) return;
@@ -164,8 +162,7 @@ export function Settings() {
             )}
           </p>
         </div>
-        {isManager ? (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
             {dirty && <span className="text-xs text-amber-600">יש שינויים שלא נשמרו</span>}
             <Button
               variant="ghost"
@@ -187,26 +184,22 @@ export function Settings() {
               שמירת הגדרות
             </Button>
           </div>
-        ) : (
-          <LockBadge />
-        )}
       </header>
 
-      {locked && <LockBanner>את/ה מחובר/ת כעובד/ת משרד. ניתן לצפות בהגדרות, אך רק מנהל/ת המשרד יכול/ה לשנות את שיעור המע״מ, הספים וחוקי הבוט.</LockBanner>}
-      {invalid.length > 0 && isManager && (
+      {invalid.length > 0 && (
         <p className="rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700">ערכים לא תקינים: {invalid.join(" · ")}</p>
       )}
 
       <Section icon={<Landmark className="h-5 w-5" />} title="הגדרות מס ורגולציה" hint="כללי רשות המסים שהבוט ו-Vision AI אוכפים על כל חשבונית">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="שיעור מע״מ נוכחי (%)" hint="משמש לבדיקת התאמת המע״מ בכל חשבונית ובתצוגות המס">
-            <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} disabled={locked} suffix="%" limits={LIMITS.vat_rate} />
+            <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} suffix="%" limits={LIMITS.vat_rate} />
           </Field>
           <Field label="סף חובת מספר הקצאה (₪ לפני מע״מ)" hint="חשבונית בסכום זה ומעלה חייבת מספר הקצאה בן 9 ספרות">
             <NumberInput
               value={draft.allocation_number_threshold_nis}
               onChange={(v) => set("allocation_number_threshold_nis", v)}
-              disabled={locked}
+             
               suffix="₪"
               limits={LIMITS.allocation_number_threshold_nis}
             />
@@ -235,17 +228,17 @@ export function Settings() {
       <Section icon={<BellRing className="h-5 w-5" />} title="הגדרות בוט ותזכורות" hint="קצב המעקב האוטומטי אחרי לקוחות שלא השיבו">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="מרווח זמן בין תזכורות אוטומטיות (שעות)" hint="חל על פניות חדשות ועל התזכורת הבאה בפניות פתוחות">
-            <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} disabled={locked} suffix="שעות" limits={LIMITS.reminder_interval_hours} />
+            <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} />
           </Field>
           <Field label="מספר תזכורות מקסימלי לפני התראה אדומה" hint="לאחר מכן הפנייה מסומנת 🚨 הוסלם לשיחת טלפון; מתעדכן גם בפניות פתוחות">
-            <NumberInput value={draft.max_reminders} onChange={(v) => set("max_reminders", v)} disabled={locked} suffix="פעמים" limits={LIMITS.max_reminders} />
+            <NumberInput value={draft.max_reminders} onChange={(v) => set("max_reminders", v)} suffix="פעמים" limits={LIMITS.max_reminders} />
           </Field>
         </div>
         <div className="mt-4">
           <Toggle
             checked={draft.auto_approve_verified}
             onChange={(v) => set("auto_approve_verified", v)}
-            disabled={locked}
+           
             label="אישור אוטומטי לחשבוניות שעברו את כל בדיקות Vision AI (ללא בדיקת פקיד)"
           />
         </div>
@@ -254,7 +247,7 @@ export function Settings() {
       <Section icon={<Building2 className="h-5 w-5" />} title="פרטי המשרד וניהול צוות" hint="שם המשרד מוצג ללקוחות בכותרת הוואטסאפ ובכל הודעה">
         <div className="max-w-md">
           <Field label="שם המשרד">
-            <input value={draft.firm_name} onChange={(e) => set("firm_name", e.target.value)} disabled={locked} className={inputClass} dir="auto" />
+            <input value={draft.firm_name} onChange={(e) => set("firm_name", e.target.value)} className={inputClass} dir="auto" />
           </Field>
         </div>
 
@@ -298,13 +291,9 @@ export function Settings() {
                       <span className={cx("font-medium", u.is_active ? "text-emerald-700" : "text-red-600")}>{u.is_active ? "פעיל" : "הושעה"}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2">
-                      {isManager ? (
-                        <Button size="sm" variant="secondary" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditingWorker(u)}>
-                          עריכה
-                        </Button>
-                      ) : (
-                        <LockBadge />
-                      )}
+                      <Button size="sm" variant="secondary" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditingWorker(u)}>
+                        עריכה
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -312,13 +301,9 @@ export function Settings() {
             </table>
           </div>
 
-          {isManager ? (
-            <Button variant="primary" className="mt-3" icon={<UserPlus className="h-4 w-4" />} onClick={() => setAddingWorker(true)}>
-              הוספת עובד/ת
-            </Button>
-          ) : (
-            <p className="mt-3 text-xs text-slate-500">🔒 הוספת עובדים ושינוי תפקידים — הרשאת מנהל בלבד.</p>
-          )}
+          <Button variant="primary" className="mt-3" icon={<UserPlus className="h-4 w-4" />} onClick={() => setAddingWorker(true)}>
+            הוספת עובד/ת
+          </Button>
         </div>
       </Section>
 

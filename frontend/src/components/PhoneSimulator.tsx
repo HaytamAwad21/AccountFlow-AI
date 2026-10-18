@@ -239,7 +239,7 @@ export function PhoneSimulator() {
               </div>
             )}
             {!loading && messages.length === 0 && (
-              <p className="py-10 text-center text-xs text-slate-500">אין עדיין הודעות. שלחו תבנית מעמדת ”שליחה ב-3 שניות“.</p>
+              <p className="py-10 text-center text-xs text-slate-500">אין עדיין הודעות. שלחו בקשה מעמדת ”שליחת בקשה“.</p>
             )}
             {groups.map((g) => (
               <div key={g.day} className="space-y-1.5">

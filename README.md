@@ -114,7 +114,7 @@ Managers manage users in **הגדרות ▸ עובדי המשרד**:
   - An initial password and its confirmation, at least 6 characters.
   - Status.
 - **עריכה** on each row opens the edit popup. It changes the same fields and can set a new password. Leave the password empty to keep the current one. A reset signs the user out of every open session.
-- Workers see `🔒 הרשאת מנהל בלבד` instead of these buttons, and the API refuses them with HTTP 403.
+- Workers never see these buttons: manager-only controls are not rendered at all for them. The API refuses them with HTTP 403 as well.
 - The last active manager cannot be demoted or suspended.
 
 Older databases stored the name and title together, as `"שם - תפקיד"` in `full_name`. On startup they are split into `full_name` and `job_title` automatically, and no data is lost.
@@ -160,13 +160,24 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 | --- | --- | --- |
 | Send messages, bulk tax broadcasts, WhatsApp simulator | ✅ | ✅ |
 | Live chasing board, approve or close tickets, correct OCR fields | ✅ | ✅ |
-| Add, edit or deactivate clients | ✅ | 🔒 HTTP 403 |
-| Edit message templates | ✅ | 🔒 read-only |
-| Edit office settings (VAT rate, thresholds, bot rules, firm name, auto-approve) | ✅ | 🔒 read-only, with a lock banner |
-| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | 🔒 HTTP 403; no Add / Edit buttons |
-| Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | 🔒 HTTP 403; tab hidden |
+| Add, edit or deactivate clients (buttons and the actions column) | ✅ | hidden |
+| Edit message templates | ✅ | hidden; workers see the Hebrew text only |
+| **הגדרות** tab: VAT rate, thresholds, bot rules, firm name, auto-approve | ✅ | tab hidden |
+| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | hidden (inside הגדרות) |
+| Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | tab hidden |
+| Auto-approve switch on the chasing board | ✅ | hidden |
 
-Endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
+"Hidden" means the control is not rendered at all, not merely disabled or marked with a lock. A worker who opens `#settings` or `#activity` directly is sent back to **שליחת בקשה**. The API enforces the same rules: endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
+
+### Sidebar and dark mode
+
+- **Navigation order:** שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, then for managers only יומן פעילות and הגדרות. הגדרות is always last.
+- **Profile card:** the logged-in user's avatar, name, role badge, **שינוי סיסמה** and **התנתקות** sit at the bottom of the sidebar, under the phone-simulator button.
+- **Dark mode:** click the blue robot logo at the top to switch between light and dark mode. Hovering it shows the tooltip "מעבר למצב כהה / בהיר".
+  - The choice is saved in `localStorage` as `accountflow.theme`. Without a saved choice, the app follows the system setting.
+  - The theme is applied before the first paint, so the page doesn't flash white on load.
+  - The whole UI switches, including cards, tables, modals and inputs. The phone simulator uses WhatsApp's own dark colors.
+  - All dark colors are defined in one place, the dark-mode block in `frontend/src/index.css`.
 
 ## Israel Tax Authority rules
 
@@ -213,7 +224,7 @@ Managers set the frequency in the client form. The clients table shows it next t
 
 ## 5-minute demo script
 
-1. **⚡ שליחה ב-3 שניות.**
+1. **⚡ שליחת בקשה.**
    1. Search for a client and press Enter.
    2. Choose **חשבונית חסרה** and type a supplier and an amount. `1240` becomes `₪1,240.00`, and the VAT breakdown at the live rate appears under the field.
    3. Press **Enter**. The message appears on the client's phone, with buttons.
@@ -230,7 +241,7 @@ Managers set the frequency in the client form. The clients table shows it next t
    - The six Vision AI and Tax Authority checks.
    - **אישור החשבונית וסגירה**.
 5. **Roles.**
-   1. Switch to ראמי חדאד in the sidebar. The client buttons show `🔒 הרשאת מנהל בלבד`, and Settings becomes read-only.
+   1. Switch to ראמי חדאד from the profile card at the bottom of the sidebar. The client and template editing buttons disappear, and so do the הגדרות and יומן פעילות tabs.
    2. Switch back to מאיה כהן and change the VAT rate to 17%. New invoice checks now use 17%.
 
 ## Architecture

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, Loader2, Lock, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, Loader2, X, XCircle } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { PRIORITY_META, ROLE_LABEL, STATUS_META, cx } from "../lib/format";
 import type { TicketPriority, TicketStatus, UserRole } from "../lib/types";
@@ -79,32 +79,6 @@ export function RoleBadge({ role, className }: { role: UserRole; className?: str
       {role === "MANAGER" ? "👑 " : "🧑‍💼 "}
       {ROLE_LABEL[role]}
     </span>
-  );
-}
-
-/** Shown in place of (or beside) controls that only an office manager may use. */
-export function LockBadge({ className, text = "🔒 הרשאת מנהל בלבד" }: { className?: string; text?: string }) {
-  return (
-    <span
-      title="פעולה זו זמינה למנהל/ת המשרד בלבד. החליפו פרופיל בתפריט הצד כדי לבדוק."
-      className={cx("inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-200", className)}
-    >
-      {text}
-    </span>
-  );
-}
-
-export function LockBanner({ children }: { children?: ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-      <div>
-        <p className="font-semibold">🔒 הרשאת מנהל בלבד — מצב צפייה</p>
-        <p className="mt-0.5 text-xs text-amber-800">
-          {children ?? "את/ה מחובר/ת כעובד/ת משרד. ניתן לצפות בנתונים אך לא לשנות אותם. כדי לערוך, יש לעבור לפרופיל מנהל/ת משרד."}
-        </p>
-      </div>
-    </div>
   );
 }
 

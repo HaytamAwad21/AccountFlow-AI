@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Settings as SettingsIcon, Smartphone, Users, Zap } from "lucide-react";
+import { Bot, ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { cx, splitUserName } from "./lib/format";
 import { PhoneSimulator } from "./components/PhoneSimulator";
 import { LoginPanel } from "./components/LoginPanel";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { Modal, RoleBadge, Spinner, Toaster } from "./components/ui";
+import { useTheme } from "./lib/theme";
 import { QuickDispatch } from "./pages/QuickDispatch";
 import { ChasingBoard } from "./pages/ChasingBoard";
 import { BulkTax } from "./pages/BulkTax";
@@ -15,14 +16,17 @@ import { ActivityLog } from "./pages/ActivityLog";
 
 type Tab = "trigger" | "board" | "bulk" | "clients" | "settings" | "activity";
 
+/** Sidebar order — "הגדרות" always last. Manager-only tabs are not rendered at all for workers. */
 const TABS: { key: Tab; label: string; sub: string; icon: ReactNode; managerOnly?: boolean }[] = [
-  { key: "trigger", label: "שליחה ב-3 שניות", sub: "עמדת שליחה מהירה", icon: <Zap className="h-4 w-4" /> },
+  { key: "trigger", label: "שליחת בקשה", sub: "עמדת שליחה מהירה", icon: <Zap className="h-4 w-4" /> },
   { key: "board", label: "לוח מעקב חי", sub: "מצב הפניות והבוט", icon: <ClipboardList className="h-4 w-4" /> },
   { key: "bulk", label: "הדיווח מוכן", sub: "הודעות מס בתפוצה", icon: <Megaphone className="h-4 w-4" /> },
   { key: "clients", label: "לקוחות ותבניות", sub: "לקוחות ונוסחי הודעות", icon: <Users className="h-4 w-4" /> },
-  { key: "settings", label: "הגדרות", sub: "⚙️ הגדרות המשרד", icon: <SettingsIcon className="h-4 w-4" /> },
-  { key: "activity", label: "יומן פעילות", sub: "🔒 מנהל משרד בלבד", icon: <History className="h-4 w-4" />, managerOnly: true },
+  { key: "activity", label: "יומן פעילות", sub: "פעולות צוות המשרד", icon: <History className="h-4 w-4" />, managerOnly: true },
+  { key: "settings", label: "הגדרות", sub: "הגדרות המשרד", icon: <SettingsIcon className="h-4 w-4" />, managerOnly: true },
 ];
+
+const MANAGER_ONLY_TABS = new Set<Tab>(TABS.filter((t) => t.managerOnly).map((t) => t.key));
 
 function readTab(): Tab {
   const h = window.location.hash.replace("#", "") as Tab;
@@ -106,6 +110,7 @@ function ProfileSwitcher() {
 export default function App() {
   const [tab, setTab] = useState<Tab>(readTab);
   const { settings, phoneOpen, setPhoneOpen, clients, user, isManager, authChecked } = useApp();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     const onHash = () => setTab(readTab());
@@ -117,6 +122,12 @@ export default function App() {
     window.location.hash = t;
     setTab(t);
   };
+
+  // A worker never stays on a manager-only tab (e.g. after switching users, or via a typed URL).
+  const blocked = !!user && !isManager && MANAGER_ONLY_TABS.has(tab);
+  useEffect(() => {
+    if (blocked) go("trigger");
+  }, [blocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openCount = clients.reduce((n, c) => n + (c.is_active ? c.open_ticket_count : 0), 0);
 
@@ -133,19 +144,25 @@ export default function App() {
     <div dir="rtl" className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
       <nav className="flex w-64 shrink-0 flex-col border-e border-slate-200 bg-slate-950 text-slate-300">
         <div className="flex items-center gap-2.5 px-5 py-5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title="מעבר למצב כהה / בהיר"
+            aria-label={dark ? "מעבר למצב בהיר" : "מעבר למצב כהה"}
+            aria-pressed={dark}
+            className="group relative grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
             <Bot className="h-5 w-5" />
-          </span>
+            <span className="absolute -bottom-1 -start-1 grid h-4 w-4 place-items-center rounded-full bg-slate-950 text-amber-300 ring-1 ring-white/10">
+              {dark ? <Sun className="h-2.5 w-2.5" /> : <Moon className="h-2.5 w-2.5" />}
+            </span>
+          </button>
           <div className="min-w-0">
             <p className="text-sm font-bold text-white" dir="ltr">
               AccountFlow AI
             </p>
             <p className="truncate text-[11px] text-slate-500">{settings?.firm_name ?? "מעקב לקוחות"}</p>
           </div>
-        </div>
-
-        <div className="px-3 pb-3">
-          <ProfileSwitcher />
         </div>
 
         <div className="flex-1 space-y-1 overflow-y-auto px-3">
@@ -170,30 +187,14 @@ export default function App() {
           ))}
         </div>
 
-        <div className="space-y-3 border-t border-white/10 p-4 text-[11px]">
+        <div className="space-y-3 border-t border-white/10 p-3 text-[11px]">
           <button
             onClick={() => setPhoneOpen(!phoneOpen)}
             className="flex w-full items-center gap-2 rounded-lg bg-wa-teal/20 px-3 py-2 font-medium text-emerald-300 hover:bg-wa-teal/30"
           >
             <Smartphone className="h-4 w-4" /> {phoneOpen ? "הסתרת" : "הצגת"} הטלפון של הלקוח
           </button>
-          {settings && (
-            <div className="space-y-1 text-slate-500">
-              <p>
-                מע״מ: <span className="font-medium text-slate-300">{settings.vat_rate}%</span> · סף הקצאה:{" "}
-                <span className="font-medium text-slate-300">₪{settings.allocation_number_threshold_nis.toLocaleString("he-IL")}</span>
-              </p>
-              <p>
-                Vision AI: <span className="font-medium text-slate-300">{settings.vision_provider === "local" ? "סימולטור לא מקוון" : settings.vision_provider}</span>
-              </p>
-              <p>
-                מנוע תזכורות:{" "}
-                <span className={cx("font-medium", settings.scheduler.running ? "text-emerald-400" : "text-amber-400")}>
-                  {settings.scheduler.running ? `פעיל · כל ${settings.reminder_interval_hours} ש׳` : "מושהה"}
-                </span>
-              </p>
-            </div>
-          )}
+          <ProfileSwitcher />
         </div>
       </nav>
 
@@ -202,8 +203,8 @@ export default function App() {
         {tab === "board" && <ChasingBoard />}
         {tab === "bulk" && <BulkTax />}
         {tab === "clients" && <ClientsTemplates />}
-        {tab === "settings" && <Settings />}
-        {tab === "activity" && <ActivityLog />}
+        {tab === "activity" && isManager && <ActivityLog />}
+        {tab === "settings" && isManager && <Settings />}
       </main>
 
       <PhoneSimulator />

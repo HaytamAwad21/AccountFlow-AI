@@ -189,7 +189,7 @@ export function QuickDispatch() {
     <div className="mx-auto max-w-6xl space-y-5 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">⚡ שליחה ב-3 שניות</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">⚡ שליחת בקשה</h1>
           <p className="text-sm text-slate-500">בוחרים לקוח, בוחרים בקשה, ממלאים את החסר ולוחצים Enter. הבוט ימשיך לרדוף אחרי הלקוח בוואטסאפ.</p>
         </div>
         {lastSent && (

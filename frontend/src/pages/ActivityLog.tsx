@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
 import { cx, fullDateTime, splitUserName } from "../lib/format";
 import type { ActivityEntry } from "../lib/types";
-import { Button, Card, Empty, inputClass, LockBanner, Ltr, RoleBadge, Spinner } from "../components/ui";
+import { Button, Card, Empty, inputClass, Ltr, RoleBadge, Spinner } from "../components/ui";
 
 const PAGE = 100;
 
@@ -73,13 +73,8 @@ export function ActivityLog() {
     }
   };
 
-  if (!isManager) {
-    return (
-      <div className="mx-auto max-w-3xl p-6">
-        <LockBanner>יומן הפעילות זמין למנהל/ת המשרד בלבד.</LockBanner>
-      </div>
-    );
-  }
+  // Manager-only page: nothing is rendered for workers (the sidebar also hides the tab).
+  if (!isManager) return null;
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-6">

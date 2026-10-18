@@ -12,6 +12,19 @@
       rel="stylesheet"
     />
     <title>AccountFlow AI · ניהול מעקב לקוחות</title>
+    <script>
+      // Apply the saved light / dark theme before the first paint (no white flash). See src/lib/theme.ts.
+      (function () {
+        try {
+          var saved = localStorage.getItem("accountflow.theme");
+          var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            document.documentElement.style.colorScheme = "dark";
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

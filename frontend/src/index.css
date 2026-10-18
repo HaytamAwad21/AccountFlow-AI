@@ -25,3 +25,169 @@
     background: transparent;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dark mode (toggled by the logo button; class "dark" on <html>, see lib/theme.ts)
+
+   The UI is built from a small set of Tailwind light-palette utilities, so instead of
+   adding a dark: variant to every element, this layer re-maps those utilities once.
+   Selectors are prefixed with html.dark, which outranks the plain utility classes.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0b1120;
+}
+
+/* surfaces */
+html.dark .bg-white {
+  background-color: #111a2e;
+}
+html.dark .bg-white\/90 {
+  background-color: rgb(17 26 46 / 0.9);
+}
+html.dark .bg-slate-50 {
+  background-color: #0b1120;
+}
+html.dark .bg-slate-100 {
+  background-color: #1e293b;
+}
+html.dark .bg-slate-200 {
+  background-color: #334155;
+}
+html.dark .bg-slate-200\/70 {
+  background-color: rgb(30 41 59 / 0.8);
+}
+html.dark .bg-slate-300 {
+  background-color: #475569;
+}
+html.dark :is(.hover\:bg-slate-50, .hover\:bg-slate-100):hover {
+  background-color: #1a2438;
+}
+html.dark .hover\:bg-slate-200:hover {
+  background-color: #334155;
+}
+html.dark .disabled\:bg-slate-50:disabled {
+  background-color: #0b1120;
+}
+
+/* text */
+html.dark .text-slate-900 {
+  color: #f1f5f9;
+}
+html.dark .text-slate-800 {
+  color: #e2e8f0;
+}
+html.dark .text-slate-700 {
+  color: #cbd5e1;
+}
+html.dark :is(.text-slate-600, .text-slate-500) {
+  color: #94a3b8;
+}
+html.dark .hover\:text-slate-900:hover,
+html.dark .hover\:text-slate-700:hover {
+  color: #f1f5f9;
+}
+
+/* borders, dividers, rings */
+html.dark :is(.border-slate-100, .border-slate-200) {
+  border-color: #1e293b;
+}
+html.dark .border-slate-300 {
+  border-color: #334155;
+}
+html.dark :is(.divide-slate-100, .divide-slate-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b;
+}
+html.dark :is(.ring-slate-200, .ring-slate-300) {
+  --tw-ring-color: #334155;
+}
+html.dark .hover\:border-slate-300:hover {
+  border-color: #475569;
+}
+
+/* tinted chips, banners and selected rows */
+html.dark :is(.bg-brand-50, .bg-brand-50\/60) {
+  background-color: rgb(39 82 230 / 0.18);
+}
+html.dark .bg-brand-100 {
+  background-color: rgb(39 82 230 / 0.3);
+}
+html.dark :is(.text-brand-600, .text-brand-700) {
+  color: #93acff;
+}
+html.dark :is(.bg-sky-50, .bg-sky-100) {
+  background-color: rgb(14 165 233 / 0.15);
+}
+html.dark :is(.bg-indigo-50, .bg-indigo-100) {
+  background-color: rgb(99 102 241 / 0.16);
+}
+html.dark :is(.bg-emerald-50, .bg-emerald-100) {
+  background-color: rgb(16 185 129 / 0.15);
+}
+html.dark :is(.bg-amber-50, .bg-amber-100, .bg-amber-50\/40) {
+  background-color: rgb(245 158 11 / 0.14);
+}
+html.dark :is(.bg-red-50, .bg-red-100, .bg-red-50\/40, .bg-red-50\/70) {
+  background-color: rgb(239 68 68 / 0.14);
+}
+html.dark :is(.bg-violet-50, .bg-violet-100) {
+  background-color: rgb(139 92 246 / 0.16);
+}
+html.dark .bg-blue-100 {
+  background-color: rgb(59 130 246 / 0.18);
+}
+html.dark :is(.text-sky-700, .text-sky-800) {
+  color: #7dd3fc;
+}
+html.dark :is(.text-indigo-600, .text-indigo-700, .text-indigo-800) {
+  color: #a5b4fc;
+}
+html.dark :is(.text-emerald-700, .text-emerald-800) {
+  color: #6ee7b7;
+}
+html.dark :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900) {
+  color: #fcd34d;
+}
+html.dark :is(.text-red-600, .text-red-700) {
+  color: #fca5a5;
+}
+html.dark :is(.text-violet-700, .text-violet-800) {
+  color: #c4b5fd;
+}
+html.dark .text-blue-800 {
+  color: #93c5fd;
+}
+html.dark :is(.ring-sky-200, .ring-indigo-200, .ring-emerald-200, .ring-amber-200, .ring-red-200, .ring-violet-200) {
+  --tw-ring-color: rgb(148 163 184 / 0.25);
+}
+html.dark .border-amber-200 {
+  border-color: rgb(245 158 11 / 0.35);
+}
+html.dark .hover\:bg-red-50:hover {
+  background-color: rgb(239 68 68 / 0.16);
+}
+
+/* WhatsApp phone simulator: WhatsApp's own dark palette */
+html.dark .bg-wa-wall {
+  background-color: #0b141a;
+}
+html.dark .bg-wa-bubble {
+  background-color: #005c4b;
+}
+html.dark .bg-\[\#f0f2f5\] {
+  background-color: #1f2c34;
+}
+html.dark .bg-sky-50\/95 {
+  background-color: rgb(31 44 52 / 0.95);
+}
+html.dark .text-wa-link {
+  color: #53bdeb;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}

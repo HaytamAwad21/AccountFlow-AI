@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { cx, relativeTime } from "../lib/format";
 import type { Kpis, SchedulerAction, Ticket, TicketStatus } from "../lib/types";
 import { TicketModal } from "../components/TicketModal";
-import { Button, Card, Empty, inputClass, LockBadge, Ltr, PriorityLabel, Spinner, StatusBadge, Toggle } from "../components/ui";
+import { Button, Card, Empty, inputClass, Ltr, PriorityLabel, Spinner, StatusBadge, Toggle } from "../components/ui";
 
 const FILTERS: { key: string; label: string; statuses: TicketStatus[] | null }[] = [
   { key: "all", label: "הכל", statuses: null },
@@ -157,11 +157,8 @@ export function ChasingBoard() {
           <p className="text-sm text-slate-500">כל בקשה פתוחה, מצבה בוואטסאפ ומה הבוט יעשה בהמשך.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {settings && (
-            <span className="flex items-center gap-2">
-              <Toggle checked={settings.auto_approve_verified} onChange={toggleAuto} disabled={!isManager} label="אישור אוטומטי לחשבוניות מאומתות" />
-              {!isManager && <LockBadge />}
-            </span>
+          {settings && isManager && (
+            <Toggle checked={settings.auto_approve_verified} onChange={toggleAuto} label="אישור אוטומטי לחשבוניות מאומתות" />
           )}
           <Button variant="ghost" icon={<RefreshCw className="h-4 w-4" />} loading={checking} onClick={runCheck} title="הרצת מחזור התזכורות לפי השעון האמיתי">
             בדיקה עכשיו
@@ -214,7 +211,7 @@ export function ChasingBoard() {
             <Spinner className="h-6 w-6" />
           </div>
         ) : visible.length === 0 ? (
-          <Empty icon={<Inbox className="h-10 w-10" />} title="אין כאן פניות" hint="שלחו בקשה מעמדת ”שליחה ב-3 שניות“ או שנו את הסינון." />
+          <Empty icon={<Inbox className="h-10 w-10" />} title="אין כאן פניות" hint="שלחו בקשה מעמדת ”שליחת בקשה“ או שנו את הסינון." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

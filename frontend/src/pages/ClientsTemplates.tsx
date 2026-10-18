@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { cx, FREQUENCY_LABEL, hasArabic, localizedButtons, NAME_LANGUAGE_ERROR, renderTemplate, splitUserName, templateName, VAT_DEADLINE_DAY } from "../lib/format";
 import type { Client, ClientInput, ReportingFrequency, Template, TemplateButton } from "../lib/types";
 import { WaBubble } from "../components/WaBubble";
-import { Button, Card, Empty, Field, inputClass, LockBadge, LockBanner, Ltr, Modal } from "../components/ui";
+import { Button, Card, Empty, Field, inputClass, Ltr, Modal } from "../components/ui";
 
 const NINE_DIGITS = /^\d{9}$/;
 
@@ -203,20 +203,13 @@ function ClientsPanel() {
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> הצגת לקוחות לא פעילים
         </label>
-        <div className="ms-auto">
-          {isManager ? (
+        {isManager && (
+          <div className="ms-auto">
             <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>
               הוספת לקוח
             </Button>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Button variant="primary" icon={<Plus className="h-4 w-4" />} disabled>
-                הוספת לקוח
-              </Button>
-              <LockBadge />
-            </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       {list.length === 0 ? (
         <Empty icon={<Users className="h-10 w-10" />} title="אין לקוחות" />
@@ -232,7 +225,7 @@ function ClientsPanel() {
                 <th className="px-3 py-2.5 text-start">מועד הדיווח הבא</th>
                 <th className="px-3 py-2.5 text-start">עובד/ת אחראי/ת</th>
                 <th className="px-3 py-2.5 text-start">פתוחות</th>
-                <th className="px-3 py-2.5 text-start">פעולות</th>
+                {isManager && <th className="px-3 py-2.5 text-start">פעולות</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -272,8 +265,8 @@ function ClientsPanel() {
                   </td>
                   <td className="px-3 py-2.5 text-xs text-slate-600">{c.assigned_worker_name ? splitUserName(c.assigned_worker_name).name : "—"}</td>
                   <td className="px-3 py-2.5 text-xs">{c.open_ticket_count}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5">
-                    {isManager ? (
+                  {isManager && (
+                    <td className="whitespace-nowrap px-3 py-2.5">
                       <span className="flex gap-1">
                         <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(c)}>
                           עריכה
@@ -284,10 +277,8 @@ function ClientsPanel() {
                           </Button>
                         )}
                       </span>
-                    ) : (
-                      <LockBadge />
-                    )}
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -366,21 +357,17 @@ function TemplateEditor({ template }: { template: Template }) {
             {template.requires_media_reply ? " · 📷 נסגר לאחר אימות Vision AI" : " · נסגר בלחיצת כפתור"}
           </p>
         </div>
-        <div className="ms-auto flex items-center gap-2">
-          {isManager ? (
-            <>
-              {dirty && <span className="text-xs text-amber-600">יש שינויים שלא נשמרו</span>}
-              <Button variant="ghost" size="sm" disabled={!dirty} onClick={() => setDraft(template)}>
-                ביטול שינויים
-              </Button>
-              <Button variant="primary" size="sm" disabled={!dirty} loading={saving} icon={<Save className="h-3.5 w-3.5" />} onClick={save}>
-                שמירה
-              </Button>
-            </>
-          ) : (
-            <LockBadge />
-          )}
-        </div>
+        {isManager && (
+          <div className="ms-auto flex items-center gap-2">
+            {dirty && <span className="text-xs text-amber-600">יש שינויים שלא נשמרו</span>}
+            <Button variant="ghost" size="sm" disabled={!dirty} onClick={() => setDraft(template)}>
+              ביטול שינויים
+            </Button>
+            <Button variant="primary" size="sm" disabled={!dirty} loading={saving} icon={<Save className="h-3.5 w-3.5" />} onClick={save}>
+              שמירה
+            </Button>
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-1 px-4 pt-3">
         <span className="text-[11px] text-slate-500">משתנים:</span>
@@ -388,12 +375,12 @@ function TemplateEditor({ template }: { template: Template }) {
           <code key={v} dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">{`{{${v}}}`}</code>
         ))}
       </div>
-      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={cx("grid gap-4 p-4", isManager && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+        {isManager && (
         <div className="min-w-0 space-y-2" dir="rtl">
           <Field label="שם התבנית">
             <input
               dir="rtl"
-              disabled={!isManager}
               value={draft.name_he}
               onChange={(e) => setDraft((d) => ({ ...d, name_he: e.target.value }))}
               className={cx(inputClass, "py-1.5 text-sm")}
@@ -403,7 +390,6 @@ function TemplateEditor({ template }: { template: Template }) {
             <textarea
               dir="rtl"
               rows={9}
-              disabled={!isManager}
               value={draft.body_he}
               onChange={(e) => setDraft((d) => ({ ...d, body_he: e.target.value }))}
               className={cx(inputClass, "font-sans text-[13px] leading-relaxed")}
@@ -416,7 +402,6 @@ function TemplateEditor({ template }: { template: Template }) {
                 <input
                   key={b.id}
                   dir="rtl"
-                  disabled={!isManager}
                   value={b.he}
                   onChange={(e) => setButton(i, e.target.value)}
                   className={cx(inputClass, "py-1 text-xs")}
@@ -426,8 +411,9 @@ function TemplateEditor({ template }: { template: Template }) {
             </div>
           </div>
         </div>
-        <div>
-          <span className="mb-1 block text-xs font-medium text-slate-600">תצוגה מקדימה</span>
+        )}
+        <div className={cx(!isManager && "max-w-md")}>
+          <span className="mb-1 block text-xs font-medium text-slate-600">{isManager ? "תצוגה מקדימה" : "נוסח ההודעה בוואטסאפ"}</span>
           <div className="rounded-lg bg-wa-wall p-3" dir="rtl">
             <WaBubble text={renderTemplate(draft.body_he, SAMPLE_VARS)} fromFirm compact buttons={localizedButtons(draft)} type="TEMPLATE" />
           </div>
@@ -438,12 +424,11 @@ function TemplateEditor({ template }: { template: Template }) {
 }
 
 function TemplatesPanel() {
-  const { templates, isManager } = useApp();
+  const { templates } = useApp();
   const [activeId, setActiveId] = useState<number | null>(null);
   const active = templates.find((t) => t.id === activeId) ?? templates[0] ?? null;
   return (
     <div className="space-y-4">
-      {!isManager && <LockBanner>עובדי משרד יכולים לצפות בתבניות. עריכת נוסחי ההודעות זמינה למנהל/ת המשרד בלבד.</LockBanner>}
       <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
         <Card className="h-fit p-2">
           {templates.map((t) => (
