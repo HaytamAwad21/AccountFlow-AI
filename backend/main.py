@@ -15,11 +15,12 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import SessionLocal, init_db
-from routers import activity, auth, campaigns, core, scheduler as scheduler_router, tickets, webhook
+from routers import activity, auth, campaigns, core, scheduler as scheduler_router, tickets, webhook, whatsapp
 from seed import ensure_passwords, seed_if_empty
 from services.events import broker
 from services.activity import cleanup_legacy_activity
 from services.history import hebrewize_message_history
+from services.no_emoji import purge_emojis_from_db
 from services.scheduler import start_scheduler, stop_scheduler
 from services.ticket_engine import EngineError, MissingVariablesError
 
@@ -36,6 +37,7 @@ async def lifespan(_app: FastAPI):
             log.info("Seeded demo data: %s", result)
     with SessionLocal() as db:
         hebrewize_message_history(db)  # WhatsApp chat is Hebrew-only, also for older history
+        purge_emojis_from_db(db)  # strict no-emoji policy, also for templates and history from older releases
         cleaned = cleanup_legacy_activity(db)  # failed logins / simulator demos are not activity
         if cleaned:
             log.warning("Activity log cleanup: %d legacy rows removed or renamed", cleaned)
@@ -73,7 +75,8 @@ async def engine_error_handler(_request: Request, exc: EngineError):
     return JSONResponse(status_code=exc.status_code, content=body)
 
 
-for r in (auth.router, core.router, tickets.router, webhook.router, scheduler_router.router, campaigns.router, activity.router):
+for r in (auth.router, core.router, tickets.router, webhook.router, whatsapp.router, scheduler_router.router, campaigns.router,
+          activity.router):
     app.include_router(r)
 
 app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")

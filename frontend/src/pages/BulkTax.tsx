@@ -9,8 +9,8 @@ import { Button, Card, Empty, inputClass, Ltr, SectionTitle, StatusBadge } from 
 const PAY_META: Record<PaymentStatus, { label: string; className: string }> = {
   SENT: { label: "נשלח", className: "bg-slate-100 text-slate-700" },
   VIEWED: { label: "צפה בקישור התשלום", className: "bg-sky-100 text-sky-800" },
-  CONFIRMED_PAID: { label: "✅ אישר תשלום", className: "bg-emerald-100 text-emerald-800" },
-  QUESTION_ASKED: { label: "📞 ביקש שיחה", className: "bg-amber-100 text-amber-800" },
+  CONFIRMED_PAID: { label: "אישר תשלום", className: "bg-emerald-100 text-emerald-800" },
+  QUESTION_ASKED: { label: "ביקש שיחה", className: "bg-amber-100 text-amber-800" },
 };
 
 function ProgressBar({ c }: { c: Campaign }) {
@@ -87,7 +87,7 @@ export function BulkTax() {
       setSelected(r.campaign);
       toast({
         tone: r.errors.length ? "warning" : "success",
-        title: `📊 נשלחו ${r.sent} הודעות דיווח אישיות`,
+        title: `נשלחו ${r.sent} הודעות דיווח אישיות`,
         body: `${r.campaign.title}${r.created_clients ? ` · נוצרו ${r.created_clients} לקוחות חדשים` : ""}${r.errors.length ? ` · ${r.errors.length} שורות דולגו` : ""}`,
       });
       setTitle("");
@@ -106,7 +106,7 @@ export function BulkTax() {
       const r = await api.demoBatch();
       setSelectedId(r.campaign.id);
       setSelected(r.campaign);
-      toast({ tone: "success", title: `📊 קבוצת ההדגמה נשלחה ל-${r.sent} לקוחות`, body: "לחצו ✅ שולם או 📞 שיחה בסימולטור וצפו בסרגל מתעדכן." });
+      toast({ tone: "success", title: `קבוצת ההדגמה נשלחה ל-${r.sent} לקוחות`, body: "לחצו שולם או שיחה בסימולטור וצפו בסרגל מתעדכן." });
       await load();
     } catch (e) {
       toast({ tone: "error", title: "שליחת ההדגמה נכשלה", body: e instanceof Error ? e.message : String(e) });
@@ -126,7 +126,7 @@ export function BulkTax() {
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">📊 הודעות ”הדיווח מוכן“ בתפוצה</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">הודעות ”הדיווח מוכן“ בתפוצה</h1>
         <p className="text-sm text-slate-500">גוררים את הגיליון החודשי מתוכנת הנהלת החשבונות — כל לקוח מקבל בוואטסאפ את הסכומים שלו, עם כפתורי ”שולם“ ו”שיחה“.</p>
       </header>
 

@@ -39,15 +39,15 @@ TEMPLATES: list[dict] = [
         "requires_media_reply": True,
         "name_he": "חשבונית ספק חסרה",
         "body_he": (
-            "שלום {{client_name}} 👋\n"
+            "שלום {{client_name}}\n"
             "במסגרת בדיקת הנהלת החשבונות החודשית ראינו תשלום בסך {{amount}} לספק '{{supplier_name}}' "
             "בתאריך {{invoice_date}}, אך חשבונית המס חסרה בתיק שלך.\n"
             "נא להשיב עם צילום ברור או קובץ PDF של החשבונית כדי שנוכל לקזז עבורך את המע\"מ."
         ),
         "buttons_json": [
-            {"id": "upload_photo", "action": "REQUEST_MEDIA", "he": "📷 העלאת צילום חשבונית"},
-            {"id": "remind_8pm", "action": "SNOOZE_TONIGHT", "he": "⏰ תזכירו לי ב-20:00"},
-            {"id": "no_document", "action": "NO_DOCUMENT", "he": "❓ אין לי אותה"},
+            {"id": "upload_photo", "action": "REQUEST_MEDIA", "he": "העלאת צילום חשבונית"},
+            {"id": "remind_8pm", "action": "SNOOZE_TONIGHT", "he": "תזכירו לי ב-20:00"},
+            {"id": "no_document", "action": "NO_DOCUMENT", "he": "אין לי אותה"},
         ],
     },
     {
@@ -56,14 +56,14 @@ TEMPLATES: list[dict] = [
         "requires_media_reply": True,
         "name_he": "חסר פרט בחשבונית (מספר / ח.פ / פרט אחר)",
         "body_he": (
-            "שלום {{client_name}} 👋\n"
+            "שלום {{client_name}}\n"
             "בנוגע לחשבונית מס' {{invoice_number}} מהספק '{{supplier_name}}': חסר בה '{{missing_detail}}'.\n"
             "נא לשלוח חשבונית מתוקנת או להשיב עם הפרט החסר כדי שנוכל לרשום אותה כראוי."
         ),
         "buttons_json": [
-            {"id": "send_corrected", "action": "REQUEST_MEDIA", "he": "📷 שליחת צילום מתוקן"},
-            {"id": "type_detail", "action": "TYPE_DETAIL", "he": "✍️ הקלדת הפרט החסר"},
-            {"id": "remind_tonight", "action": "SNOOZE_TONIGHT", "he": "⏰ תזכירו לי הערב"},
+            {"id": "send_corrected", "action": "REQUEST_MEDIA", "he": "שליחת צילום מתוקן"},
+            {"id": "type_detail", "action": "TYPE_DETAIL", "he": "הקלדת הפרט החסר"},
+            {"id": "remind_tonight", "action": "SNOOZE_TONIGHT", "he": "תזכירו לי הערב"},
         ],
     },
     {
@@ -72,15 +72,15 @@ TEMPLATES: list[dict] = [
         "requires_media_reply": False,
         "name_he": "חיוב לא מזוהה בכרטיס / בבנק",
         "body_he": (
-            "שלום {{client_name}} 👋\n"
+            "שלום {{client_name}}\n"
             "מופיע חיוב בבנק / בכרטיס האשראי על סך {{charge_amount}} בתאריך {{charge_date}} "
             "(אסמכתא: {{bank_reference}}) ללא חשבונית או תיאור תואם.\n"
             "עבור מה הייתה ההוצאה, והאם אפשר לצרף את החשבונית?"
         ),
         "buttons_json": [
-            {"id": "attach_receipt", "action": "REQUEST_MEDIA", "he": "📷 צירוף קבלה"},
-            {"id": "business_no_receipt", "action": "BUSINESS_NO_RECEIPT", "he": "🏢 הוצאה עסקית (ללא קבלה)"},
-            {"id": "personal_expense", "action": "PERSONAL_EXPENSE", "he": "🏠 הוצאה פרטית"},
+            {"id": "attach_receipt", "action": "REQUEST_MEDIA", "he": "צירוף קבלה"},
+            {"id": "business_no_receipt", "action": "BUSINESS_NO_RECEIPT", "he": "הוצאה עסקית (ללא קבלה)"},
+            {"id": "personal_expense", "action": "PERSONAL_EXPENSE", "he": "הוצאה פרטית"},
         ],
     },
     {
@@ -89,17 +89,17 @@ TEMPLATES: list[dict] = [
         "requires_media_reply": False,
         "name_he": "דיווח מע\"מ ומקדמות מוכן לתשלום",
         "body_he": (
-            "שלום {{client_name}} 👋\n"
+            "שלום {{client_name}}\n"
             "הדיווח שלך עבור {{tax_period}} מוכן.\n"
-            "🧾 מע\"מ לתשלום: {{vat_amount}}\n"
-            "📊 מקדמות מס: {{tax_advance_amount}}\n"
-            "📅 מועד אחרון לתשלום: {{due_date}}\n"
+            "מע\"מ לתשלום: {{vat_amount}}\n"
+            "מקדמות מס: {{tax_advance_amount}}\n"
+            "מועד אחרון לתשלום: {{due_date}}\n"
             "נא לאשר למטה לאחר התשלום או לאשר חיוב מחשבון הבנק."
         ),
         "buttons_json": [
-            {"id": "paid_confirmed", "action": "PAID_CONFIRMED", "he": "✅ שולם / מאושר"},
-            {"id": "pay_link", "action": "PAY_LINK", "he": "💳 תשלום בשובר / קישור"},
-            {"id": "request_call", "action": "REQUEST_CALL", "he": "📞 בקשת שיחה מרו\"ח"},
+            {"id": "paid_confirmed", "action": "PAID_CONFIRMED", "he": "שולם / מאושר"},
+            {"id": "pay_link", "action": "PAY_LINK", "he": "תשלום בשובר / קישור"},
+            {"id": "request_call", "action": "REQUEST_CALL", "he": "בקשת שיחה מרו\"ח"},
         ],
     },
     {
@@ -109,13 +109,13 @@ TEMPLATES: list[dict] = [
         "is_system": True,
         "name_he": "דחיית Vision AI — בקשה חוזרת",
         "body_he": (
-            "תודה {{client_name}}! 🙏\n"
+            "תודה {{client_name}}!\n"
             "בדקתי עכשיו את הצילום ששלחת עבור '{{supplier_name}}', אבל {{rejection_reason}}.\n"
-            "מכיוון שהמסמך עדיין לידך, אפשר לצלם שוב תמונה ברורה אחת שבה רואים את העמוד המלא ואת מספר החשבונית? 📷"
+            "מכיוון שהמסמך עדיין לידך, אפשר לצלם שוב תמונה ברורה אחת שבה רואים את העמוד המלא ואת מספר החשבונית?"
         ),
         "buttons_json": [
-            {"id": "send_clearer", "action": "REQUEST_MEDIA", "he": "📷 שליחת צילום ברור יותר"},
-            {"id": "send_to_clerk", "action": "SEND_CLERK_ANYWAY", "he": "👨‍💼 להעביר לפקיד בכל זאת"},
+            {"id": "send_clearer", "action": "REQUEST_MEDIA", "he": "שליחת צילום ברור יותר"},
+            {"id": "send_to_clerk", "action": "SEND_CLERK_ANYWAY", "he": "להעביר לפקיד בכל זאת"},
         ],
     },
     {
@@ -124,13 +124,13 @@ TEMPLATES: list[dict] = [
         "requires_media_reply": True,
         "name_he": "הסלמה לקראת מועד הדיווח (ה-15 בחודש)",
         "body_he": (
-            "⚠️ תזכורת דחופה עבור {{client_name}}:\n"
+            "תזכורת דחופה עבור {{client_name}}:\n"
             "נותרו רק {{days_left}} ימים עד המועד האחרון לדיווח החודשי, ואנחנו עדיין ממתינים ל-{{open_items_count}} פריטים חסרים.\n"
             "נא לשלוח אותם עוד היום כדי שהדיווח או החזר המע\"מ שלך לא יתעכבו."
         ),
         "buttons_json": [
-            {"id": "upload_now", "action": "REQUEST_MEDIA", "he": "📷 להעלות עכשיו"},
-            {"id": "call_me", "action": "REQUEST_CALL", "he": "📞 תתקשרו אליי"},
+            {"id": "upload_now", "action": "REQUEST_MEDIA", "he": "להעלות עכשיו"},
+            {"id": "call_me", "action": "REQUEST_CALL", "he": "תתקשרו אליי"},
         ],
     },
 ]
@@ -217,7 +217,7 @@ def _upload_demo(db: Session, ticket: ChasingTicket, scenario: str) -> None:
         vat_rate=get_system_settings(db).vat_rate / 100.0,
         allocation_threshold=get_system_settings(db).allocation_number_threshold_nis,
     )
-    handle_media(db, ticket.client, path, f"/uploads/{path.name}", "image/png", ticket.id, "📸")
+    handle_media(db, ticket.client, path, f"/uploads/{path.name}", "image/png", ticket.id, "")
 
 
 def seed_demo(db: Session) -> dict:

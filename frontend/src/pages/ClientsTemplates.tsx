@@ -89,7 +89,7 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="שם איש הקשר" hint={hasArabic(form.full_name) ? `⚠️ ${NAME_LANGUAGE_ERROR}` : "עברית או אנגלית"}>
+        <Field label="שם איש הקשר" hint={hasArabic(form.full_name) ? `${NAME_LANGUAGE_ERROR}` : "עברית או אנגלית"}>
           <input
             required
             dir="auto"
@@ -98,7 +98,7 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
             className={cx(inputClass, hasArabic(form.full_name) && "ring-2 ring-red-400")}
           />
         </Field>
-        <Field label="שם העסק" hint={hasArabic(form.company_name) ? `⚠️ ${NAME_LANGUAGE_ERROR}` : "עברית או אנגלית"}>
+        <Field label="שם העסק" hint={hasArabic(form.company_name) ? `${NAME_LANGUAGE_ERROR}` : "עברית או אנגלית"}>
           <input
             dir="auto"
             value={form.company_name}
@@ -106,7 +106,7 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
             className={cx(inputClass, hasArabic(form.company_name) && "ring-2 ring-red-400")}
           />
         </Field>
-        <Field label="ח.פ / ע.מ (9 ספרות)" hint={taxIdInvalid ? "⚠️ נדרשות בדיוק 9 ספרות" : "לפי הוראות רשות המסים"}>
+        <Field label="ח.פ / ע.מ (9 ספרות)" hint={taxIdInvalid ? "נדרשות בדיוק 9 ספרות" : "לפי הוראות רשות המסים"}>
           <input
             required
             dir="ltr"
@@ -354,7 +354,7 @@ function TemplateEditor({ template }: { template: Template }) {
           <p className="font-semibold text-slate-900">{templateName(template)}</p>
           <p className="font-mono text-[11px] text-slate-400">
             <Ltr>{template.slug}</Ltr>
-            {template.requires_media_reply ? " · 📷 נסגר לאחר אימות Vision AI" : " · נסגר בלחיצת כפתור"}
+            {template.requires_media_reply ? " · נסגר לאחר אימות Vision AI" : " · נסגר בלחיצת כפתור"}
           </p>
         </div>
         {isManager && (
@@ -457,7 +457,7 @@ export function ClientsTemplates() {
     <div className="mx-auto max-w-7xl space-y-5 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">👥 לקוחות ותבניות הודעה</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">לקוחות ותבניות הודעה</h1>
           <p className="text-sm text-slate-500">פרטי הלקוח קובעים את תדירות הדיווח והעובד האחראי. כל ההודעות ללקוחות נשלחות בוואטסאפ בעברית.</p>
         </div>
         <div className="flex rounded-lg bg-slate-200/70 p-1">

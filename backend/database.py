@@ -78,6 +78,21 @@ def _add_missing_columns() -> None:
                         conn.execute(text("UPDATE users SET full_name = :n, job_title = :t WHERE id = :i"),
                                      {"n": name.strip(), "t": title.strip(), "i": user_id})
             logging.getLogger("accountflow").warning("Added users.job_title and split existing 'name - title' values.")
+    if "whatsapp_message_logs" in inspector.get_table_names():
+        msg_cols = {c["name"] for c in inspector.get_columns("whatsapp_message_logs")}
+        if "is_automated" not in msg_cols:
+            # Every message stored so far was sent by the bot; inbound client messages are not automated.
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE whatsapp_message_logs ADD COLUMN is_automated BOOLEAN NOT NULL DEFAULT TRUE"))
+                conn.execute(text("UPDATE whatsapp_message_logs SET is_automated = FALSE WHERE direction = 'INBOUND'"))
+            logging.getLogger("accountflow").warning("Added whatsapp_message_logs.is_automated.")
+        if "sender_user_id" not in msg_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE whatsapp_message_logs ADD COLUMN sender_user_id INTEGER "
+                                  "REFERENCES users(id) ON DELETE SET NULL"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_whatsapp_message_logs_sender_user_id "
+                                  "ON whatsapp_message_logs (sender_user_id)"))
+            logging.getLogger("accountflow").warning("Added whatsapp_message_logs.sender_user_id.")
 
 
 def init_db() -> None:

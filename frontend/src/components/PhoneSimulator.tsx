@@ -1,25 +1,51 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, ChevronLeft, CloudFog, FileX2, Paperclip, Phone, ScanLine, Send, Smartphone, Video, Wifi, WifiOff } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  ChevronLeft,
+  CloudFog,
+  FileX2,
+  Lock,
+  Paperclip,
+  Phone,
+  ScanLine,
+  Send,
+  Smartphone,
+  UserRound,
+  Video,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, ApiError } from "../lib/api";
 import { cx, dayLabel, initials, STATUS_META } from "../lib/format";
 import type { InboundResult, Message, RenderedButton, Ticket } from "../lib/types";
+import { AttachmentChip, MANUAL_ATTACHMENT_ACCEPT, attachmentError, useObjectUrl } from "./ManualAttachment";
 import { Ltr, Spinner } from "./ui";
 import { WaBubble } from "./WaBubble";
 
 const DONE_STATUSES = new Set(["RESOLVED"]);
 
+/** Who the composer at the bottom of the phone writes as. */
+type ComposeAs = "client" | "worker";
+
 export function PhoneSimulator() {
-  const { clients, selectedClientId, selectClient, phoneOpen, setPhoneOpen, tick, live, toast, settings } = useApp();
+  const { clients, selectedClientId, selectClient, phoneOpen, setPhoneOpen, tick, live, toast, settings, user } = useApp();
   const firm = settings?.firm_name ?? "משרד רואי חשבון";
+  const workerName = user?.full_name ?? "עובד/ת המשרד";
   const client = clients.find((c) => c.id === selectedClientId) ?? null;
   const [messages, setMessages] = useState<Message[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const [composeAs, setComposeAs] = useState<ComposeAs>("client");
+  const [workerFile, setWorkerFile] = useState<File | null>(null);
+  const workerPreviewUrl = useObjectUrl(workerFile);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const asWorker = composeAs === "worker";
 
   const load = useCallback(async () => {
     if (!client) return;
@@ -35,6 +61,9 @@ export function PhoneSimulator() {
       .catch(() => undefined)
       .finally(() => setLoading(false));
   }, [client?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A picked attachment belongs to the chat it was picked in.
+  useEffect(() => setWorkerFile(null), [client?.id]);
 
   // Ticks coalesce bursts of events from many clients, so refetch on every tick (one small query).
   useEffect(() => {
@@ -87,7 +116,7 @@ export function PhoneSimulator() {
       const fieldName = r.validation.field === "allocation_number" ? "מספר הקצאה" : "ח.פ / ע.מ";
       toast({
         tone: r.validation.valid ? "success" : "warning",
-        title: r.validation.valid ? `${fieldName} תקין נקלט ✓` : `${fieldName} נדחה — חייב להכיל בדיוק 9 ספרות`,
+        title: r.validation.valid ? `${fieldName} תקין נקלט` : `${fieldName} נדחה — חייב להכיל בדיוק 9 ספרות`,
         body: r.reply ?? undefined,
         dir: "rtl",
       });
@@ -126,22 +155,53 @@ export function PhoneSimulator() {
     run(`btn-${m.id}-${b.id}`, `הלקוח לחץ ”${b.title}“`, () => api.sendButton(client.id, b.id, m.ticket_id));
   };
 
-  const sendText = () => {
+  const sendAsClient = () => {
     if (!client || !text.trim()) return;
     const value = text.trim();
     setText("");
     run("text", "הלקוח השיב", () => api.sendText(client.id, value));
   };
 
+  /** Outbound manual message from the logged-in worker (text and / or a picture), sent immediately. */
+  const sendAsWorker = async () => {
+    if (!client || busy !== null) return;
+    const value = text.trim();
+    if (!value && !workerFile) return;
+    setBusy("worker");
+    try {
+      await api.manualSend(client.id, value, workerFile);
+      setText("");
+      setWorkerFile(null);
+      await load();
+    } catch (e) {
+      toast({ tone: "error", title: "שליחת ההודעה הידנית נכשלה", body: e instanceof ApiError ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+      inputRef.current?.focus();
+    }
+  };
+
   const onFile = (file: File | undefined) => {
-    if (!client || !file) return;
-    run("upload", "הלקוח העלה קובץ", () => api.uploadMedia(client.id, file, activeTicket?.id));
     if (fileRef.current) fileRef.current.value = "";
+    if (!client || !file) return;
+    if (asWorker) {
+      const error = attachmentError(file);
+      if (error) toast({ tone: "warning", title: "לא ניתן לצרף את הקובץ", body: error });
+      else setWorkerFile(file);
+      return;
+    }
+    run("upload", "הלקוח העלה קובץ", () => api.uploadMedia(client.id, file, activeTicket?.id));
   };
 
   const demo = (scenario: "clear" | "blurry" | "missing_number") => {
     if (!client) return;
     run(`demo-${scenario}`, "קבלת הדגמה", () => api.demoReceipt(client.id, scenario, activeTicket?.id));
+  };
+
+  const switchComposer = (next: ComposeAs) => {
+    setComposeAs(next);
+    if (next === "client") setWorkerFile(null);
+    window.setTimeout(() => inputRef.current?.focus(), 30);
   };
 
   if (!phoneOpen) {
@@ -164,12 +224,14 @@ export function PhoneSimulator() {
     groups[groups.length - 1].items.push(m);
   }
 
+  const canSend = asWorker ? !!text.trim() || workerFile !== null : !!text.trim();
+
   return (
     <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-slate-200 bg-slate-100 shadow-xl xl:static xl:z-auto xl:shadow-none">
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
         <Smartphone className="h-4 w-4 text-wa-teal" />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-slate-900">📱 סימולטור וואטסאפ חי של הלקוח</p>
+          <p className="text-xs font-semibold text-slate-900">סימולטור וואטסאפ חי של הלקוח</p>
           <p className="flex items-center gap-1 text-[11px] text-slate-500">
             {live ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
             {live ? "מחובר בזמן אמת" : "מתחבר מחדש (רענון תקופתי)"}
@@ -210,7 +272,10 @@ export function PhoneSimulator() {
             <ArrowRight className="h-4 w-4 opacity-80" />
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-200 text-xs font-bold text-wa-header">{initials(firm)}</div>
             <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-[13px] font-semibold">{firm} ✔︎</p>
+              <p className="flex items-center gap-1 truncate text-[13px] font-semibold">
+                <span className="truncate">{firm}</span>
+                <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-200" />
+              </p>
               <p className="truncate text-[10.5px] opacity-80">חשבון עסקי · בטלפון של {client?.full_name ?? "—"}</p>
             </div>
             <Video className="h-4 w-4 opacity-80" />
@@ -229,8 +294,8 @@ export function PhoneSimulator() {
             }}
           >
             {client && (
-              <div className="mx-auto mb-2 max-w-[90%] rounded-md bg-amber-50 px-2 py-1 text-center text-[10.5px] text-amber-900 shadow-sm">
-                🔒 הודעות אל <Ltr>{client.whatsapp_phone}</Ltr> · בעברית
+              <div className="mx-auto mb-2 flex max-w-[90%] items-center justify-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-center text-[10.5px] text-amber-900 shadow-sm">
+                <Lock className="h-3 w-3 shrink-0" /> הודעות אל <Ltr>{client.whatsapp_phone}</Ltr> · בעברית
               </div>
             )}
             {loading && (
@@ -256,6 +321,8 @@ export function PhoneSimulator() {
                     delivery={m.delivery_status}
                     mediaPath={m.media_url}
                     type={m.message_type}
+                    automated={m.is_automated}
+                    senderName={m.sender_name}
                     buttonsDisabled={!liveButtonMessageIds.has(m.id) || busy !== null}
                     onButton={onButton(m)}
                   />
@@ -263,11 +330,15 @@ export function PhoneSimulator() {
               </div>
             ))}
             {busy && (
-              <div className="flex items-start">
+              <div className={cx("flex", busy === "worker" ? "items-start opacity-70" : "items-start")}>
                 <div className="flex items-center gap-1 rounded-lg rounded-ss-none bg-white px-3 py-2 shadow-sm">
                   {busy.startsWith("demo") || busy === "upload" ? (
                     <span className="flex items-center gap-1.5 text-[11px] text-indigo-700">
                       <ScanLine className="h-3.5 w-3.5 animate-pulse" /> Vision AI בודק את הצילום…
+                    </span>
+                  ) : busy === "worker" ? (
+                    <span className="flex items-center gap-1.5 text-[11px] text-emerald-700">
+                      <Spinner className="!h-3.5 !w-3.5" /> שולח בשם {workerName}…
                     </span>
                   ) : (
                     [0, 1, 2].map((i) => (
@@ -279,52 +350,67 @@ export function PhoneSimulator() {
             )}
           </div>
 
-          {/* demo actions */}
-          <div className="space-y-1 bg-[#f0f2f5] px-2 pt-2">
-            <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500">
-              <span className="font-semibold">הדגמת Vision AI</span>
-              <span className="truncate ps-2" dir="rtl">
-                {activeTicket ? `${activeTicket.ticket_ref} · ${activeTicket.context_variables_json.supplier_name ?? activeTicket.template_name}` : "אין בקשה פתוחה"}
-              </span>
+          {/* demo actions: the customer's side only */}
+          {!asWorker && (
+            <div className="space-y-1 bg-[#f0f2f5] px-2 pt-2">
+              <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500">
+                <span className="font-semibold">הדגמת Vision AI</span>
+                <span className="truncate ps-2" dir="rtl">
+                  {activeTicket ? `${activeTicket.ticket_ref} · ${activeTicket.context_variables_json.supplier_name ?? activeTicket.template_name}` : "אין בקשה פתוחה"}
+                </span>
+              </div>
+              <DemoButton
+                icon={<ScanLine className="h-3.5 w-3.5" />}
+                label="הדמיה: הלקוח שולח חשבונית תקינה וברורה"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                loading={busy === "demo-clear"}
+                disabled={!client || busy !== null}
+                onClick={() => demo("clear")}
+              />
+              <DemoButton
+                icon={<CloudFog className="h-3.5 w-3.5" />}
+                label="הדמיה: הלקוח שולח קבלה מטושטשת"
+                className="bg-amber-500 hover:bg-amber-600"
+                loading={busy === "demo-blurry"}
+                disabled={!client || busy !== null}
+                onClick={() => demo("blurry")}
+              />
+              <DemoButton
+                icon={<FileX2 className="h-3.5 w-3.5" />}
+                label="הדמיה: חשבונית ללא מספר חשבונית"
+                className="bg-rose-600 hover:bg-rose-700"
+                loading={busy === "demo-missing_number"}
+                disabled={!client || busy !== null}
+                onClick={() => demo("missing_number")}
+              />
             </div>
-            <DemoButton
-              icon={<ScanLine className="h-3.5 w-3.5" />}
-              label="📸 הדמיה: הלקוח שולח חשבונית תקינה וברורה"
-              className="bg-emerald-600 hover:bg-emerald-700"
-              loading={busy === "demo-clear"}
-              disabled={!client || busy !== null}
-              onClick={() => demo("clear")}
-            />
-            <DemoButton
-              icon={<CloudFog className="h-3.5 w-3.5" />}
-              label="🌫️ הדמיה: הלקוח שולח קבלה מטושטשת"
-              className="bg-amber-500 hover:bg-amber-600"
-              loading={busy === "demo-blurry"}
-              disabled={!client || busy !== null}
-              onClick={() => demo("blurry")}
-            />
-            <DemoButton
-              icon={<FileX2 className="h-3.5 w-3.5" />}
-              label="❌ הדמיה: חשבונית ללא מספר חשבונית"
-              className="bg-rose-600 hover:bg-rose-700"
-              loading={busy === "demo-missing_number"}
-              disabled={!client || busy !== null}
-              onClick={() => demo("missing_number")}
-            />
+          )}
+
+          {/* composer mode switch */}
+          <div className="bg-[#f0f2f5] px-2 pt-2">
+            <ComposerSwitch value={composeAs} onChange={switchComposer} disabled={!client || busy !== null} />
           </div>
+
+          {/* pending worker attachment (sent together with the text) */}
+          {asWorker && workerFile && (
+            <div className="bg-[#f0f2f5] px-2 pt-2">
+              <AttachmentChip file={workerFile} previewUrl={workerPreviewUrl} onRemove={() => setWorkerFile(null)} disabled={busy !== null} />
+            </div>
+          )}
 
           {/* composer */}
           <form
             className="flex items-center gap-1.5 bg-[#f0f2f5] px-2 pb-3 pt-2"
             onSubmit={(e) => {
               e.preventDefault();
-              sendText();
+              if (asWorker) sendAsWorker();
+              else sendAsClient();
             }}
           >
             <input
               ref={fileRef}
               type="file"
-              accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+              accept={asWorker ? MANUAL_ATTACHMENT_ACCEPT : ".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"}
               className="hidden"
               onChange={(e) => onFile(e.target.files?.[0])}
             />
@@ -333,23 +419,30 @@ export function PhoneSimulator() {
               onClick={() => fileRef.current?.click()}
               disabled={!client || busy !== null}
               className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-white disabled:opacity-40"
-              title="העלאת צילום / PDF אמיתי מהמחשב"
+              title={asWorker ? "צירוף תמונה או קובץ להודעה מהמשרד" : "העלאת צילום / PDF אמיתי מהמחשב בשם הלקוח"}
             >
               <Paperclip className="h-4 w-4" />
             </button>
             <input
+              ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
               dir="auto"
-              placeholder={client ? `השב כ${client.full_name}…` : "בחרו לקוח"}
+              placeholder={!client ? "בחרו לקוח" : asWorker ? `הודעה ללקוח בשם ${workerName}…` : `השב כ${client.full_name}…`}
               disabled={!client}
-              className="h-9 min-w-0 flex-1 rounded-full border-0 bg-white px-3.5 text-[13px] text-slate-900 ring-0 placeholder:text-slate-400 focus:ring-1 focus:ring-wa-teal"
+              className={cx(
+                "h-9 min-w-0 flex-1 rounded-full border-0 bg-white px-3.5 text-[13px] text-slate-900 ring-0 placeholder:text-slate-400 focus:ring-1",
+                asWorker ? "ring-1 ring-emerald-300 focus:ring-emerald-500" : "focus:ring-wa-teal",
+              )}
             />
             <button
               type="submit"
-              disabled={!client || !text.trim() || busy !== null}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-wa-teal text-white hover:bg-wa-header disabled:opacity-40"
-              title="שליחה בשם הלקוח"
+              disabled={!client || !canSend || busy !== null}
+              className={cx(
+                "grid h-9 w-9 shrink-0 place-items-center rounded-full text-white disabled:opacity-40",
+                asWorker ? "bg-emerald-700 hover:bg-emerald-800" : "bg-wa-teal hover:bg-wa-header",
+              )}
+              title={asWorker ? `שליחה ללקוח בשם ${workerName}` : "שליחה בשם הלקוח"}
             >
               <Send className="h-4 w-4 -scale-x-100" />
             </button>
@@ -366,6 +459,55 @@ export function PhoneSimulator() {
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Toggle switch for the composer: simulate the customer's reply (inbound) or send a manual
+ * message as the logged-in office worker (outbound, "הודעה מאת <worker>").
+ */
+function ComposerSwitch({ value, onChange, disabled }: { value: ComposeAs; onChange: (v: ComposeAs) => void; disabled: boolean }) {
+  const asWorker = value === "worker";
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5 text-[11px] ring-1 ring-slate-200">
+      <button
+        type="button"
+        onClick={() => onChange("client")}
+        disabled={disabled}
+        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-slate-400" : "text-wa-teal")}
+      >
+        <Smartphone className="h-3.5 w-3.5" />
+        מענה כלקוח (סימולטור)
+      </button>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={asWorker}
+        aria-label="שליחה כעובד משרד (ידני)"
+        onClick={() => onChange(asWorker ? "client" : "worker")}
+        disabled={disabled}
+        className={cx(
+          "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
+          asWorker ? "bg-emerald-600" : "bg-wa-teal",
+        )}
+      >
+        <span
+          className={cx(
+            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+            asWorker ? "start-[1.125rem]" : "start-0.5",
+          )}
+        />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("worker")}
+        disabled={disabled}
+        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-emerald-700" : "text-slate-400")}
+      >
+        <UserRound className="h-3.5 w-3.5" />
+        שליחה כעובד משרד (ידני)
+      </button>
+    </div>
   );
 }
 

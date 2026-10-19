@@ -157,7 +157,7 @@ export function Settings() {
     <div className="mx-auto max-w-5xl space-y-5 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">⚙️ הגדרות המשרד</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">הגדרות המשרד</h1>
           <p className="text-sm text-slate-500">
             {readOnly
               ? "הכללים שהמשרד מפעיל כרגע על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ. רק מנהל/ת המשרד יכול/ה לשנות אותם."
@@ -216,7 +216,7 @@ export function Settings() {
           <div>
             <span className="mb-1 block text-xs font-medium text-slate-600">מועד דיווח מע״מ</span>
             <div className="flex h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-sm text-slate-700 ring-1 ring-inset ring-slate-200">
-              🗓️ ה-<Num value={settings.vat_deadline_day ?? VAT_DEADLINE_DAY} /> בכל חודש דיווח
+              ה-<Num value={settings.vat_deadline_day ?? VAT_DEADLINE_DAY} /> בכל חודש דיווח
             </div>
             <span className="mt-1 block text-[11px] text-slate-400">קבוע לפי חוק; לקוחות דו חודשיים מדווחים בחודשים האי-זוגיים</span>
           </div>
@@ -239,7 +239,7 @@ export function Settings() {
           <Field label="מרווח זמן בין תזכורות אוטומטיות (שעות)" hint="חל על פניות חדשות ועל התזכורת הבאה בפניות פתוחות">
             <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} disabled={readOnly} />
           </Field>
-          <Field label="מספר תזכורות מקסימלי לפני התראה אדומה" hint="לאחר מכן הפנייה מסומנת 🚨 הוסלם לשיחת טלפון; מתעדכן גם בפניות פתוחות">
+          <Field label="מספר תזכורות מקסימלי לפני התראה אדומה" hint="לאחר מכן הפנייה מסומנת ”הוסלם“ לשיחת טלפון; מתעדכן גם בפניות פתוחות">
             <NumberInput value={draft.max_reminders} onChange={(v) => set("max_reminders", v)} suffix="פעמים" limits={LIMITS.max_reminders} disabled={readOnly} />
           </Field>
         </div>

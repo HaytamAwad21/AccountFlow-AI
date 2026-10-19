@@ -1,5 +1,5 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, Loader2, X, XCircle } from "lucide-react";
+import { AlertTriangle, Briefcase, CheckCircle2, Crown, Eye, EyeOff, Info, Loader2, X, XCircle } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { PRIORITY_META, ROLE_LABEL, STATUS_META, cx } from "../lib/format";
 import type { TicketPriority, TicketStatus, UserRole } from "../lib/types";
@@ -71,12 +71,12 @@ export function RoleBadge({ role, className }: { role: UserRole; className?: str
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
         role === "MANAGER" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800",
         className,
       )}
     >
-      {role === "MANAGER" ? "👑 " : "🧑‍💼 "}
+      {role === "MANAGER" ? <Crown className="h-3 w-3 shrink-0" /> : <Briefcase className="h-3 w-3 shrink-0" />}
       {ROLE_LABEL[role]}
     </span>
   );

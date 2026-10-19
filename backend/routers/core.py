@@ -50,6 +50,7 @@ from services.activity import log_activity
 from services.clock import VAT_DEADLINE_DAY, days_until_deadline, fmt_date, local_to_utc, local_today, next_deadline, utcnow
 from services.events import queue_event
 from services.i18n import NAME_LANGUAGE_ERROR, has_arabic
+from services.no_emoji import strip_buttons, strip_emoji
 from services.scheduler import scheduler_status
 from services.security import hash_password
 from services.system_settings import get_system_settings
@@ -187,7 +188,7 @@ def _clients_out(db: Session, clients: list[Client]) -> list[ClientOut]:
         last = last_msgs.get(c.id)
         if last:
             item.last_message_at = last.created_at
-            item.last_message_preview = (last.content_text or "📎")[:90]
+            item.last_message_preview = (last.content_text or "קובץ מצורף")[:90]
         out.append(item)
     return out
 
@@ -335,8 +336,10 @@ def update_template(template_id: int, body: TemplateUpdate, request: Request, db
         ids = [b["id"] for b in buttons]
         if len(ids) != len(set(ids)):
             raise HTTPException(422, "מזהי הכפתורים חייבים להיות ייחודיים")
-        tpl.buttons_json = buttons
+        tpl.buttons_json = strip_buttons(buttons)
     for key, value in data.items():
+        if isinstance(value, str):
+            value = strip_emoji(value)
         if key.startswith("body_") and not str(value).strip():
             raise HTTPException(422, "גוף ההודעה אינו יכול להיות ריק")
         setattr(tpl, key, value)

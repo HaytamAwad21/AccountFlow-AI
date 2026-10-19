@@ -101,7 +101,7 @@ Each user has three separate fields, plus a status:
 | --- | --- | --- |
 | `full_name` (**שם מלא**) | The name on the profile button, login cards and activity log | יעל לוי |
 | `job_title` (**תפקיד במשרד**) | A small line under the name; optional | פקידת הנה״ח |
-| `role` (**הרשאה**) | A badge: 👑 מנהל משרד or 🧑‍💼 עובד משרד; this is what decides permissions | `WORKER` |
+| `role` (**הרשאה**) | A badge: מנהל משרד or עובד משרד; this is what decides permissions | `WORKER` |
 | `is_active` (**סטטוס**) | פעיל / הושעה; a suspended user cannot log in and is signed out at once | `true` |
 
 Managers manage users in **הגדרות ▸ עובדי המשרד**:
@@ -163,16 +163,16 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 
 | Action | Manager (מנהל משרד) | Worker (עובד משרד) |
 | --- | --- | --- |
-| Send messages, bulk tax broadcasts, WhatsApp simulator | ✅ | ✅ |
-| Live chasing board, approve, reject or close tickets, correct OCR fields | ✅ | ✅ |
-| Add, edit or deactivate clients (buttons and the actions column) | ✅ | hidden |
-| Edit message templates | ✅ | hidden; workers see the Hebrew text only |
-| **הגדרות** tab: VAT rate, allocation threshold, reminder interval, max reminders, firm name, auto-approve | ✅ edit | 👁 read-only: inputs disabled, no שמירת הגדרות / ביטול שינויים buttons |
-| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | ✅ | hidden: the whole **עובדי המשרד** section is not rendered |
-| Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | ✅ | tab hidden |
-| Auto-approve switch on the chasing board | ✅ | hidden |
+| Send messages (templates and manual text / pictures), bulk tax broadcasts, WhatsApp simulator | Yes | Yes |
+| Live chasing board, approve, reject or close tickets, correct OCR fields | Yes | Yes |
+| Add, edit or deactivate clients (buttons and the actions column) | Yes | hidden |
+| Edit message templates | Yes | hidden; workers see the Hebrew text only |
+| **הגדרות** tab: VAT rate, allocation threshold, reminder interval, max reminders, firm name, auto-approve | Yes, edit | Read-only: inputs disabled, no שמירת הגדרות / ביטול שינויים buttons |
+| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | Yes | hidden: the whole **עובדי המשרד** section is not rendered |
+| Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | Yes | tab hidden |
+| Auto-approve switch on the chasing board | Yes | hidden |
 
-"Hidden" means the control is not rendered at all, not merely disabled or marked with a lock. Workers can view and search clients and templates and read the office rules in הגדרות, but every management action is hidden. A worker who opens `#activity` directly is sent back to **שליחת בקשה**. The API enforces the same rules: endpoints answer `401` without a valid session and `403` (`🔒 הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
+"Hidden" means the control is not rendered at all, not merely disabled or marked with a lock. Workers can view and search clients and templates and read the office rules in הגדרות, but every management action is hidden. A worker who opens `#activity` directly is sent back to **שליחת בקשה**. The API enforces the same rules: endpoints answer `401` without a valid session and `403` (`הרשאת מנהל בלבד`) when the user is a worker. The last active manager cannot be demoted or deactivated.
 
 ### Sidebar and dark mode
 
@@ -201,7 +201,7 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 
 **Other places.** Client records and bulk tax sheets require a 9-digit ח.פ / ע.מ. Excel's dropped leading zero is restored for 8-digit IDs.
 
-## Office settings (⚙️ הגדרות)
+## Office settings (הגדרות)
 
 Settings live in a single `system_settings` row. `GET /api/settings` returns it, and `PUT /api/settings` updates it (manager only). Every engine reads the live values.
 
@@ -210,7 +210,7 @@ Settings live in a single `system_settings` row. `GET /api/settings` returns it,
 | `vat_rate` (%) | 18 | Vision AI math check, demo invoices, VAT breakdowns in the UI |
 | `allocation_number_threshold_nis` | 10,000 | Amount before VAT from which an allocation number is mandatory |
 | `reminder_interval_hours` | 48 | Reminder cadence for new reminders |
-| `max_reminders` | 3 | Reminders before 🚨 escalation; also applied to open tickets |
+| `max_reminders` | 3 | Reminders before escalation; also applied to open tickets |
 | `firm_name` | כהן ושות׳ - רואי חשבון | WhatsApp sender name and simulator header |
 | `auto_approve_verified` | false | Resolve fully verified invoices without worker review |
 
@@ -229,18 +229,18 @@ Managers set the frequency in the client form. The clients table shows it next t
 
 ## 5-minute demo script
 
-1. **⚡ שליחת בקשה.**
+1. **שליחת בקשה.**
    1. Search for a client and press Enter.
    2. Choose **חשבונית חסרה** and type a supplier and an amount. `1240` becomes `₪1,240.00`, and the VAT breakdown at the live rate appears under the field.
    3. Press **Enter**. The message appears on the client's phone, with buttons.
-2. **📱 Phone simulator.**
-   1. Tap **🌫️ קבלה מטושטשת**. Vision AI rejects the photo, and the bot answers within a second.
-   2. Tap **📸 חשבונית תקינה**. The ticket moves to *ממתין לבדיקת פקיד*.
+2. **Phone simulator.**
+   1. Tap **קבלה מטושטשת**. Vision AI rejects the photo, and the bot answers within a second.
+   2. Tap **חשבונית תקינה**. The ticket moves to *ממתין לבדיקת פקיד*.
 3. **Allocation number.**
    1. Select יוסי מזרחי in the simulator.
-   2. On the allocation-number request, tap **✍️ הקלדת הפרט החסר** and type `12345`. The Tax Authority rejection arrives, and the ticket stays open.
+   2. On the allocation-number request, tap **הקלדת הפרט החסר** and type `12345`. The Tax Authority rejection arrives, and the ticket stays open.
    3. Type `123456789`. The number is accepted.
-4. **📋 לוח מעקב חי.** Click **⏩ הדמיית +48 שעות**. Notifications list every reminder and deadline escalation that was sent. Open a ticket to see the following:
+4. **לוח מעקב חי.** Click **הדמיית +48 שעות**. Notifications list every reminder and deadline escalation that was sent. Open a ticket to see the following:
    - The WhatsApp timeline.
    - The receipt.
    - The six Vision AI and Tax Authority checks.
@@ -291,7 +291,7 @@ quick-send ──► WAITING_FOR_CLIENT ──(interval, ≤ max)──► remin
                      └──pass──► NEEDS_CLERK_REVIEW ──Approve──► RESOLVED
    typed מספר הקצאה / ח.פ ──not 9 digits──► NEEDS_CORRECTION (Tax Authority reply)
                           └──9 digits────► NEEDS_CLERK_REVIEW
-   buttons: Paid ✅ / Business / Personal expense ──► RESOLVED     Call me 📞 ──► ESCALATED
+   buttons: Paid / Business / Personal expense ──► RESOLVED     Call me ──► ESCALATED
 ```
 
 ### Vision AI
@@ -323,6 +323,7 @@ Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify 
 | GET / PUT | `/api/settings` | read: all · write: manager | Office configuration |
 | POST / PUT / DELETE | `/api/clients…` | manager | Client management (soft delete) |
 | POST | `/api/tickets/quick-send` | any user | Render in the client's language, create the ticket, dispatch |
+| POST | `/api/whatsapp/manual-send` | any user | Worker's manual message (multipart: `client_id`, `content_text`, `image_file` / `image_base64` / `media_url`); not automated, logged as **שליחת הודעה ידנית ללקוח** |
 | POST | `/api/tickets/{id}/approve` | any user | Approve a verified invoice |
 | POST | `/api/tickets/{id}/reject` | any user | Reject the invoice `{reason}`: the client gets the Hebrew re-prompt with the reason, and the ticket returns to NEEDS_CORRECTION |
 | POST | `/api/webhook/whatsapp-inbound` | public (webhook) | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |

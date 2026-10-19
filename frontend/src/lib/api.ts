@@ -143,7 +143,7 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
 
 export function mediaUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  return path.startsWith("http") ? path : `${API_BASE}${path}`;
+  return /^(https?:|blob:|data:)/.test(path) ? path : `${API_BASE}${path}`;
 }
 
 export const api = {
@@ -235,6 +235,14 @@ export const api = {
       method: "POST",
       ...json({ client_id: clientId, scenario, ticket_id: ticketId ?? null }),
     }),
+  /** A worker's manual message to the client: free text and / or a picture or PDF (not automated). */
+  manualSend: (clientId: number, contentText: string, imageFile?: File | null) => {
+    const fd = new FormData();
+    fd.append("client_id", String(clientId));
+    fd.append("content_text", contentText);
+    if (imageFile) fd.append("image_file", imageFile);
+    return request<Message>("/api/whatsapp/manual-send", { method: "POST", body: fd });
+  },
   markRead: (clientId: number) => request<{ ok: boolean; updated: number }>(`/api/simulator/${clientId}/read`, { method: "POST" }),
 
   timeJump: (hours = 48) => request<SchedulerResult>(`/api/scheduler/simulate-time-jump?hours=${hours}`, { method: "POST" }),

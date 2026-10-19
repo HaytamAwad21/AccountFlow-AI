@@ -37,6 +37,7 @@ from models import (
 from services.clock import days_until_deadline, next_local_hour, utcnow
 from services.events import queue_event
 from services.i18n import classify_missing_detail, t
+from services.no_emoji import strip_buttons, strip_emoji
 from services.system_settings import auto_approve_enabled, firm_name, get_system_settings
 from services.templating import (
     AUTO_VARIABLES,
@@ -157,12 +158,20 @@ def log_message(
     sender_name: str,
     buttons: list[dict] | None = None,
     media_url: str | None = None,
+    is_automated: bool = True,
+    sender_user: User | None = None,
 ) -> WhatsAppMessageLog:
+    if direction == MessageDirection.OUTBOUND:
+        # Strict no-emoji policy: everything the firm sends is clean Hebrew text.
+        text = strip_emoji(text) or ""
+        buttons = strip_buttons(buttons)
     msg = WhatsAppMessageLog(
         ticket_id=ticket.id if ticket else None,
         client_id=client.id,
         direction=direction,
         sender_name=sender_name,
+        is_automated=is_automated,
+        sender_user_id=sender_user.id if sender_user else None,
         message_type=message_type,
         content_text=text,
         buttons_json=buttons or None,
@@ -189,14 +198,41 @@ def send_outbound(
     )
     if ticket is not None:
         ticket.last_contacted_at = msg.created_at
-    dispatch(db, msg, client, buttons, external=external)
+    dispatch(db, msg, client, msg.buttons_json, external=external)
+    return msg
+
+
+def send_manual_message(
+    db: Session,
+    *,
+    client: Client,
+    worker: User,
+    text: str,
+    media_url: str | None = None,
+    media_mime: str | None = None,
+    external: bool = True,
+) -> WhatsAppMessageLog:
+    """A worker's free-text message and/or picture, sent as-is (no template, no ticket, no reminders)."""
+    if not client.is_active:
+        raise EngineError(f"הלקוח '{client.full_name}' אינו פעיל")
+    clean = (strip_emoji(text) or "").strip()
+    if not clean and not media_url:
+        raise EngineError("יש לכתוב הודעה או לצרף תמונה")
+    msg = log_message(
+        db, client=client, ticket=None, direction=MessageDirection.OUTBOUND,
+        message_type=MessageType.IMAGE_UPLOAD if media_url else MessageType.TEXT,
+        text=clean, sender_name=worker.full_name, media_url=media_url,
+        is_automated=False, sender_user=worker,
+    )
+    dispatch(db, msg, client, None, external=external, media_mime=media_mime)
     return msg
 
 
 def log_inbound(db: Session, client: Client, ticket: ChasingTicket | None, message_type: MessageType,
                 text: str, media_url: str | None = None) -> WhatsAppMessageLog:
     msg = log_message(db, client=client, ticket=ticket, direction=MessageDirection.INBOUND,
-                      message_type=message_type, text=text, sender_name=client.full_name, media_url=media_url)
+                      message_type=message_type, text=text, sender_name=client.full_name, media_url=media_url,
+                      is_automated=False)
     queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": msg.ticket_id})
     return msg
 
@@ -469,7 +505,7 @@ def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: 
                  ticket_id: int | None = None, caption: str = "") -> dict:
     lang = lang_of(client)
     ticket = find_active_ticket(db, client, ticket_id, for_media=True)
-    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "📎", media_url=media_url)
+    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
     if ticket is None:
         reply = t("no_open_ticket", lang)
         send_outbound(db, client, None, reply, None, MessageType.TEXT)

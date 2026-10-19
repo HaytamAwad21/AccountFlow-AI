@@ -12,6 +12,7 @@ const ACTION_TONE: Record<string, string> = {
   LOGIN: "bg-emerald-50 text-emerald-800",
   LOGOUT: "bg-slate-100 text-slate-700",
   TICKET_SENT: "bg-sky-50 text-sky-800",
+  MANUAL_MESSAGE_SENT: "bg-emerald-50 text-emerald-800",
   REMINDERS_SENT: "bg-sky-50 text-sky-800",
   CAMPAIGN_SENT: "bg-sky-50 text-sky-800",
   TICKET_APPROVED: "bg-emerald-50 text-emerald-800",

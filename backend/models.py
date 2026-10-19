@@ -222,6 +222,10 @@ class WhatsAppMessageLog(Base):
     client_id: Mapped[int] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), index=True)
     direction: Mapped[MessageDirection] = mapped_column(_enum(MessageDirection))
     sender_name: Mapped[str] = mapped_column(String(160))
+    # True for bot / template / reminder / Vision AI messages; False for a worker's manual message
+    # (and for inbound client messages). The customer sees "הודעה אוטומטית" or "הודעה מאת <worker>".
+    is_automated: Mapped[bool] = mapped_column(Boolean, default=True)
+    sender_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     message_type: Mapped[MessageType] = mapped_column(_enum(MessageType), index=True)
     content_text: Mapped[str] = mapped_column(Text, default="")
     buttons_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -233,6 +237,7 @@ class WhatsAppMessageLog(Base):
 
     ticket: Mapped[ChasingTicket | None] = relationship(back_populates="messages")
     client: Mapped[Client] = relationship()
+    sender_user: Mapped[User | None] = relationship()
 
 
 class BulkTaxCampaign(Base):

@@ -16,7 +16,7 @@ from models import ChasingTicket, Client, User, UserRole, UserSession
 from services.clock import utcnow
 from services.security import token_digest
 
-MANAGER_ONLY = "🔒 הרשאת מנהל בלבד — פעולה זו זמינה למנהל/ת המשרד בלבד."
+MANAGER_ONLY = "הרשאת מנהל בלבד — פעולה זו זמינה למנהל/ת המשרד בלבד."
 NOT_LOGGED_IN = "יש להתחבר למערכת עם שם משתמש וסיסמה"
 
 

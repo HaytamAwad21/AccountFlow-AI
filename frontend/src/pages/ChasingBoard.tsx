@@ -9,19 +9,19 @@ import { Button, Card, Empty, inputClass, Ltr, PriorityLabel, Spinner, StatusBad
 
 const FILTERS: { key: string; label: string; statuses: TicketStatus[] | null }[] = [
   { key: "all", label: "הכל", statuses: null },
-  { key: "waiting", label: "⏳ ממתין ללקוח", statuses: ["WAITING_FOR_CLIENT", "SNOOZED_TONIGHT", "OPEN"] },
-  { key: "correction", label: "⚠️ דרוש תיקון (מטושטש / שגוי)", statuses: ["NEEDS_CORRECTION"] },
-  { key: "review", label: "🔍 מוכן לבדיקת פקיד", statuses: ["NEEDS_CLERK_REVIEW"] },
-  { key: "escalated", label: "🚨 הוסלם", statuses: ["ESCALATED"] },
-  { key: "resolved", label: "✅ טופל", statuses: ["RESOLVED"] },
+  { key: "waiting", label: "ממתין ללקוח", statuses: ["WAITING_FOR_CLIENT", "SNOOZED_TONIGHT", "OPEN"] },
+  { key: "correction", label: "דרוש תיקון (מטושטש / שגוי)", statuses: ["NEEDS_CORRECTION"] },
+  { key: "review", label: "מוכן לבדיקת פקיד", statuses: ["NEEDS_CLERK_REVIEW"] },
+  { key: "escalated", label: "הוסלם", statuses: ["ESCALATED"] },
+  { key: "resolved", label: "טופל", statuses: ["RESOLVED"] },
 ];
 
 const ACTION_COPY: Record<SchedulerAction["kind"], { title: string; tone: "info" | "warning" | "error" | "success" }> = {
-  FRIENDLY_REMINDER: { title: "🔔 נשלחה תזכורת ידידותית", tone: "info" },
-  URGENT_DEADLINE_WARNING: { title: "⚠️ נשלחה התראת מועד דיווח", tone: "warning" },
-  URGENT_GROUPED: { title: "⚠️ סומן דחוף (כלול בהתראת המועד)", tone: "warning" },
-  ESCALATED: { title: "🚨 הוסלם — יש להתקשר ללקוח", tone: "error" },
-  SNOOZE_PING: { title: "🌙 נשלחה תזכורת של 20:00", tone: "success" },
+  FRIENDLY_REMINDER: { title: "נשלחה תזכורת ידידותית", tone: "info" },
+  URGENT_DEADLINE_WARNING: { title: "נשלחה התראת מועד דיווח", tone: "warning" },
+  URGENT_GROUPED: { title: "סומן דחוף (כלול בהתראת המועד)", tone: "warning" },
+  ESCALATED: { title: "הוסלם — יש להתקשר ללקוח", tone: "error" },
+  SNOOZE_PING: { title: "נשלחה תזכורת של 20:00", tone: "success" },
 };
 
 function Kpi({ icon, label, value, accent, hint }: { icon: ReactNode; label: string; value: string | number; accent: string; hint?: string }) {
@@ -119,7 +119,7 @@ export function ChasingBoard() {
     setJumping(true);
     try {
       const r = await api.timeJump(interval);
-      announce(r.actions, `⏩ הודמה קפיצה של +${interval} שעות`);
+      announce(r.actions, `הודמה קפיצה של +${interval} שעות`);
       await load();
     } catch (e) {
       toast({ tone: "error", title: "הדמיית הזמן נכשלה", body: e instanceof Error ? e.message : String(e) });
@@ -153,7 +153,7 @@ export function ChasingBoard() {
     <div className="mx-auto max-w-7xl space-y-5 p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">📋 לוח מעקב חי</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">לוח מעקב חי</h1>
           <p className="text-sm text-slate-500">כל בקשה פתוחה, מצבה בוואטסאפ ומה הבוט יעשה בהמשך.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +164,7 @@ export function ChasingBoard() {
             בדיקה עכשיו
           </Button>
           <Button variant="primary" size="lg" icon={<FastForward className="h-5 w-5 -scale-x-100" />} loading={jumping} onClick={timeJump}>
-            ⏩ הדמיית +{interval} שעות (הפעלת לולאת התזכורות)
+            הדמיית +{interval} שעות (הפעלת לולאת התזכורות)
           </Button>
         </div>
       </header>

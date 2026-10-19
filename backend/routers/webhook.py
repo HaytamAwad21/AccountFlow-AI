@@ -203,7 +203,7 @@ def _demo_receipt(body: DemoReceiptRequest) -> InboundResult:
             allocation_threshold=office.allocation_number_threshold_nis,
         )
         url = f"/uploads/{path.name}"
-        out = handle_media(db, client, path, url, "image/png", ticket.id if ticket else None, "📸")
+        out = handle_media(db, client, path, url, "image/png", ticket.id if ticket else None, "")
         db.commit()
         return _result(out, started)
 

@@ -7,6 +7,7 @@ offline Vision simulator, exercising every engine through the real HTTP API:
 """
 from __future__ import annotations
 
+import base64
 import io
 import os
 import re
@@ -38,8 +39,9 @@ import services.clock as clock  # noqa: E402
 from main import app  # noqa: E402
 from services.vision_ocr import validate_extraction  # noqa: E402
 from sqlalchemy import func, select  # noqa: E402
-from models import ActivityLog, LoginFailure  # noqa: E402
+from models import ActivityLog, LoginFailure, MessageTemplate  # noqa: E402
 from services.activity import cleanup_legacy_activity  # noqa: E402
+from services.no_emoji import has_emoji, purge_emojis_from_db  # noqa: E402
 from services.scheduler import describe_reminder_actions  # noqa: E402
 
 _real_local_today = clock.local_today
@@ -62,14 +64,14 @@ passed = 0
 def check(cond: bool, label: str, detail: object = "") -> None:
     global passed
     if not cond:
-        print(f"  ✗ {label}  {detail}")
+        print(f"  FAIL {label}  {detail}")
         raise AssertionError(label)
     passed += 1
-    print(f"  ✓ {label}")
+    print(f"  ok   {label}")
 
 
 def section(title: str) -> None:
-    print(f"\n▶ {title}")
+    print(f"\n== {title}")
 
 
 def parse_ts(s: str) -> datetime:
@@ -265,7 +267,7 @@ def main() -> None:
         urgent = [a for a in r["actions"] if a["kind"] == "URGENT_DEADLINE_WARNING"]
         check(len(urgent) >= 1, f"24th of the month → URGENT_DEADLINE_WARNING ({len(urgent)})")
         check("2" in next(m["content_text"] for m in c.get(f"/api/tickets/{urgent[0]['ticket_id']}").json()["messages"]
-                          if m["message_type"] == "AUTO_REMINDER" and "⚠️" in m["content_text"]), "warning says 2 days are left")
+                          if m["message_type"] == "AUTO_REMINDER" and "תזכורת דחופה" in m["content_text"]), "warning says 2 days are left")
         check(c.get(f"/api/tickets/{urgent[0]['ticket_id']}").json()["priority"] == "URGENT_DEADLINE", "priority → URGENT_DEADLINE")
 
         section("Israel Tax Authority — typed allocation number (מספר הקצאה)")
@@ -315,7 +317,7 @@ def main() -> None:
         r = c.post("/api/simulator/demo-receipt", json={"client_id": new_clients["he"]["id"], "ticket_id": tickets["he"]["id"], "scenario": "clear"}).json()
         ocr = r["ocr"]
         check(r["ticket"]["status"] == "NEEDS_CLERK_REVIEW" and ocr["is_valid"] is True, "clear invoice verified → NEEDS_CLERK_REVIEW")
-        check(ocr["checks"]["tax_id"] is True and re.fullmatch(r"\d{9}", ocr["business_id"]) is not None, "supplier ח.פ 9 digits ✓")
+        check(ocr["checks"]["tax_id"] is True and re.fullmatch(r"\d{9}", ocr["business_id"]) is not None, "supplier ח.פ has 9 digits")
         check(abs(ocr["total_amount"] - 1180.0) < 0.01 and ocr["vat_rate_applied"] == 18.0, "₪1,180 total validated at 18% VAT")
         r = c.post("/api/simulator/demo-receipt", json={"client_id": new_clients["en"]["id"], "ticket_id": tickets["en"]["id"], "scenario": "invalid_tax_id"}).json()
         check("invalid_tax_id" in r["ocr"]["rejection_codes"], "invoice with a 6-digit supplier ח.פ rejected")
@@ -412,12 +414,12 @@ def main() -> None:
             tk = db.get(ChasingTicket, legacy_ticket_id)
             rows = [
                 WhatsAppMessageLog(ticket_id=tk.id, client_id=tk.client_id, direction=MessageDirection.OUTBOUND, sender_name="firm",
-                                   message_type=MessageType.TEMPLATE, content_text="Hello Olivia Grant 👋 During our monthly bookkeeping review…",
-                                   buttons_json=[{"id": "upload_photo", "title": "📷 Upload Invoice Photo", "action": "REQUEST_MEDIA"}]),
+                                   message_type=MessageType.TEMPLATE, content_text="Hello Olivia Grant \U0001F44B During our monthly bookkeeping review…",
+                                   buttons_json=[{"id": "upload_photo", "title": "\U0001F4F7 Upload Invoice Photo", "action": "REQUEST_MEDIA"}]),
                 WhatsAppMessageLog(ticket_id=tk.id, client_id=tk.client_id, direction=MessageDirection.OUTBOUND, sender_name="firm",
-                                   message_type=MessageType.AUTO_REMINDER, content_text="🔔 Friendly reminder (2/3): we're still waiting for the invoice"),
+                                   message_type=MessageType.AUTO_REMINDER, content_text="\U0001F514 Friendly reminder (2/3): we're still waiting for the invoice"),
                 WhatsAppMessageLog(ticket_id=tk.id, client_id=tk.client_id, direction=MessageDirection.OUTBOUND, sender_name="firm",
-                                   message_type=MessageType.TEXT, content_text="⏰ لا مشكلة! سنذكّرك الليلة الساعة 20:00."),
+                                   message_type=MessageType.TEXT, content_text="\u23F0 لا مشكلة! سنذكّرك الليلة الساعة 20:00."),
             ]
             db.add_all(rows)
             db.commit()
@@ -425,16 +427,77 @@ def main() -> None:
             check(hebrewize_message_history(db) >= 3, "legacy messages rewritten on startup")
             converted = [db.get(WhatsAppMessageLog, i) for i in ids]
             check(all(HE.search(m.content_text) and not AR.search(m.content_text) for m in converted), "English and Arabic history is now Hebrew")
-            check(converted[0].content_text.startswith("שלום Olivia Grant") and converted[0].buttons_json[0]["title"] == "📷 העלאת צילום חשבונית",
+            check(converted[0].content_text.startswith("שלום Olivia Grant") and converted[0].buttons_json[0]["title"] == "העלאת צילום חשבונית",
                   "template message and its buttons re-rendered from the Hebrew template")
             check("(2/3)" in converted[1].content_text and "תזכורת ידידותית" in converted[1].content_text, "reminder keeps its counter")
             check(hebrewize_message_history(db) == 0, "conversion is idempotent")
+            purge_emojis_from_db(db)
+            cleaned = [db.get(WhatsAppMessageLog, i) for i in ids]
+            check(not any(has_emoji(m.content_text) or any(has_emoji(b.get("title")) for b in (m.buttons_json or [])) for m in cleaned),
+                  "emojis removed from converted legacy history")
+            tpl_row = db.scalar(select(MessageTemplate).where(MessageTemplate.slug == "missing_supplier_invoice"))
+            original_body, original_buttons = tpl_row.body_he, tpl_row.buttons_json
+            tpl_row.body_he = "\U0001F44B " + original_body + " \U0001F64F"
+            tpl_row.buttons_json = [{**b, "he": "\U0001F4F7 " + b["he"]} for b in original_buttons]
+            db.commit()
+            check(purge_emojis_from_db(db) >= 1, "startup purge cleans emojis stored by older releases")
+            db.refresh(tpl_row)
+            check(tpl_row.body_he == original_body and tpl_row.buttons_json == original_buttons,
+                  "template body and quick-reply buttons are clean Hebrew text again")
+            check(purge_emojis_from_db(db) == 0, "emoji purge is idempotent")
+
+        section("Manual worker messages (text + pictures) and automated labels")
+        cid = seeded[0]["id"]
+        history = c.get(f"/api/clients/{cid}/messages").json()
+        auto = [m for m in history if m["direction"] == "OUTBOUND"]
+        check(bool(auto) and all(m["is_automated"] and m["sender_user_id"] is None for m in auto),
+              f"template / reminder / Vision AI messages are automated ({len(auto)})")
+        check(all(not m["is_automated"] for m in history if m["direction"] == "INBOUND"), "inbound client messages are not automated")
+        check(c.post("/api/whatsapp/manual-send", data={"client_id": cid, "content_text": "x"}, headers=ANON).status_code == 401,
+              "manual send requires login")
+        r = c.post("/api/whatsapp/manual-send", data={"client_id": cid, "content_text": "שלום, בדקתי את התיק שלך \U0001F64F"})
+        check(r.status_code == 201, "worker sends a manual text message", r.text)
+        manual = r.json()
+        check(manual["is_automated"] is False and manual["sender_user_id"] == worker["id"] and manual["sender_name"] == worker["full_name"]
+              and manual["direction"] == "OUTBOUND" and manual["ticket_id"] is None, "manual message is OUTBOUND, not automated, from the worker")
+        check(manual["content_text"] == "שלום, בדקתי את התיק שלך", "emojis stripped from the manual text")
+        buf = io.BytesIO()
+        Image.new("RGB", (40, 30), "white").save(buf, format="PNG")
+        png = buf.getvalue()
+        r = c.post("/api/whatsapp/manual-send", data={"client_id": str(cid), "content_text": ""},
+                   files={"image_file": ("scan.png", png, "image/png")})
+        check(r.status_code == 201 and r.json()["media_url"].startswith("/uploads/out_") and r.json()["message_type"] == "IMAGE_UPLOAD",
+              "worker sends a picture without text", r.text)
+        check(c.get(r.json()["media_url"]).status_code == 200, "the picture is served from /uploads")
+        r = c.post("/api/whatsapp/manual-send", data={"client_id": cid, "content_text": "החשבונית המתוקנת",
+                                                      "image_base64": "data:image/png;base64," + base64.b64encode(png).decode()})
+        check(r.status_code == 201 and r.json()["media_url"].endswith(".png") and r.json()["content_text"] == "החשבונית המתוקנת",
+              "base64 picture with a caption")
+        check(c.post("/api/whatsapp/manual-send", data={"client_id": cid, "content_text": "  "}).status_code == 400,
+              "empty manual message rejected")
+        check(c.post("/api/whatsapp/manual-send", data={"client_id": cid},
+                     files={"image_file": ("a.gif", b"GIF89a", "image/gif")}).status_code == 422, "unsupported attachment type rejected")
+        check(c.post("/api/whatsapp/manual-send", data={"client_id": 999999, "content_text": "x"}).status_code == 404, "unknown client 404")
+        from services.whatsapp import _cloud_payload, customer_header, with_header
+        with SessionLocal() as db:
+            mrow = db.get(WhatsAppMessageLog, manual["id"])
+            arow = db.get(WhatsAppMessageLog, auto[0]["id"])
+            check(customer_header(arow) == "הודעה אוטומטית" and customer_header(mrow) == f"הודעה מאת {worker['full_name']}",
+                  "customer-facing headers: automated vs worker name")
+        check(with_header("הודעה אוטומטית", "גוף") == "*הודעה אוטומטית*\nגוף", "Cloud API text starts with the header line")
+        payload = _cloud_payload("+972501234567", "*הודעה מאת ראמי*", [], None, "https://x.test/uploads/out_1.png", "image/png")
+        check(payload["type"] == "image" and payload["image"]["link"].endswith(".png"), "manual picture goes to the Cloud API as an image")
+        everything = [m for cl in c.get("/api/clients").json() for m in c.get(f"/api/clients/{cl['id']}/messages").json()]
+        check(not any(has_emoji(m["content_text"]) or any(has_emoji(b.get("title")) for b in (m["buttons_json"] or [])) for m in everything),
+              f"no emojis in any WhatsApp message ({len(everything)} checked)")
+        check(not any(has_emoji(t["body_he"]) or has_emoji(t["name_he"]) or any(has_emoji(b["he"]) for b in t["buttons_json"])
+                      for t in c.get("/api/templates").json()), "no emojis in any template or quick-reply button")
 
         section("Activity log (manager only)")
         check(c.get("/api/activity", headers=W).status_code == 403, "worker cannot read the activity log (403)")
         log = c.get("/api/activity?limit=500", headers=M).json()
         actions = {e["action"] for e in log["items"]}
-        for a in ("LOGIN", "LOGOUT", "TICKET_SENT", "REMINDERS_SENT", "CAMPAIGN_SENT", "TICKET_APPROVED", "TICKET_REJECTED",
+        for a in ("LOGIN", "LOGOUT", "TICKET_SENT", "MANUAL_MESSAGE_SENT", "REMINDERS_SENT", "CAMPAIGN_SENT", "TICKET_APPROVED", "TICKET_REJECTED",
                   "CLIENT_CREATED", "CLIENT_UPDATED", "SETTINGS_UPDATED", "USER_CREATED", "USER_UPDATED", "PASSWORD_RESET",
                   "PASSWORD_CHANGED"):
             check(a in actions, f"activity log records {a} ({log['actions'][a]})")
@@ -445,6 +508,9 @@ def main() -> None:
         check(rem["user_name"] == worker["full_name"] and "תזכורות" in rem["description"], f"reminders entry: {rem['description']}")
         rej = next(e for e in log["items"] if e["action"] == "TICKET_REJECTED")
         check("הסכום בחשבונית לא תואם לתשלום" in rej["description"], "rejection entry keeps the reason")
+        man = next(e for e in log["items"] if e["action"] == "MANUAL_MESSAGE_SENT")
+        check(man["user_name"] == worker["full_name"] and man["description"].startswith("שליחת הודעה ידנית ללקוח ")
+              and seeded[0]["full_name"] in man["description"], f"manual message entry: {man['description']}")
         sent = next(e for e in log["items"] if e["action"] == "TICKET_SENT")
         check(sent["user_name"] == worker["full_name"] and "נשלחה בקשה מסוג" in sent["description"] and "ללקוח" in sent["description"],
               f"request entries name the worker, the request type and the client: {sent['description']}")
@@ -478,7 +544,7 @@ def main() -> None:
         k = c.get("/api/dashboard/kpis").json()
         check(k["auto_reminders_this_month"] > 0 and "הודעות" in k["hours_saved_basis"], f"KPIs ({k['estimated_hours_saved']} h saved)")
 
-    print(f"\n✅ ALL {passed} CHECKS PASSED")
+    print(f"\nALL {passed} CHECKS PASSED")
 
 
 if __name__ == "__main__":

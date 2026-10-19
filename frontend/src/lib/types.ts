@@ -85,6 +85,10 @@ export interface Message {
   client_id: number;
   direction: "OUTBOUND" | "INBOUND";
   sender_name: string;
+  /** true for bot / template / reminder / Vision AI messages; false for a worker's manual message */
+  is_automated: boolean;
+  /** the worker who wrote a manual message */
+  sender_user_id: number | null;
   message_type: MessageType;
   content_text: string;
   buttons_json: RenderedButton[] | null;

@@ -45,23 +45,25 @@ def _button_index(db: Session) -> tuple[dict[str, str], dict[str, str]]:
     return by_id, by_title
 
 
-# English / Arabic reply prefixes from older releases -> current Hebrew string key
+# English / Arabic reply prefixes from older releases -> current Hebrew string key.
+# Older releases started these replies with an emoji; they are written as escapes because the
+# project contains no emoji characters (they are stripped from stored rows after this upgrade).
 ACK_PREFIXES: list[tuple[tuple[str, ...], str]] = [
-    (("⏰ No problem", "⏰ لا مشكلة"), "ack_SNOOZE_TONIGHT"),
-    (("📷 Great", "📷 ممتاز"), "ack_REQUEST_MEDIA"),
-    (("✍️ Sure", "✍️ بكل سرور"), "ack_TYPE_DETAIL"),
-    (("👍 Thanks for letting", "👍 شكرًا لإبلاغنا"), "ack_NO_DOCUMENT"),
-    (("🏢",), "ack_BUSINESS_NO_RECEIPT"),
-    (("🏠",), "ack_PERSONAL_EXPENSE"),
-    (("✅ Thank you! Your", "✅ شكرًا لك! تم تسجيل"), "ack_PAID_CONFIRMED"),
-    (("💳",), "ack_PAY_LINK"),
-    (("📞",), "ack_REQUEST_CALL"),
-    (("👨‍💼",), "ack_SEND_CLERK_ANYWAY"),
-    (("🙏 Thank you! We added", "🙏 شكرًا لك! أضفنا"), "ack_text_detail"),
-    (("🙏 Thank you! Your message", "🙏 شكرًا لك! تم تحويل"), "ack_text_generic"),
-    (("📥 Thanks", "📥 شكرًا"), "no_open_ticket"),
-    (("📥 Received", "📥 تم الاستلام"), "media_forwarded"),
-    (("✅ Received and verified", "✅ تم الاستلام والتحقق"), "ocr_verified"),
+    (("\u23F0 No problem", "\u23F0 لا مشكلة"), "ack_SNOOZE_TONIGHT"),
+    (("\U0001F4F7 Great", "\U0001F4F7 ممتاز"), "ack_REQUEST_MEDIA"),
+    (("\u270D\uFE0F Sure", "\u270D\uFE0F بكل سرور"), "ack_TYPE_DETAIL"),
+    (("\U0001F44D Thanks for letting", "\U0001F44D شكرًا لإبلاغنا"), "ack_NO_DOCUMENT"),
+    (("\U0001F3E2",), "ack_BUSINESS_NO_RECEIPT"),
+    (("\U0001F3E0",), "ack_PERSONAL_EXPENSE"),
+    (("\u2705 Thank you! Your", "\u2705 شكرًا لك! تم تسجيل"), "ack_PAID_CONFIRMED"),
+    (("\U0001F4B3",), "ack_PAY_LINK"),
+    (("\U0001F4DE",), "ack_REQUEST_CALL"),
+    (("\U0001F468\u200D\U0001F4BC",), "ack_SEND_CLERK_ANYWAY"),
+    (("\U0001F64F Thank you! We added", "\U0001F64F شكرًا لك! أضفنا"), "ack_text_detail"),
+    (("\U0001F64F Thank you! Your message", "\U0001F64F شكرًا لك! تم تحويل"), "ack_text_generic"),
+    (("\U0001F4E5 Thanks", "\U0001F4E5 شكرًا"), "no_open_ticket"),
+    (("\U0001F4E5 Received", "\U0001F4E5 تم الاستلام"), "media_forwarded"),
+    (("\u2705 Received and verified", "\u2705 تم الاستلام والتحقق"), "ocr_verified"),
 ]
 
 
@@ -74,7 +76,7 @@ def _hebrew_for(db: Session, msg: WhatsAppMessageLog, ticket: ChasingTicket | No
     if msg.message_type == MessageType.TEMPLATE and ticket is not None:
         return render_text(body_for(ticket.template), ctx)
 
-    if text.startswith("🔔") and ticket is not None:
+    if text.startswith("\U0001F514") and ticket is not None:
         m = REMINDER_COUNT_RE.search(text)
         n, total = (m.group(1), m.group(2)) if m else (ticket.reminder_count, ticket.max_reminders)
         kwargs = {**ctx, "n": n, "max": total, "ticket_ref": ticket.ticket_ref}
@@ -85,13 +87,13 @@ def _hebrew_for(db: Session, msg: WhatsAppMessageLog, ticket: ChasingTicket | No
             category = TemplateCategory.MONTHLY_FOLDER
         return t(f"reminder_{category.value}", **kwargs)
 
-    if text.startswith("⚠️"):
+    if text.startswith("\u26A0\uFE0F"):
         tpl = db.scalar(select(MessageTemplate).where(MessageTemplate.slug == "monthly_folder_deadline_warning"))
         numbers = re.findall(r"\d+", text)
         if tpl and len(numbers) >= 2:
             return render_text(body_for(tpl), {"client_name": msg.client.full_name, "days_left": numbers[0], "open_items_count": numbers[1]})
 
-    if text.startswith("🌙") and ticket is not None:
+    if text.startswith("\U0001F319") and ticket is not None:
         return f"{t('snooze_ping', client_name=msg.client.full_name)}\n\n{render_text(body_for(ticket.template), ctx)}"
 
     if msg.message_type == MessageType.OCR_FEEDBACK and (text.startswith("Thanks") or text.startswith("شكرًا")) and ticket is not None:

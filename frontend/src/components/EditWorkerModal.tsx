@@ -74,7 +74,7 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
           }}
         >
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="שם מלא" hint={nameInvalid ? "⚠️ נדרשים לפחות 2 תווים" : undefined}>
+            <Field label="שם מלא" hint={nameInvalid ? "נדרשים לפחות 2 תווים" : undefined}>
               <input
                 autoFocus
                 dir="auto"
@@ -109,7 +109,7 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
             {!active && <p className="mt-1 text-[11px] text-slate-500">עובד/ת מושעה לא יוכל/תוכל להתחבר למערכת ולבצע פעולות.</p>}
           </div>
 
-          <Field label="סיסמה חדשה (אופציונלי)" hint={passwordInvalid ? "⚠️ לפחות 6 תווים" : "השאירו ריק כדי לא לשנות. איפוס סיסמה מנתק את העובד/ת מכל החיבורים."}>
+          <Field label="סיסמה חדשה (אופציונלי)" hint={passwordInvalid ? "לפחות 6 תווים" : "השאירו ריק כדי לא לשנות. איפוס סיסמה מנתק את העובד/ת מכל החיבורים."}>
             <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" placeholder="" invalid={passwordInvalid} />
           </Field>
 

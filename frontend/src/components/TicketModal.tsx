@@ -212,6 +212,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                     delivery={m.delivery_status}
                     mediaPath={m.media_url}
                     type={m.message_type}
+                    automated={m.is_automated}
+                    senderName={m.sender_name}
                   />
                 </div>
               ))}
@@ -282,7 +284,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 </div>
               </div>
             )}
-            {ticket.resolution_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">📝 {ticket.resolution_note}</p>}
+            {ticket.resolution_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{ticket.resolution_note}</p>}
 
             <section>
               <h4 className="mb-2 text-xs font-semibold text-slate-500">הקבלה שהועלתה</h4>
@@ -343,7 +345,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                     ))}
                   </ul>
                   {ocr.rejection_reason_he && (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">✗ {ocr.rejection_reason_he}</p>
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{ocr.rejection_reason_he}</p>
                   )}
 
                   {editing ? (

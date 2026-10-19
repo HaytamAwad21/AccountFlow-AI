@@ -18,7 +18,7 @@ for arg in "$@"; do
   esac
 done
 
-info() { printf '\033[1;34m▶ %s\033[0m\n' "$*"; }
+info() { printf '\033[1;34m>> %s\033[0m\n' "$*"; }
 
 # ── Python virtualenv ────────────────────────────────────────────────────────
 if [ -x "$BACKEND/.venv/Scripts/python.exe" ]; then

@@ -210,6 +210,8 @@ class MessageOut(ORMModel):
     client_id: int
     direction: MessageDirection
     sender_name: str
+    is_automated: bool = True
+    sender_user_id: int | None = None
     message_type: MessageType
     content_text: str
     buttons_json: list[dict] | None
