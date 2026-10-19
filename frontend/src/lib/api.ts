@@ -23,6 +23,7 @@ import type {
   User,
   UserRole,
 } from "./types";
+import type { Currency } from "./format";
 
 export const API_BASE: string = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
@@ -77,8 +78,10 @@ function detailMessage(detail: unknown): string {
       .map((d) => {
         if (typeof d === "object" && d && "msg" in d) {
           const field = (d as { loc?: unknown[] }).loc?.slice(-1)[0] ?? "";
-          const msg = String((d as { msg: string }).msg);
+          const msg = String((d as { msg: string }).msg).replace(/^Value error,\s*/, "");
           if (field === "tax_id" && /pattern/i.test(msg)) return "ח.פ / ע.מ חייב להכיל בדיוק 9 ספרות";
+          // Whole-request checks (e.g. strict variable types) already name the field in Hebrew.
+          if (field === "body" || field === "") return msg;
           return `${field}: ${msg}`;
         }
         return String(d);
@@ -196,7 +199,14 @@ export const api = {
   supplierSuggestions: (clientId?: number) =>
     request<string[]>(`/api/suppliers/suggestions${clientId ? `?client_id=${clientId}` : ""}`),
 
-  quickSend: (body: { client_id: number; template_id: number; context_variables: Record<string, string>; priority?: TicketPriority }) =>
+  quickSend: (body: {
+    client_id: number;
+    template_id: number;
+    context_variables: Record<string, string>;
+    /** currency of each money variable; missing entries default to ILS on the server */
+    currencies?: Record<string, Currency>;
+    priority?: TicketPriority;
+  }) =>
     request<QuickSendResponse>("/api/tickets/quick-send", { method: "POST", ...json(body) }),
   tickets: (params: { status?: TicketStatus[]; client_id?: number; q?: string } = {}) => {
     const qs = new URLSearchParams();

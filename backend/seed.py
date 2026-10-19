@@ -259,7 +259,7 @@ def seed_demo(db: Session) -> dict:
     c = clients
 
     # 1. Gabay garage — waiting, sent 30h ago
-    t1 = send(c[0], "missing_supplier_invoice", supplier_name="Delek Fuel Station", amount="₪1,240.00", invoice_date=d(12))
+    t1 = send(c[0], "missing_supplier_invoice", supplier_name="Delek Fuel Station", amount="1,240 ₪", invoice_date=d(12))
     _backdate(db, t1, 30)
     t1.next_reminder_at = now + timedelta(hours=18)
 
@@ -271,29 +271,29 @@ def seed_demo(db: Session) -> dict:
     t2.next_reminder_at = now - timedelta(hours=2)
 
     # 3. Haddad clinic — unidentified card charge
-    t3 = send(c[2], "unidentified_bank_charge", charge_amount="₪2,350.00", charge_date=d(9), bank_reference="CC-7781-2290")
+    t3 = send(c[2], "unidentified_bank_charge", charge_amount="2,350 ₪", charge_date=d(9), bank_reference="CC-7781-2290")
     _backdate(db, t3, 20)
     t3.next_reminder_at = now + timedelta(hours=28)
 
     # 4. Ben-David engineering (HE) — sent a blurry photo → NEEDS_CORRECTION
-    t4 = send(c[3], "missing_supplier_invoice", supplier_name="Office Depot Israel", amount="₪865.40", invoice_date=d(15))
+    t4 = send(c[3], "missing_supplier_invoice", supplier_name="Office Depot Israel", amount="865.40 ₪", invoice_date=d(15))
     _upload_demo(db, t4, "blurry")
     _backdate(db, t4, 26)
     t4.next_reminder_at = now + timedelta(hours=22)
 
     # 5. Turner studio (EN) — clear invoice verified by Vision AI → NEEDS_CLERK_REVIEW
-    t5 = send(c[4], "missing_supplier_invoice", supplier_name="Adobe Systems Software Ireland", amount="₪1,980.00", invoice_date=d(6))
+    t5 = send(c[4], "missing_supplier_invoice", supplier_name="Adobe Systems Software Ireland", amount="1,980 ₪", invoice_date=d(6))
     _upload_demo(db, t5, "clear")
     _backdate(db, t5, 8)
 
     # 6. Nissim mini-market — 2 reminders, overdue (urgent if the 26th is ≤ 3 days away)
-    t6 = send(c[5], "missing_supplier_invoice", supplier_name="Tnuva Dairy", amount="₪3,412.75", invoice_date=d(18))
+    t6 = send(c[5], "missing_supplier_invoice", supplier_name="Tnuva Dairy", amount="3,412.75 ₪", invoice_date=d(18))
     _add_reminders(db, t6, 2)
     _backdate(db, t6, 150)
     t6.next_reminder_at = now - timedelta(hours=1)
 
     # 7. Peretz electric (HE) — 3 reminders ignored → ESCALATED
-    t7 = send(c[6], "missing_supplier_invoice", supplier_name="Electra Wholesale", amount="₪5,760.00", invoice_date=d(24))
+    t7 = send(c[6], "missing_supplier_invoice", supplier_name="Electra Wholesale", amount="5,760 ₪", invoice_date=d(24))
     _add_reminders(db, t7, 3)
     _backdate(db, t7, 200)
     t7.status = TicketStatus.ESCALATED
@@ -301,7 +301,7 @@ def seed_demo(db: Session) -> dict:
     t7.next_reminder_at = None
 
     # 8. Ohana bakery — verified & approved
-    t8 = send(c[7], "missing_supplier_invoice", supplier_name="Shufersal Wholesale", amount="₪2,104.30", invoice_date=d(10))
+    t8 = send(c[7], "missing_supplier_invoice", supplier_name="Shufersal Wholesale", amount="2,104.30 ₪", invoice_date=d(10))
     _upload_demo(db, t8, "clear")
     approve_ticket(db, t8, users[0])
     _backdate(db, t8, 50)
@@ -322,7 +322,7 @@ def seed_demo(db: Session) -> dict:
     _backdate(db, t10, 5)
 
     # Extra: Gabay garage resolved earlier this week (second approved invoice)
-    t11 = send(c[0], "missing_supplier_invoice", supplier_name="Auto Parts Galil", amount="₪4,318.00", invoice_date=d(20))
+    t11 = send(c[0], "missing_supplier_invoice", supplier_name="Auto Parts Galil", amount="4,318 ₪", invoice_date=d(20))
     _upload_demo(db, t11, "clear")
     approve_ticket(db, t11, users[1])
     _backdate(db, t11, 90)

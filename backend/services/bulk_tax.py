@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from models import BulkTaxCampaign, BulkTaxRecipient, Client, PaymentStatus, ReportingFrequency
 from services.clock import fmt_date, next_deadline
 from services.demo_invoices import parse_amount
+from services.money import format_money
 from services.i18n import NAME_LANGUAGE_ERROR, has_arabic
 from services.ticket_engine import EngineError, create_and_send_ticket, recount_campaign, template_by_slug, TAX_SLUG
 from services.whatsapp import normalize_phone
@@ -46,7 +47,7 @@ COLUMN_ALIASES = {
 
 
 def fmt_ils(value: float) -> str:
-    return f"₪{value:,.2f}"
+    return format_money(value, "ILS")
 
 
 def _norm_col(col: str) -> str:

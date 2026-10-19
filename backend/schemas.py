@@ -4,7 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, model_validator
+from pydantic_core import PydanticCustomError
 
 from models import (
     BulkTaxCampaign,
@@ -23,6 +24,7 @@ from models import (
     UserRole,
     WhatsAppMessageLog,
 )
+from services.money import Currency, normalize_variables
 from services.templating import required_variables, template_variables
 
 
@@ -259,7 +261,19 @@ class QuickSendRequest(BaseModel):
     template_id: int | None = None
     template_slug: str | None = None
     context_variables: dict[str, Any] = {}
+    # Currency of each money variable ({"amount": "USD"}); missing entries default to ILS (₪).
+    currencies: dict[str, Currency] = {}
     priority: TicketPriority = TicketPriority.NORMAL
+
+    @model_validator(mode="after")
+    def _strict_variable_types(self) -> "QuickSendRequest":
+        """Amounts must be numbers (formatted with their currency), dates real calendar dates,
+        months MM/YYYY and counts whole numbers. Nothing invalid reaches the database."""
+        normalized, errors = normalize_variables(self.context_variables, self.currencies)
+        if errors:
+            raise PydanticCustomError("invalid_variables", "{message}", {"message": " · ".join(errors)})
+        self.context_variables = normalized
+        return self
 
 
 class QuickSendResponse(BaseModel):

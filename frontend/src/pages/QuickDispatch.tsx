@@ -20,21 +20,30 @@ import { useApp } from "../context/AppContext";
 import { api, ApiError } from "../lib/api";
 import {
   AMOUNT_VARS,
+  DATE_VARS,
+  DEFAULT_CURRENCY,
+  INTEGER_VARS,
   MISSING_DETAIL_CHIPS,
+  MONTH_VARS,
   VARIABLE_LABELS,
   autoVariables,
   cx,
-  formatAmountInput,
-  ils,
+  formatMoney,
+  isoDate,
+  isoMonth,
+  isoToDmy,
   localizedButtons,
+  monthToMy,
   parseAmount,
   renderTemplate,
   templateBody,
   templateName,
+  variableError,
   VAT_DEADLINE_DAY,
+  type Currency,
 } from "../lib/format";
 import type { Client } from "../lib/types";
-import { DateInput } from "../components/DateInput";
+import { AmountInput, FieldError } from "../components/TypedInputs";
 import {
   AttachmentChip,
   MANUAL_ATTACHMENT_ACCEPT,
@@ -53,11 +62,16 @@ const CARD_META: Record<string, { title: string; icon: ReactNode; tone: string }
   monthly_folder_deadline_warning: { title: "מועד דיווח דחוף", icon: <AlertOctagon className="h-5 w-5" />, tone: "text-red-600 bg-red-50" },
 };
 
-const DATE_VARS = new Set(["invoice_date", "charge_date", "due_date"]);
 const GROSS_AMOUNT_VARS = new Set(["amount", "charge_amount"]);
 
-function ddmmyyyy(d: Date): string {
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+/** The text a variable shows in the WhatsApp preview (same formatting as the server). */
+function displayValue(name: string, raw: string, currency: Currency): string {
+  const v = raw.trim();
+  if (!v || variableError(name, v)) return v;
+  if (AMOUNT_VARS.has(name)) return formatMoney(Number(v), currency);
+  if (DATE_VARS.has(name)) return isoToDmy(v) ?? v;
+  if (MONTH_VARS.has(name)) return monthToMy(v) ?? v;
+  return v;
 }
 
 export function QuickDispatch() {
@@ -73,7 +87,12 @@ export function QuickDispatch() {
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const [templateId, setTemplateId] = useState<number | null>(null);
+  // Raw input values: amounts "1240.5", dates "YYYY-MM-DD", months "YYYY-MM" (formatted for display / by the server).
   const [vars, setVars] = useState<Record<string, string>>({});
+  // Currency of each money field; ₪ unless the worker picks $.
+  const [currencies, setCurrencies] = useState<Record<string, Currency>>({});
+  // Per-field validation errors (Hebrew).
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
   const [suppliers, setSuppliers] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
@@ -117,6 +136,7 @@ export function QuickDispatch() {
   useEffect(() => {
     if (!template || !client) return;
     setMissing([]);
+    setInvalid({});
     setVars((prev) => {
       const next: Record<string, string> = {};
       for (const v of template.required_variables) next[v] = prev[v] ?? "";
@@ -128,13 +148,13 @@ export function QuickDispatch() {
       if ("tax_period" in next && !next.tax_period) {
         const d = new Date();
         const m = d.getDate() > 15 ? d : new Date(d.getFullYear(), d.getMonth() - 1, 1);
-        next.tax_period = `${String(m.getMonth() + 1).padStart(2, "0")}/${m.getFullYear()}`;
+        next.tax_period = isoMonth(m);
       }
       if ("due_date" in next && !next.due_date) {
         const d = new Date();
         const day = VAT_DEADLINE_DAY;
         const due = d.getDate() <= day ? new Date(d.getFullYear(), d.getMonth(), day) : new Date(d.getFullYear(), d.getMonth() + 1, day);
-        next.due_date = ddmmyyyy(due);
+        next.due_date = isoDate(due);
       }
       return next;
     });
@@ -146,13 +166,24 @@ export function QuickDispatch() {
       : template.required_variables
     : [];
 
-  const finalVars = useMemo(() => {
+  const previewVars = useMemo(() => {
     const out: Record<string, string> = {};
-    for (const [k, v] of Object.entries(vars)) out[k] = AMOUNT_VARS.has(k) ? formatAmountInput(v) : v.trim();
+    for (const [k, v] of Object.entries(vars)) out[k] = displayValue(k, v, currencies[k] ?? DEFAULT_CURRENCY);
     return out;
-  }, [vars]);
+  }, [vars, currencies]);
 
-  const preview = template && client ? renderTemplate(templateBody(template), { ...autoVariables(client), ...finalVars }) : "";
+  const setVar = (name: string, value: string) => {
+    setVars((p) => ({ ...p, [name]: value }));
+    setMissing((m) => m.filter((x) => x !== name));
+    setInvalid((p) => {
+      if (!(name in p)) return p;
+      const next = { ...p };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const preview = template && client ? renderTemplate(templateBody(template), { ...autoVariables(client), ...previewVars }) : "";
   const previewButtons = template ? localizedButtons(template) : [];
   const unfilled = inputVars.filter((v) => !String(vars[v] ?? "").trim());
 
@@ -177,13 +208,28 @@ export function QuickDispatch() {
 
   const send = async () => {
     if (!client || !template || sending) return;
-    if (unfilled.length) {
-      setMissing(unfilled);
-      return;
+    const errors: Record<string, string> = {};
+    for (const v of inputVars) {
+      const error = variableError(v, vars[v] ?? "");
+      if (error) errors[v] = error;
+    }
+    setInvalid(errors);
+    if (unfilled.length) setMissing(unfilled);
+    if (unfilled.length || Object.keys(errors).length) return;
+    const contextVariables: Record<string, string> = {};
+    const sendCurrencies: Record<string, Currency> = {};
+    for (const [k, v] of Object.entries(vars)) {
+      contextVariables[k] = v.trim();
+      if (AMOUNT_VARS.has(k)) sendCurrencies[k] = currencies[k] ?? DEFAULT_CURRENCY;
     }
     setSending(true);
     try {
-      const r = await api.quickSend({ client_id: client.id, template_id: template.id, context_variables: finalVars });
+      const r = await api.quickSend({
+        client_id: client.id,
+        template_id: template.id,
+        context_variables: contextVariables,
+        currencies: sendCurrencies,
+      });
       setLastSent({ ref: r.ticket.ticket_ref, ms: r.elapsed_ms, client: client.full_name });
       toast({
         tone: "success",
@@ -193,6 +239,7 @@ export function QuickDispatch() {
       const keep: Record<string, string> = {};
       for (const k of ["tax_period", "due_date"]) if (vars[k]) keep[k] = vars[k];
       setVars(keep);
+      setCurrencies({}); // every new request starts in shekels
       refreshClients().catch(() => undefined);
       api.supplierSuggestions(client.id).then(setSuppliers).catch(() => undefined);
       searchRef.current?.focus();
@@ -255,16 +302,19 @@ export function QuickDispatch() {
 
   /** Gross amount -> net + VAT at the office's live VAT rate (and the allocation-number hint). */
   const vatBreakdown = (key: string): ReactNode => {
+    if (variableError(key, vars[key] ?? "")) return null;
     const gross = parseAmount(vars[key]);
     if (gross === null || gross <= 0) return null;
+    const currency = currencies[key] ?? DEFAULT_CURRENCY;
     const net = gross / (1 + vatRate / 100);
-    const needsAllocation = net >= allocationThreshold;
+    // The Tax Authority allocation-number threshold is in shekels; it is shown for ₪ amounts only.
+    const needsAllocation = currency === "ILS" && net >= allocationThreshold;
     return (
       <p className="mt-1 text-[11px] text-slate-500">
-        לפני מע״מ {ils(net)} · מע״מ {vatRate}% {ils(gross - net)}
+        לפני מע״מ <bdi>{formatMoney(net, currency)}</bdi> · מע״מ {vatRate}% <bdi>{formatMoney(gross - net, currency)}</bdi>
         {needsAllocation && (
           <span className="ms-1 inline-flex items-center gap-1 font-semibold text-amber-700">
-            · <AlertTriangle className="h-3 w-3" /> חובת מספר הקצאה (מעל {ils(allocationThreshold)})
+            · <AlertTriangle className="h-3 w-3" /> חובת מספר הקצאה (מעל <bdi>{formatMoney(allocationThreshold, "ILS")}</bdi>)
           </span>
         )}
       </p>
@@ -473,35 +523,72 @@ export function QuickDispatch() {
                     {inputVars.map((v, idx) => {
                       const meta = VARIABLE_LABELS[v] ?? { label: v, placeholder: "" };
                       const isMissing = missing.includes(v);
+                      const error = invalid[v] ?? null;
+                      const ringClass = (isMissing || error) && "ring-2 ring-red-400";
+                      const ref = idx === 0 ? firstInputRef : undefined;
                       return (
                         <Field key={v} label={meta.label}>
-                          {DATE_VARS.has(v) ? (
-                            <DateInput
-                              ref={idx === 0 ? firstInputRef : undefined}
+                          {AMOUNT_VARS.has(v) ? (
+                            <AmountInput
+                              ref={ref}
                               value={vars[v] ?? ""}
-                              onChange={(val) => {
-                                setVars((p) => ({ ...p, [v]: val }));
-                                setMissing((m) => m.filter((x) => x !== v));
-                              }}
+                              onChange={(val) => setVar(v, val)}
+                              currency={currencies[v] ?? DEFAULT_CURRENCY}
+                              onCurrencyChange={(cur) => setCurrencies((p) => ({ ...p, [v]: cur }))}
                               placeholder={meta.placeholder}
-                              className={cx(isMissing && "ring-2 ring-red-400")}
+                              error={error}
+                              invalid={isMissing}
+                            />
+                          ) : DATE_VARS.has(v) ? (
+                            <input
+                              ref={ref}
+                              type="date"
+                              min="2000-01-01"
+                              max="2100-12-31"
+                              value={vars[v] ?? ""}
+                              onChange={(e) => setVar(v, e.target.value)}
+                              className={cx(inputClass, ringClass)}
+                            />
+                          ) : MONTH_VARS.has(v) ? (
+                            <input
+                              ref={ref}
+                              type="month"
+                              min="2000-01"
+                              max="2100-12"
+                              value={vars[v] ?? ""}
+                              onChange={(e) => setVar(v, e.target.value)}
+                              className={cx(inputClass, ringClass)}
+                            />
+                          ) : INTEGER_VARS.has(v) ? (
+                            <input
+                              ref={ref}
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              dir="ltr"
+                              value={vars[v] ?? ""}
+                              onKeyDown={(e) => {
+                                if (["e", "E", "+", "-", ".", ","].includes(e.key)) {
+                                  e.preventDefault();
+                                  setInvalid((p) => ({ ...p, [v]: "נא להזין מספר שלם בלבד" }));
+                                }
+                              }}
+                              onChange={(e) => setVar(v, e.target.value.replace(/\D/g, ""))}
+                              className={cx(inputClass, "text-end", ringClass)}
                             />
                           ) : (
                             <input
-                              ref={idx === 0 ? firstInputRef : undefined}
+                              ref={ref}
                               value={vars[v] ?? ""}
-                              onChange={(e) => {
-                                setVars((p) => ({ ...p, [v]: e.target.value }));
-                                setMissing((m) => m.filter((x) => x !== v));
-                              }}
-                              onBlur={() => AMOUNT_VARS.has(v) && setVars((p) => ({ ...p, [v]: formatAmountInput(p[v] ?? "") }))}
+                              onChange={(e) => setVar(v, e.target.value)}
                               placeholder={meta.placeholder}
                               list={v === "supplier_name" ? "supplier-suggestions" : undefined}
-                              dir={AMOUNT_VARS.has(v) ? "ltr" : "auto"}
-                              inputMode={AMOUNT_VARS.has(v) ? "decimal" : undefined}
-                              className={cx(inputClass, AMOUNT_VARS.has(v) && "text-end", isMissing && "ring-2 ring-red-400")}
+                              dir="auto"
+                              className={cx(inputClass, ringClass)}
                             />
                           )}
+                          {!AMOUNT_VARS.has(v) && <FieldError message={error} />}
                           {GROSS_AMOUNT_VARS.has(v) && vatBreakdown(v)}
                           {DATE_VARS.has(v) && (
                             <div className="mt-1 flex gap-1">
@@ -509,7 +596,7 @@ export function QuickDispatch() {
                                 <button
                                   key={off}
                                   type="button"
-                                  onClick={() => setVars((p) => ({ ...p, [v]: ddmmyyyy(new Date(Date.now() + off * 86400000)) }))}
+                                  onClick={() => setVar(v, isoDate(new Date(Date.now() + off * 86400000)))}
                                   className="rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] text-slate-600 hover:bg-slate-200"
                                 >
                                   {off === 0 ? "היום" : off === -1 ? "אתמול" : "לפני שבוע"}

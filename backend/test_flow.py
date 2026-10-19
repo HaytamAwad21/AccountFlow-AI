@@ -251,6 +251,49 @@ def main() -> None:
                                                                "context_variables": {"supplier_name": "X"}})
         check(r.status_code == 422 and set(r.json()["missing"]) == {"invoice_number", "missing_detail"}, "missing variables rejected with 422")
 
+        section("Strict variable types and currency (₪ / $)")
+        check(body["ticket"]["context_variables_json"]["amount"] == "1,180 ₪" and "1,180 ₪" in body["rendered_text"],
+              "symbol amount ₪1,180.00 stored and rendered as 1,180 ₪")
+        typed_client = seeded[1]["id"]
+
+        def typed_send(variables: dict, currencies: dict | None = None, slug: str = "missing_supplier_invoice"):
+            payload = {"client_id": typed_client, "template_slug": slug, "context_variables": variables}
+            if currencies is not None:
+                payload["currencies"] = currencies
+            return c.post("/api/tickets/quick-send", headers=W, json=payload)
+
+        for bad, why in (("12a", "letters"), ("abc", "letters only"), ("1.234", "3 decimals"), ("-50", "negative"), ("0", "zero"),
+                         ("1 000", "space"), ("₪$5", "two currencies")):
+            r = typed_send({"supplier_name": "Typed Ltd", "amount": bad, "invoice_date": "2026-10-03"})
+            check(r.status_code == 422, f"amount '{bad}' rejected ({why})", r.text[:160])
+        r = typed_send({"supplier_name": "Typed Ltd", "amount": "12abc", "invoice_date": "2026-10-03"})
+        check("נא להזין מספרים בלבד" in r.json()["detail"][0]["msg"], "Hebrew 'numbers only' message for letters in an amount")
+        for bad in ("31/02/2026", "2026-13-01", "03-10-2026", "yesterday", "1/1/1999"):
+            check(typed_send({"supplier_name": "Typed Ltd", "amount": "500", "invoice_date": bad}).status_code == 422, f"date '{bad}' rejected")
+        check(typed_send({"supplier_name": "Typed Ltd", "amount": "500", "invoice_date": "2026-10-03"}, {"amount": "EUR"}).status_code == 422,
+              "unsupported currency rejected")
+        check(typed_send({"supplier_name": "Typed Ltd", "amount": "500", "invoice_date": "2026-10-03"}, {"supplier_name": "USD"}).status_code == 422,
+              "currency on a non-money field rejected")
+        check(typed_send({"supplier_name": "Typed Ltd", "amount": "$500", "invoice_date": "2026-10-03"}, {"amount": "ILS"}).status_code == 422,
+              "currency selector must match a typed symbol")
+        r = typed_send({"supplier_name": "Typed Ltd", "amount": "500", "invoice_date": "2026-10-03"})
+        check(r.status_code == 201 and r.json()["ticket"]["context_variables_json"]["amount"] == "500 ₪"
+              and "500 ₪" in r.json()["rendered_text"], "500 with the default currency becomes '500 ₪'")
+        check(r.json()["ticket"]["context_variables_json"]["invoice_date"] == "03/10/2026" and "03/10/2026" in r.json()["rendered_text"],
+              "HTML date 2026-10-03 stored and rendered as 03/10/2026")
+        r = typed_send({"supplier_name": "Typed Ltd", "amount": "1240.5", "invoice_date": "03/10/2026"}, {"amount": "USD"})
+        check(r.status_code == 201 and r.json()["ticket"]["context_variables_json"]["amount"] == "$1,240.50"
+              and "$1,240.50" in r.json()["rendered_text"], "1240.5 in dollars becomes '$1,240.50'")
+        r = typed_send({"tax_period": "2026-09", "vat_amount": "4820", "tax_advance_amount": "99.9", "due_date": "2026-10-26"},
+                       {"vat_amount": "ILS", "tax_advance_amount": "USD"}, slug="tax_ready_to_pay")
+        ctx = r.json()["ticket"]["context_variables_json"] if r.status_code == 201 else {}
+        check(ctx.get("tax_period") == "09/2026" and ctx.get("vat_amount") == "4,820 ₪" and ctx.get("tax_advance_amount") == "$99.90"
+              and ctx.get("due_date") == "26/10/2026", "month picker, per-field currencies and due date normalized", r.text[:200])
+        check(typed_send({"tax_period": "13/2026", "vat_amount": "1", "tax_advance_amount": "1", "due_date": "2026-10-26"},
+                         slug="tax_ready_to_pay").status_code == 422, "invalid month rejected")
+        check(typed_send({"days_left": "3a", "open_items_count": "2"}, slug="monthly_folder_deadline_warning").status_code == 422,
+              "counts must be whole numbers")
+
         section("Engine B — 48h auto-nagging & 26th-of-the-month escalation")
         freeze_day(10)  # 16 days before the 26th → friendly reminders only
         r = c.post("/api/scheduler/simulate-time-jump?hours=48").json()

@@ -57,13 +57,76 @@ export function autoVariables(client: Client): Record<string, string> {
 }
 
 export const AMOUNT_VARS = new Set(["amount", "charge_amount", "vat_amount", "tax_advance_amount", "expected_amount"]);
+/** Variables entered with the HTML date picker (YYYY-MM-DD) and sent to WhatsApp as DD/MM/YYYY. */
+export const DATE_VARS = new Set(["invoice_date", "charge_date", "due_date"]);
+/** Variables entered with the HTML month picker (YYYY-MM) and sent to WhatsApp as MM/YYYY. */
+export const MONTH_VARS = new Set(["tax_period"]);
+/** Whole-number variables. */
+export const INTEGER_VARS = new Set(["days_left", "open_items_count"]);
 
-/** "1250" -> "₪1,250.00"; anything already formatted is left untouched. */
-export function formatAmountInput(value: string): string {
-  const raw = value.trim();
-  if (!/^-?\d+(?:[.,]\d+)?$/.test(raw.replace(/,/g, ""))) return raw;
-  const n = Number(raw.replace(/,/g, ""));
-  return Number.isFinite(n) ? ils(n) : raw;
+export type Currency = "ILS" | "USD";
+export const DEFAULT_CURRENCY: Currency = "ILS";
+export const CURRENCY_OPTIONS: { value: Currency; symbol: string; label: string }[] = [
+  { value: "ILS", symbol: "₪", label: "שקל" },
+  { value: "USD", symbol: "$", label: "דולר" },
+];
+
+/** What an amount field may contain while typing: digits and one decimal point, at most 2 decimals. */
+export const AMOUNT_TYPING_RE = /^\d*(?:\.\d{0,2})?$/;
+/** A complete, valid amount. */
+const AMOUNT_COMPLETE_RE = /^\d+(?:\.\d{1,2})?$/;
+export const NUMBERS_ONLY_ERROR = "נא להזין מספרים בלבד";
+
+/** Same output as the backend (services/money.py): 500 -> "500 ₪" / "$500"; 1240.5 -> "1,240.50 ₪" / "$1,240.50". */
+export function formatMoney(value: number, currency: Currency = DEFAULT_CURRENCY): string {
+  const rounded = Math.round(value * 100) / 100;
+  const digits = Number.isInteger(rounded) ? 0 : 2;
+  const number = rounded.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return currency === "USD" ? `$${number}` : `${number} ₪`;
+}
+
+/** Hebrew error for a typed variable, or null when it is valid (empty values are checked as "missing"). */
+export function variableError(name: string, value: string): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (AMOUNT_VARS.has(name)) {
+    if (!AMOUNT_COMPLETE_RE.test(v)) return NUMBERS_ONLY_ERROR;
+    if (Number(v) <= 0) return "הסכום חייב להיות גדול מאפס";
+    return null;
+  }
+  if (DATE_VARS.has(name)) return isoToDmy(v) ? null : "תאריך לא תקין";
+  if (MONTH_VARS.has(name)) return monthToMy(v) ? null : "חודש לא תקין";
+  if (INTEGER_VARS.has(name)) return /^\d{1,5}$/.test(v) ? null : "נא להזין מספר שלם בלבד";
+  return null;
+}
+
+/** Local date -> "YYYY-MM-DD" (the value format of <input type="date">). */
+export function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "2026-10-03" -> "03/10/2026"; null when it is not a real calendar date between 2000 and 2100. */
+export function isoToDmy(iso: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(y, mo - 1, d);
+  if (y < 2000 || y > 2100 || date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+/** Local date -> "YYYY-MM" (the value format of <input type="month">). */
+export function isoMonth(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "2026-09" -> "09/2026"; null when invalid. */
+export function monthToMy(value: string): string | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const [y, mo] = [Number(m[1]), Number(m[2])];
+  if (y < 2000 || y > 2100 || mo < 1 || mo > 12) return null;
+  return `${m[2]}/${m[1]}`;
 }
 
 export function parseAmount(value: string | number | null | undefined): number | null {
@@ -126,17 +189,17 @@ export const PRIORITY_META: Record<TicketPriority, { label: string; className: s
 
 export const VARIABLE_LABELS: Record<string, { label: string; placeholder: string }> = {
   supplier_name: { label: "שם הספק", placeholder: "לדוגמה: דלק תחנת דלק" },
-  amount: { label: "סכום ששולם", placeholder: "1240 ← ₪1,240.00" },
-  invoice_date: { label: "תאריך תשלום / חשבונית", placeholder: "dd/mm/yyyy" },
+  amount: { label: "סכום ששולם", placeholder: "לדוגמה: 1240.50" },
+  invoice_date: { label: "תאריך תשלום / חשבונית", placeholder: "" },
   invoice_number: { label: "מספר חשבונית", placeholder: "לדוגמה: 88412" },
   missing_detail: { label: "הפרט החסר", placeholder: "מה חסר בחשבונית?" },
-  charge_amount: { label: "סכום החיוב", placeholder: "2350 ← ₪2,350.00" },
-  charge_date: { label: "תאריך החיוב", placeholder: "dd/mm/yyyy" },
+  charge_amount: { label: "סכום החיוב", placeholder: "לדוגמה: 2350" },
+  charge_date: { label: "תאריך החיוב", placeholder: "" },
   bank_reference: { label: "אסמכתת בנק / כרטיס", placeholder: "לדוגמה: CC-7781-2290" },
-  tax_period: { label: "תקופת דיווח", placeholder: "לדוגמה: 10/2026" },
-  vat_amount: { label: "מע״מ לתשלום", placeholder: "4820 ← ₪4,820.00" },
-  tax_advance_amount: { label: "מקדמות מס", placeholder: "2150 ← ₪2,150.00" },
-  due_date: { label: "מועד אחרון לתשלום", placeholder: "dd/mm/yyyy" },
+  tax_period: { label: "תקופת דיווח", placeholder: "" },
+  vat_amount: { label: "מע״מ לתשלום", placeholder: "לדוגמה: 4820" },
+  tax_advance_amount: { label: "מקדמות מס", placeholder: "לדוגמה: 2150" },
+  due_date: { label: "מועד אחרון לתשלום", placeholder: "" },
   days_left: { label: "ימים שנותרו (אוטומטי)", placeholder: "" },
   open_items_count: { label: "פריטים פתוחים (אוטומטי)", placeholder: "" },
   rejection_reason: { label: "סיבת הדחייה", placeholder: "" },
