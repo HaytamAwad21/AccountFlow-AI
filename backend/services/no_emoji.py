@@ -22,11 +22,11 @@ log = logging.getLogger("accountflow.no_emoji")
 EMOJI_RE = re.compile(
     "["
     "\U0001F000-\U0001FAFF"
-    "⌀-⏿"
-    "☀-➿"
-    "⬀-⯿"
-    "▶◀"
-    "⃣‍︎️"
+    "\u2300-\u23FF"
+    "\u2600-\u27BF"
+    "\u2B00-\u2BFF"
+    "\u25B6\u25C0"
+    "\u20E3\u200D\uFE0E\uFE0F"
     "]"
 )
 BUTTON_TEXT_KEYS = ("he", "en", "ar", "title")
