@@ -1,9 +1,23 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDashed, ExternalLink, Pencil, RotateCcw, Smartphone, ThumbsDown, ThumbsUp, XCircle } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  CircleDashed,
+  ExternalLink,
+  FileText,
+  FileX2,
+  Pencil,
+  Phone,
+  PhoneCall,
+  RotateCcw,
+  Smartphone,
+  ThumbsDown,
+  XCircle,
+} from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, mediaUrl } from "../lib/api";
 import { cx, fullDateTime, ils, relativeTime } from "../lib/format";
-import type { OcrResult, TicketDetail } from "../lib/types";
+import type { OcrResult, TemplateCategory, TicketDetail } from "../lib/types";
 import { Button, inputClass, Ltr, Modal, PriorityLabel, Spinner, StatusBadge } from "./ui";
 import { maskDate } from "../lib/date";
 import { DateInput } from "./DateInput";
@@ -80,6 +94,24 @@ function CheckIcon({ value }: { value: boolean | null }) {
 
 const OCR_STATUS_LABEL = { PASSED: "עבר", FAILED: "נכשל", MANUAL_REVIEW: "בדיקה ידנית" } as const;
 
+/** Request types whose answer is a document (invoice / receipt) that Vision AI checks. */
+const DOCUMENT_CATEGORIES = new Set<TemplateCategory>(["MISSING_INVOICE", "MISSING_DETAIL", "UNIDENTIFIED_CHARGE", "MONTHLY_FOLDER"]);
+
+/**
+ * How the office closes this ticket:
+ * - "call": a tax-ready notification, or a client who asked for a phone call and sent no document.
+ *   The worker calls the client and closes the ticket; receipt / Vision AI panels are irrelevant.
+ * - "document": a request for an invoice / receipt / missing detail; approve or close without a document.
+ */
+function ticketKind(ticket: TicketDetail): "call" | "document" {
+  if (ticket.category === "TAX_READY") return "call";
+  const callRequested = Boolean(ticket.context_variables_json.call_requested_at);
+  const hasDocument = Boolean(ticket.media_file_path || ticket.ocr_validation_json);
+  if (callRequested && !hasDocument) return "call";
+  if (DOCUMENT_CATEGORIES.has(ticket.category) || ticket.requires_media_reply) return "document";
+  return "call";
+}
+
 export function TicketModal({ ticketId, onClose }: { ticketId: number | null; onClose: () => void }) {
   const { tick, toast, selectClient } = useApp();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
@@ -101,6 +133,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
   }, [ticketId, tick]);
 
   const ocr = ticket?.ocr_validation_json ?? null;
+  const kind = ticket ? ticketKind(ticket) : "document";
+  const callRequestedAt = ticket?.context_variables_json.call_requested_at;
 
   const startEdit = () => {
     const f: Record<string, string> = {};
@@ -223,17 +257,29 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
           {/* OCR + actions */}
           <div className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
             <div className="flex flex-wrap gap-2">
-              {ticket.status !== "RESOLVED" && (
+              {ticket.status !== "RESOLVED" && kind === "call" && (
                 <Button
                   variant="success"
-                  icon={<ThumbsUp className="h-4 w-4" />}
-                  loading={busy === "approve"}
-                  onClick={() => act("approve", () => api.approveTicket(ticket.id), "החשבונית אושרה והפנייה נסגרה")}
+                  icon={<Phone className="h-4 w-4" />}
+                  loading={busy === "call"}
+                  onClick={() =>
+                    act("call", () => api.resolveTicket(ticket.id, "השיחה עם הלקוח בוצעה והפנייה נסגרה."), "השיחה סומנה כבוצעה והפנייה נסגרה")
+                  }
                 >
-                  אישור החשבונית וסגירה
+                  השיחה בוצעה - סגור פנייה
                 </Button>
               )}
-              {ticket.status !== "RESOLVED" && ocr && (
+              {ticket.status !== "RESOLVED" && kind === "document" && (
+                <Button
+                  variant="success"
+                  icon={<Check className="h-4 w-4" />}
+                  loading={busy === "approve"}
+                  onClick={() => act("approve", () => api.approveTicket(ticket.id), "המסמך אושר והפנייה נסגרה")}
+                >
+                  אישור מסמך וסגירה
+                </Button>
+              )}
+              {ticket.status !== "RESOLVED" && kind === "document" && ocr && (
                 <Button variant="secondary" icon={<ThumbsDown className="h-4 w-4" />} onClick={() => setRejecting((v) => !v)}>
                   דחיית החשבונית
                 </Button>
@@ -243,9 +289,15 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   פתיחה מחדש
                 </Button>
               ) : (
-                <Button loading={busy === "resolve"} onClick={() => act("resolve", () => api.resolveTicket(ticket.id), "הפנייה נסגרה")}>
-                  סגירה ללא חשבונית
-                </Button>
+                kind === "document" && (
+                  <Button
+                    icon={<FileX2 className="h-4 w-4" />}
+                    loading={busy === "resolve"}
+                    onClick={() => act("resolve", () => api.resolveTicket(ticket.id), "הפנייה נסגרה ללא מסמך")}
+                  >
+                    סגירה ללא מסמך
+                  </Button>
+                )
               )}
               <Button
                 variant="ghost"
@@ -258,7 +310,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 פתיחת השיחה
               </Button>
             </div>
-            {rejecting && ticket.status !== "RESOLVED" && (
+            {rejecting && kind === "document" && ticket.status !== "RESOLVED" && (
               <div className="space-y-2 rounded-lg bg-red-50 p-3 ring-1 ring-inset ring-red-200">
                 <label className="block text-xs font-semibold text-red-800" htmlFor="reject-reason">
                   סיבת הדחייה (תישלח ללקוח בוואטסאפ)
@@ -286,8 +338,31 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
             )}
             {ticket.resolution_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{ticket.resolution_note}</p>}
 
+            {kind === "call" && (
+              <section className="rounded-lg border border-slate-200 p-3">
+                <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                  <PhoneCall className="h-3.5 w-3.5" /> שיחה עם הלקוח
+                </h4>
+                <a
+                  href={`tel:${ticket.client_phone}`}
+                  className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100"
+                >
+                  <Phone className="h-4 w-4" />
+                  <Ltr>{ticket.client_phone}</Ltr>
+                </a>
+                <p className="mt-2 text-xs text-slate-500">
+                  {callRequestedAt
+                    ? `הלקוח ביקש שיחה ${relativeTime(String(callRequestedAt))}.`
+                    : "לאחר השיחה עם הלקוח לוחצים על ”השיחה בוצעה - סגור פנייה“."}
+                </p>
+              </section>
+            )}
+
+            {kind === "document" && (
             <section>
-              <h4 className="mb-2 text-xs font-semibold text-slate-500">הקבלה שהועלתה</h4>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                <FileText className="h-3.5 w-3.5" /> הקבלה שהועלתה
+              </h4>
               {ticket.media_file_path ? (
                 <a href={mediaUrl(ticket.media_file_path) ?? "#"} target="_blank" rel="noreferrer" className="group relative block overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   {/\.pdf$/i.test(ticket.media_file_path) ? (
@@ -303,7 +378,9 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 <p className="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-400">עדיין לא התקבל מסמך</p>
               )}
             </section>
+            )}
 
+            {kind === "document" && (
             <section>
               <div className="mb-2 flex items-center justify-between">
                 <h4 className="text-xs font-semibold text-slate-500">אימות Vision AI ורשות המסים</h4>
@@ -415,6 +492,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 </Button>
               )}
             </section>
+            )}
 
             {ctxEntries.length > 0 && (
               <section>
