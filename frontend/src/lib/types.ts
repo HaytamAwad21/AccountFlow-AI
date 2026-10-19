@@ -196,6 +196,8 @@ export interface InboundResult {
   reply: string | null;
   ocr: OcrResult | null;
   validation: { field: "allocation_number" | "tax_id"; valid: boolean; value: string } | null;
+  /** no open request was waiting for this input: saved to the chat history only, no bot reply */
+  unsolicited: boolean;
   elapsed_ms: number | null;
 }
 

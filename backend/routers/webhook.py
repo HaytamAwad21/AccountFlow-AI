@@ -24,7 +24,7 @@ from services.events import broker, queue_event
 from services.system_settings import get_system_settings
 from services.ticket_engine import (
     EngineError,
-    find_active_ticket,
+    find_awaiting_ticket,
     handle_button,
     handle_media,
     handle_text,
@@ -54,6 +54,7 @@ def _result(out: dict, started: float, action: str | None = None) -> InboundResu
         reply=out.get("reply"),
         ocr=out.get("ocr"),
         validation=out.get("validation"),
+        unsolicited=bool(out.get("unsolicited")),
         elapsed_ms=round((time.perf_counter() - started) * 1000, 2),
     )
 
@@ -188,7 +189,7 @@ def _demo_receipt(body: DemoReceiptRequest) -> InboundResult:
     started = time.perf_counter()
     with SessionLocal() as db:
         client = get_client_or_404(db, body.client_id)
-        ticket = find_active_ticket(db, client, body.ticket_id, for_media=True)
+        ticket = find_awaiting_ticket(db, client, body.ticket_id, for_media=True)
         ctx = (ticket.context_variables_json if ticket else {}) or {}
         amount = parse_amount(ctx.get("amount") or ctx.get("charge_amount") or ctx.get("expected_amount"))
         office = get_system_settings(db)
@@ -238,7 +239,7 @@ def simulator_mark_read(client_id: int, db: Session = Depends(get_db), _user: Us
 @router.get("/simulator/{client_id}/active-ticket")
 def simulator_active_ticket(client_id: int, db: Session = Depends(get_db), _user: User = Depends(require_user)):
     client = get_client_or_404(db, client_id)
-    ticket: ChasingTicket | None = find_active_ticket(db, client, for_media=True)
+    ticket: ChasingTicket | None = find_awaiting_ticket(db, client, for_media=True)
     return {"ticket": ticket_out(ticket).model_dump(mode="json") if ticket else None}
 
 

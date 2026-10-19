@@ -536,6 +536,55 @@ def main() -> None:
         check(not any(has_emoji(t["body_he"]) or has_emoji(t["name_he"]) or any(has_emoji(b["he"]) for b in t["buttons_json"])
                       for t in c.get("/api/templates").json()), "no emojis in any template or quick-reply button")
 
+        section("Unsolicited client messages: saved silently, no bot reply")
+        r = c.post("/api/clients", json={"full_name": "רונן שקט", "company_name": "שקט בע\"מ", "tax_id": "517011906",
+                                         "whatsapp_phone": "0521119006", "assigned_worker_id": worker["id"]}, headers=M)
+        check(r.status_code == 201, "client without requests created", r.text[:200])
+        quiet = r.json()["id"]
+
+        def chat(client_id: int) -> list[dict]:
+            return c.get(f"/api/clients/{client_id}/messages").json()
+
+        r = c.post("/api/webhook/whatsapp-inbound", json={"client_id": quiet, "type": "text", "text": "שלום, מה שלומכם?"}).json()
+        check(r["unsolicited"] is True and r["reply"] is None and r["ticket"] is None, "text without an open request: no reply")
+        r = c.post("/api/webhook/whatsapp-inbound", data={"client_id": str(quiet)}, files={"file": ("random.png", png, "image/png")}).json()
+        check(r["unsolicited"] is True and r["ocr"] is None and r["reply"] is None, "photo without an open request: no Vision AI, no reply")
+        r = c.post("/api/simulator/demo-receipt", json={"client_id": quiet, "scenario": "clear"}).json()
+        check(r["unsolicited"] is True and r["ocr"] is None, "simulator receipt without an open request is silent too")
+        history = chat(quiet)
+        check(len(history) == 3 and all(m["direction"] == "INBOUND" and m["ticket_id"] is None for m in history),
+              "all 3 inputs saved as INBOUND chat history, nothing sent back")
+        check(history[1]["media_url"] and history[1]["media_url"].startswith("/uploads/in_") and c.get(history[1]["media_url"]).status_code == 200,
+              "the unsolicited photo is kept and viewable by the office")
+
+        tax_tpl = templates["tax_ready_to_pay"]
+        r = c.post("/api/tickets/quick-send", headers=W, json={"client_id": quiet, "template_id": tax_tpl["id"], "context_variables": {
+            "tax_period": "09/2026", "vat_amount": "1200", "tax_advance_amount": "300", "due_date": "26/10/2026"}})
+        check(r.status_code == 201, "tax-ready notification sent", r.text[:200])
+        tax_ticket = r.json()["ticket"]
+        before = len(chat(quiet))
+        r = c.post("/api/webhook/whatsapp-inbound", data={"client_id": str(quiet), "ticket_id": str(tax_ticket["id"])},
+                   files={"file": ("selfie.png", png, "image/png")}).json()
+        tk = c.get(f"/api/tickets/{tax_ticket['id']}").json()
+        check(r["unsolicited"] is True and r["ocr"] is None, "photo to a request that does not expect a document: silent")
+        check(tk["status"] == "WAITING_FOR_CLIENT" and tk["ocr_validation_json"] is None and tk["media_file_path"] is None,
+              "the tax-ready ticket is unchanged (status, OCR, media)")
+        after = chat(quiet)
+        check(len(after) == before + 1 and after[-1]["direction"] == "INBOUND" and after[-1]["ticket_id"] is None,
+              "only the inbound photo was added to the chat")
+        r = c.post("/api/webhook/whatsapp-inbound", json={"client_id": quiet, "type": "text", "text": "שילמתי אתמול"}).json()
+        check(r["unsolicited"] is False and r["reply"] and r["ticket"]["id"] == tax_ticket["id"],
+              "text while a request waits for the client is still answered")
+
+        c.post(f"/api/tickets/{tax_ticket['id']}/resolve", json={"note": "בדיקה"})
+        r = c.post("/api/webhook/whatsapp-inbound", json={"client_id": quiet, "type": "text", "text": "עוד שאלה"}).json()
+        check(r["unsolicited"] is True and r["reply"] is None, "after the request is closed, new text is silent again")
+        envelope = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+            {"from": "972521119006", "id": "wamid.Q", "type": "text", "text": {"body": "בוקר טוב"}}]}}]}]}
+        before = len(chat(quiet))
+        check(c.post("/api/webhook/whatsapp-inbound", json=envelope).json()["processed"] == 1
+              and [m["direction"] for m in chat(quiet)[before:]] == ["INBOUND"], "Meta webhook text without a request: logged, no reply")
+
         section("Activity log (manager only)")
         check(c.get("/api/activity", headers=W).status_code == 403, "worker cannot read the activity log (403)")
         log = c.get("/api/activity?limit=500", headers=M).json()

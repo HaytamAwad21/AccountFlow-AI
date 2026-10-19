@@ -10,6 +10,7 @@ the live `system_settings` row (see services/system_settings.py).
 """
 from __future__ import annotations
 
+import logging
 import mimetypes
 import uuid
 from datetime import timedelta
@@ -49,6 +50,8 @@ from services.templating import (
 from services.vision_ocr import is_nine_digits, normalize_id, verify_invoice_image
 from services.whatsapp import dispatch
 
+log = logging.getLogger("accountflow.engine")
+
 ACTIVE_STATUSES = (
     TicketStatus.OPEN,
     TicketStatus.WAITING_FOR_CLIENT,
@@ -70,6 +73,17 @@ OCR_CATEGORIES = {
     TemplateCategory.UNIDENTIFIED_CHARGE,
     TemplateCategory.MONTHLY_FOLDER,
 }
+# Statuses in which a ticket is waiting for the client's own reply (text or document). A snoozed
+# ticket ("remind me at 20:00") and an escalated one are still waiting for the client.
+# OPEN, NEEDS_CLERK_REVIEW and RESOLVED tickets never take free-form client input.
+AWAITING_CLIENT_STATUSES = (
+    TicketStatus.WAITING_FOR_CLIENT,
+    TicketStatus.NEEDS_CORRECTION,
+    TicketStatus.SNOOZED_TONIGHT,
+    TicketStatus.ESCALATED,
+)
+# Request types whose answer is a photo / PDF even without requires_media_reply.
+MEDIA_REQUEST_CATEGORIES = {TemplateCategory.MISSING_INVOICE, TemplateCategory.MISSING_DETAIL}
 REPROMPT_SLUG = "blurry_or_wrong_receipt_reprompt"
 DEADLINE_SLUG = "monthly_folder_deadline_warning"
 TAX_SLUG = "tax_ready_to_pay"
@@ -331,6 +345,61 @@ def find_active_ticket(db: Session, client: Client, ticket_id: int | None = None
     return max(candidates, key=rank)
 
 
+def expects_media(ticket: ChasingTicket) -> bool:
+    """True when the request is answered with a photo / PDF (an invoice, receipt or corrected copy)."""
+    ctx = ticket.context_variables_json or {}
+    return (
+        bool(ticket.template.requires_media_reply)
+        or ticket.template.category in MEDIA_REQUEST_CATEGORIES
+        or bool(ctx.get("awaiting_media"))
+    )
+
+
+def find_awaiting_ticket(db: Session, client: Client, ticket_id: int | None = None,
+                         for_media: bool = False) -> ChasingTicket | None:
+    """The open request that is waiting for this client's free-form reply, or None.
+
+    Only tickets in AWAITING_CLIENT_STATUSES qualify; for a photo / PDF the ticket must also
+    expect a document. A ticket that is resolved, waiting for the clerk, or asks for something
+    else never receives the client's input, so the bot does not answer it.
+    """
+    def fits(tk: ChasingTicket) -> bool:
+        return (tk.client_id == client.id and tk.status in AWAITING_CLIENT_STATUSES
+                and (not for_media or expects_media(tk)))
+
+    if ticket_id:
+        tk = db.get(ChasingTicket, ticket_id)
+        if tk and fits(tk):
+            return tk
+    candidates = [tk for tk in db.scalars(
+        select(ChasingTicket).where(ChasingTicket.client_id == client.id,
+                                    ChasingTicket.status.in_(AWAITING_CLIENT_STATUSES))
+    ) if fits(tk)]
+    if not candidates:
+        return None
+
+    def rank(tk: ChasingTicket):
+        ctx = tk.context_variables_json or {}
+        return (
+            tk.status == TicketStatus.NEEDS_CORRECTION,
+            bool(ctx.get("awaiting_media")) if for_media else bool(ctx.get("awaiting_text")),
+            tk.template.category in OCR_CATEGORIES and tk.template.slug != DEADLINE_SLUG if for_media else True,
+            tk.last_contacted_at or tk.created_at,
+        )
+
+    return max(candidates, key=rank)
+
+
+def log_unsolicited(db: Session, client: Client, message_type: MessageType, text: str,
+                    media_url: str | None = None) -> dict:
+    """Silent logging: the message / photo is saved to the chat history for the office, and
+    nothing else happens: no Vision AI check, no ticket change, no automated reply."""
+    log_inbound(db, client, None, message_type, text, media_url=media_url)
+    kind = "תמונה / מסמך" if media_url else "הודעת טקסט"
+    log.info("%s מהלקוח %s ללא בקשה פתוחה מתאימה: נשמרה ביומן השיחה ללא מענה אוטומטי", kind, client.full_name)
+    return {"ticket": None, "reply": None, "ocr": None, "unsolicited": True}
+
+
 def sync_recipient(db: Session, ticket: ChasingTicket, status: PaymentStatus) -> None:
     recipient = db.scalar(select(BulkTaxRecipient).where(BulkTaxRecipient.ticket_id == ticket.id))
     if not recipient:
@@ -455,12 +524,10 @@ def _validate_typed_identifier(db: Session, client: Client, ticket: ChasingTicke
 
 def handle_text(db: Session, client: Client, text: str, ticket_id: int | None = None) -> dict:
     lang = lang_of(client)
-    ticket = find_active_ticket(db, client, ticket_id)
-    log_inbound(db, client, ticket, MessageType.TEXT, text)
+    ticket = find_awaiting_ticket(db, client, ticket_id)
     if ticket is None:
-        reply = t("no_open_ticket", lang)
-        send_outbound(db, client, None, reply, None, MessageType.TEXT)
-        return {"ticket": None, "reply": reply}
+        return log_unsolicited(db, client, MessageType.TEXT, text)
+    log_inbound(db, client, ticket, MessageType.TEXT, text)
 
     ctx = ticket.context_variables_json or {}
     kind = ctx.get("detail_kind")
@@ -504,12 +571,10 @@ def media_path(media_url: str | None) -> Path | None:
 def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: str,
                  ticket_id: int | None = None, caption: str = "") -> dict:
     lang = lang_of(client)
-    ticket = find_active_ticket(db, client, ticket_id, for_media=True)
-    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
+    ticket = find_awaiting_ticket(db, client, ticket_id, for_media=True)
     if ticket is None:
-        reply = t("no_open_ticket", lang)
-        send_outbound(db, client, None, reply, None, MessageType.TEXT)
-        return {"ticket": None, "ocr": None, "reply": reply}
+        return log_unsolicited(db, client, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
+    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
 
     now = utcnow()
     ctx = _set_ctx(ticket, awaiting_media=False,
@@ -633,6 +698,7 @@ __all__ = [
     "auto_variables",
     "create_and_send_ticket",
     "find_active_ticket",
+    "find_awaiting_ticket",
     "handle_button",
     "handle_media",
     "handle_text",

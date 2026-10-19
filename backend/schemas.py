@@ -330,6 +330,8 @@ class InboundResult(BaseModel):
     reply: str | None = None
     ocr: dict | None = None
     validation: dict | None = None
+    # True when no open request was waiting for this input: it was only saved to the chat history.
+    unsolicited: bool = False
     elapsed_ms: float | None = None
 
 

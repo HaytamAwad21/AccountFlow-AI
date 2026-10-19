@@ -112,7 +112,13 @@ export function PhoneSimulator() {
   }, [tickets]);
 
   const report = (r: InboundResult, label: string) => {
-    if (r.validation) {
+    if (r.unsolicited) {
+      toast({
+        tone: "info",
+        title: "נשמר ביומן השיחה ללא מענה אוטומטי",
+        body: "אין בקשה פתוחה שממתינה לתשובה כזו מהלקוח, ולכן הבוט לא הגיב וסטטוס הפניות לא השתנה.",
+      });
+    } else if (r.validation) {
       const fieldName = r.validation.field === "allocation_number" ? "מספר הקצאה" : "ח.פ / ע.מ";
       toast({
         tone: r.validation.valid ? "success" : "warning",
