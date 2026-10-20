@@ -124,13 +124,13 @@ export function BulkTax() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-6">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 @3xl:p-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">הודעות ”הדיווח מוכן“ בתפוצה</h1>
         <p className="text-sm text-slate-500">גוררים את הגיליון החודשי מתוכנת הנהלת החשבונות — כל לקוח מקבל בוואטסאפ את הסכומים שלו, עם כפתורי ”שולם“ ו”שיחה“.</p>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
+      <div className="grid gap-5 @4xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="space-y-5">
           <Card className="p-4">
             <SectionTitle

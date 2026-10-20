@@ -49,7 +49,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [phoneOpen, setPhoneOpen] = useState(true);
+  // Open by default only where the simulator fits beside the page (xl); below that it covers the page.
+  const [phoneOpen, setPhoneOpen] = useState(() => window.matchMedia("(min-width: 1280px)").matches);
   const [tick, setTick] = useState(0);
   const [live, setLive] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);

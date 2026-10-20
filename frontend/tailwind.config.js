@@ -1,3 +1,5 @@
+import containerQueries from "@tailwindcss/container-queries";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -34,5 +36,7 @@ export default {
       },
     },
   },
-  plugins: [],
+  // Pages lay out by the width of the content area (@container on <main>), not the window: the
+  // sidebar and the phone simulator take a different share of the window at every size.
+  plugins: [containerQueries],
 };

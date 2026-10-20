@@ -196,7 +196,7 @@ function ClientsPanel() {
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 p-3">
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full @xl:w-72">
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש לקוחות…" className={cx(inputClass, "py-1.5 ps-9")} dir="auto" />
         </div>
@@ -375,7 +375,7 @@ function TemplateEditor({ template }: { template: Template }) {
           <code key={v} dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">{`{{${v}}}`}</code>
         ))}
       </div>
-      <div className={cx("grid gap-4 p-4", isManager && "xl:grid-cols-[minmax(0,1fr)_340px]")}>
+      <div className={cx("grid gap-4 p-4", isManager && "@5xl:grid-cols-[minmax(0,1fr)_340px]")}>
         {isManager && (
         <div className="min-w-0 space-y-2" dir="rtl">
           <Field label="שם התבנית">
@@ -429,7 +429,7 @@ function TemplatesPanel() {
   const active = templates.find((t) => t.id === activeId) ?? templates[0] ?? null;
   return (
     <div className="space-y-4">
-      <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid gap-5 @3xl:grid-cols-[260px_minmax(0,1fr)]">
         <Card className="h-fit p-2">
           {templates.map((t) => (
             <button
@@ -454,7 +454,7 @@ export function ClientsTemplates() {
   const [tab, setTab] = useState<"clients" | "templates">("clients");
   const TABS = { clients: "לקוחות", templates: "תבניות הודעה" } as const;
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-6">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 @3xl:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">לקוחות ותבניות הודעה</h1>

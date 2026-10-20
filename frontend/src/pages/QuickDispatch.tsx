@@ -326,10 +326,12 @@ export function QuickDispatch() {
   const manualHasContent = manualText.trim().length > 0 || manualFile !== null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    // From @2xl/main up the page fills the window height (no page scroll); only the client list
+    // and, when a long form needs it, the step 3 + preview row scroll inside.
+    <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 @2xl/main:h-full @2xl/main:min-h-[560px] @2xl/main:p-5">
+      <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">שליחת בקשה</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 @3xl/main:text-2xl">שליחת בקשה</h1>
           <p className="text-sm text-slate-500">בוחרים לקוח, בוחרים בקשה, ממלאים את החסר ולוחצים Enter. הבוט ימשיך לרדוף אחרי הלקוח בוואטסאפ.</p>
         </div>
         {lastSent && (
@@ -339,9 +341,9 @@ export function QuickDispatch() {
         )}
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid gap-4 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:grid-cols-[240px_minmax(0,1fr)] @4xl/main:grid-cols-[280px_minmax(0,1fr)] @6xl/main:grid-cols-[320px_minmax(0,1fr)]">
         {/* Step 1 */}
-        <Card className="flex max-h-[calc(100vh-170px)] flex-col p-4">
+        <Card className="flex max-h-[420px] flex-col p-4 @2xl/main:max-h-none @2xl/main:min-h-0">
           <SectionTitle step="1" title="לקוח" hint="חיפוש לפי שם, עסק, טלפון או ח.פ · ↑↓ Enter" />
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -387,11 +389,11 @@ export function QuickDispatch() {
           </div>
         </Card>
 
-        <div className="space-y-5">
+        <div className="@container flex min-w-0 flex-col gap-4 @2xl/main:min-h-0">
           {/* Step 2 */}
-          <Card className="p-4">
+          <Card className="shrink-0 p-3">
             <SectionTitle step="2" title="מה צריך מהלקוח?" hint="תבניות אוטומטיות בלחיצה אחת או הודעה ידנית חופשית · כל ההודעות נשלחות בעברית" />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @3xl:grid-cols-4">
               {cards.map((t) => {
                 const meta = CARD_META[t.slug];
                 const active = mode === "template" && t.id === templateId;
@@ -399,51 +401,56 @@ export function QuickDispatch() {
                   <button
                     key={t.id}
                     onClick={() => pickTemplate(t.id)}
+                    title={t.requires_media_reply ? `${templateName(t)} · אימות Vision AI` : templateName(t)}
                     className={cx(
-                      "flex flex-col items-start gap-2 rounded-xl border p-3 text-start transition",
+                      "flex items-center gap-2 rounded-xl border px-2 py-2 text-start transition",
                       active ? "border-brand-500 bg-brand-50/60 ring-1 ring-brand-500" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
                     )}
                   >
-                    <span className={cx("grid h-9 w-9 place-items-center rounded-lg", meta.tone)}>{meta.icon}</span>
-                    <span className="text-sm font-semibold text-slate-900">{meta.title}</span>
-                    <span className="line-clamp-2 text-[11px] text-slate-500">{templateName(t)}</span>
-                    {t.requires_media_reply && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600">
-                        <ScanLine className="h-3 w-3" /> אימות Vision AI
+                    <span className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg [&>svg]:h-4 [&>svg]:w-4", meta.tone)}>{meta.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1 text-[13px] font-semibold leading-tight text-slate-900">
+                        <span>{meta.title}</span>
+                        {t.requires_media_reply && <ScanLine className="h-3 w-3 shrink-0 text-indigo-600" aria-label="אימות Vision AI" />}
                       </span>
-                    )}
+                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">{templateName(t)}</span>
+                    </span>
                   </button>
                 );
               })}
               <button
                 onClick={pickManual}
+                title="טקסט חופשי ותמונה או קובץ, בשמך · ללא תזכורות אוטומטיות"
                 className={cx(
-                  "flex flex-col items-start gap-2 rounded-xl border p-3 text-start transition",
+                  "flex items-center gap-2 rounded-xl border px-2 py-2 text-start transition",
                   mode === "manual" ? "border-wa-teal bg-teal-50/60 ring-1 ring-wa-teal" : "border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50",
                 )}
               >
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-teal-50 text-wa-teal">
-                  <MessageSquare className="h-5 w-5" />
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-teal-50 text-wa-teal">
+                  <MessageSquare className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-semibold text-slate-900">הודעה ידנית חופשית</span>
-                <span className="line-clamp-2 text-[11px] text-slate-500">טקסט חופשי ותמונה או קובץ, בשמך</span>
-                <span className="text-[10px] font-medium text-slate-400">ללא תזכורות אוטומטיות</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold leading-tight text-slate-900">הודעה ידנית חופשית</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">טקסט ותמונה בשמך · ללא תזכורות</span>
+                </span>
               </button>
               <button
                 onClick={() => setGroupOpen(true)}
-                className="flex flex-col items-start gap-2 rounded-xl border border-dashed border-slate-300 p-3 text-start transition hover:border-slate-400 hover:bg-slate-50"
+                title="בוחרים לקוחות מהרשימה וכותבים הודעה אחת לכולם · ללא תזכורות אוטומטיות"
+                className="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-2 py-2 text-start transition hover:border-slate-400 hover:bg-slate-50"
               >
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-violet-50 text-violet-600">
-                  <Users className="h-5 w-5" />
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600">
+                  <Users className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-semibold text-slate-900">הודעה לקבוצת לקוחות</span>
-                <span className="line-clamp-2 text-[11px] text-slate-500">בוחרים לקוחות מהרשימה וכותבים הודעה אחת לכולם</span>
-                <span className="text-[10px] font-medium text-slate-400">ללא תזכורות אוטומטיות</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold leading-tight text-slate-900">הודעה לקבוצת לקוחות</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">הודעה אחת לכמה לקוחות</span>
+                </span>
               </button>
             </div>
           </Card>
 
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid gap-4 @[30rem]:grid-cols-2 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:overflow-y-auto">
             {/* Step 3 */}
             {mode === "manual" ? (
               <Card className="p-4">
@@ -667,12 +674,12 @@ export function QuickDispatch() {
             )}
 
             {/* Live preview */}
-            <Card className="overflow-hidden">
+            <Card className="flex flex-col overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                 <h3 className="text-sm font-semibold text-slate-900">תצוגה מקדימה של הוואטסאפ</h3>
                 {client && <span className="text-xs text-slate-500">עברית · מימין לשמאל</span>}
               </div>
-              <div className="min-h-[260px] bg-wa-wall p-4" dir="rtl">
+              <div className="min-h-[220px] flex-1 bg-wa-wall p-4" dir="rtl">
                 {client && mode === "manual" ? (
                   manualHasContent ? (
                     <WaBubble

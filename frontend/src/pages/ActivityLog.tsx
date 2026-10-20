@@ -83,7 +83,7 @@ export function ActivityLog() {
   if (!isManager) return null;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-6">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 @3xl:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
@@ -97,7 +97,7 @@ export function ActivityLog() {
       </header>
 
       <Card className="p-3">
-        <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto_1.3fr]">
+        <div className="grid gap-2 @3xl:grid-cols-[1fr_1fr_auto_auto_1.3fr]">
           <select value={userId} onChange={(e) => setUserId(e.target.value ? Number(e.target.value) : "")} className={inputClass}>
             <option value="">כל העובדים</option>
             {users.map((u) => (

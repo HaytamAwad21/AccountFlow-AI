@@ -150,7 +150,7 @@ export function ChasingBoard() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-6">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 @3xl:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">לוח מעקב חי</h1>
@@ -169,7 +169,7 @@ export function ChasingBoard() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @4xl:grid-cols-5">
         <Kpi icon={<Hourglass className="h-5 w-5" />} accent="bg-sky-50 text-sky-600" label="פניות פעילות הממתינות ללקוח" value={kpis?.active_waiting ?? "—"} />
         <Kpi icon={<BellRing className="h-5 w-5" />} accent="bg-violet-50 text-violet-600" label="תזכורות אוטומטיות החודש" value={kpis?.auto_reminders_this_month ?? "—"} />
         <Kpi icon={<ShieldCheck className="h-5 w-5" />} accent="bg-indigo-50 text-indigo-600" label="ממתינות לבדיקת פקיד (אומתו ב-OCR)" value={kpis?.needs_clerk_review ?? "—"} />
@@ -200,7 +200,7 @@ export function ChasingBoard() {
               </button>
             ))}
           </div>
-          <div className="relative ms-auto w-full sm:w-64">
+          <div className="relative ms-auto w-full @xl:w-64">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="פנייה, לקוח, ספק…" className={cx(inputClass, "py-1.5 ps-9")} dir="auto" />
           </div>

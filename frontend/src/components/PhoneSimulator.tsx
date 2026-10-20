@@ -233,7 +233,7 @@ export function PhoneSimulator() {
   const canSend = asWorker ? !!text.trim() || workerFile !== null : !!text.trim();
 
   return (
-    <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-slate-200 bg-slate-100 shadow-xl xl:static xl:z-auto xl:shadow-none">
+    <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-slate-200 bg-slate-100 shadow-xl xl:static xl:z-auto xl:w-[340px] xl:shadow-none 2xl:w-[400px]">
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
         <Smartphone className="h-4 w-4 text-wa-teal" />
         <div className="min-w-0 flex-1">

@@ -154,7 +154,7 @@ export function Settings() {
   const exampleTotal = exampleThreshold * (1 + exampleRate / 100);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-6">
+    <div className="mx-auto max-w-5xl space-y-5 p-4 @3xl:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">הגדרות המשרד</h1>
@@ -200,7 +200,7 @@ export function Settings() {
       )}
 
       <Section icon={<Landmark className="h-5 w-5" />} title="הגדרות מס ורגולציה" hint="כללי רשות המסים שהבוט ו-Vision AI אוכפים על כל חשבונית">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 @2xl:grid-cols-3">
           <Field label="שיעור מע״מ נוכחי (%)" hint="משמש לבדיקת התאמת המע״מ בכל חשבונית ובתצוגות המס">
             <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} suffix="%" limits={LIMITS.vat_rate} disabled={readOnly} />
           </Field>
@@ -235,7 +235,7 @@ export function Settings() {
       </Section>
 
       <Section icon={<BellRing className="h-5 w-5" />} title="הגדרות בוט ותזכורות" hint="קצב המעקב האוטומטי אחרי לקוחות שלא השיבו">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <Field label="מרווח זמן בין תזכורות אוטומטיות (שעות)" hint="חל על פניות חדשות ועל התזכורת הבאה בפניות פתוחות">
             <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} disabled={readOnly} />
           </Field>
@@ -276,7 +276,7 @@ export function Settings() {
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
             <Users className="h-4 w-4" /> עובדי המשרד
           </h3>
-          <div className="overflow-hidden rounded-lg border border-slate-200">
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 text-[11px] font-semibold text-slate-500">
@@ -330,7 +330,7 @@ export function Settings() {
       </Section>
 
       <Section icon={<Cpu className="h-5 w-5" />} title="מצב המערכת" hint="מידע לקריאה בלבד">
-        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+        <dl className="grid gap-3 text-sm @xl:grid-cols-3">
           <div>
             <dt className="text-xs text-slate-500">מנוע Vision AI</dt>
             <dd className="font-medium text-slate-900">{settings.vision_provider === "local" ? "סימולטור לא מקוון" : settings.vision_provider}</dd>

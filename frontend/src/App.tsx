@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, Zap } from "lucide-react";
+import { Bot, ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { cx, splitUserName } from "./lib/format";
 import { PhoneSimulator } from "./components/PhoneSimulator";
@@ -109,6 +109,8 @@ function ProfileSwitcher() {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(readTab);
+  // Below the lg breakpoint the sidebar is a drawer opened from the top bar.
+  const [navOpen, setNavOpen] = useState(false);
   const { settings, phoneOpen, setPhoneOpen, clients, user, isManager, authChecked } = useApp();
   const { dark, toggle: toggleTheme } = useTheme();
 
@@ -121,6 +123,7 @@ export default function App() {
   const go = (t: Tab) => {
     window.location.hash = t;
     setTab(t);
+    setNavOpen(false);
   };
 
   // A worker never stays on a manager-only tab (e.g. after switching users, or via a typed URL).
@@ -142,7 +145,14 @@ export default function App() {
 
   return (
     <div dir="rtl" className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
-      <nav className="flex w-64 shrink-0 flex-col border-e border-slate-200 bg-slate-950 text-slate-300">
+      {navOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden />}
+      <nav
+        className={cx(
+          "fixed inset-y-0 start-0 z-50 flex w-64 shrink-0 flex-col border-e border-slate-200 bg-slate-950 text-slate-300 transition-transform",
+          "lg:static lg:z-auto lg:w-56 lg:translate-x-0 2xl:w-64",
+          navOpen ? "translate-x-0" : "translate-x-full",
+        )}
+      >
         <div className="flex items-center gap-2.5 px-5 py-5">
           <button
             type="button"
@@ -163,6 +173,14 @@ export default function App() {
             </p>
             <p className="truncate text-[11px] text-slate-500">{settings?.firm_name ?? "מעקב לקוחות"}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setNavOpen(false)}
+            aria-label="סגירת התפריט"
+            className="ms-auto grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white lg:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex-1 space-y-1 overflow-y-auto px-3">
@@ -198,14 +216,35 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        {tab === "trigger" && <QuickDispatch />}
-        {tab === "board" && <ChasingBoard />}
-        {tab === "bulk" && <BulkTax />}
-        {tab === "clients" && <ClientsTemplates />}
-        {tab === "activity" && isManager && <ActivityLog />}
-        {tab === "settings" && <Settings />}
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            aria-label="פתיחת התפריט"
+            className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{TABS.find((t) => t.key === tab)?.label}</span>
+          <button
+            type="button"
+            onClick={() => setPhoneOpen(!phoneOpen)}
+            aria-label={phoneOpen ? "הסתרת הטלפון של הלקוח" : "הצגת הטלפון של הלקוח"}
+            className="grid h-9 w-9 place-items-center rounded-lg text-wa-teal hover:bg-slate-100"
+          >
+            <Smartphone className="h-5 w-5" />
+          </button>
+        </header>
+        <main className="@container/main min-h-0 flex-1 overflow-y-auto">
+          {tab === "trigger" && <QuickDispatch />}
+          {tab === "board" && <ChasingBoard />}
+          {tab === "bulk" && <BulkTax />}
+          {tab === "clients" && <ClientsTemplates />}
+          {tab === "activity" && isManager && <ActivityLog />}
+          {tab === "settings" && <Settings />}
+        </main>
+      </div>
 
       <PhoneSimulator />
       <Toaster />
