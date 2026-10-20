@@ -276,6 +276,18 @@ class QuickSendRequest(BaseModel):
         return self
 
 
+class ManualBroadcastRequest(BaseModel):
+    """One free-text message from the logged-in worker to several selected clients."""
+    client_ids: list[int] = Field(min_length=1, max_length=500)
+    content_text: str = Field(min_length=1, max_length=4096)
+
+
+class ManualBroadcastResponse(BaseModel):
+    sent: int
+    client_ids: list[int]
+    message_ids: list[int]
+
+
 class QuickSendResponse(BaseModel):
     ticket: TicketOut
     message: MessageOut

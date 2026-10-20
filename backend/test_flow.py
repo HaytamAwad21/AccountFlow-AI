@@ -536,6 +536,27 @@ def main() -> None:
         check(not any(has_emoji(t["body_he"]) or has_emoji(t["name_he"]) or any(has_emoji(b["he"]) for b in t["buttons_json"])
                       for t in c.get("/api/templates").json()), "no emojis in any template or quick-reply button")
 
+        section("Manual message to a group of selected clients")
+        group = [seeded[2]["id"], seeded[3]["id"], seeded[4]["id"]]
+        counts = {cid: len(c.get(f"/api/clients/{cid}/messages").json()) for cid in group}
+        check(c.post("/api/whatsapp/manual-broadcast", json={"client_ids": group, "content_text": "x"}, headers=ANON).status_code == 401,
+              "group message requires login")
+        check(c.post("/api/whatsapp/manual-broadcast", json={"client_ids": [], "content_text": "שלום"}).status_code == 422,
+              "at least one client is required")
+        check(c.post("/api/whatsapp/manual-broadcast", json={"client_ids": group, "content_text": ""}).status_code == 422,
+              "empty group message rejected")
+        check(c.post("/api/whatsapp/manual-broadcast", json={"client_ids": group + [999999], "content_text": "שלום"}).status_code == 404,
+              "unknown client in the group rejected (nothing sent)")
+        check(all(len(c.get(f"/api/clients/{cid}/messages").json()) == counts[cid] for cid in group), "a rejected group send sends nothing")
+        r = c.post("/api/whatsapp/manual-broadcast",
+                   json={"client_ids": group + [group[0]], "content_text": "המשרד יהיה סגור ביום שישי \U0001F64F"})
+        check(r.status_code == 201 and r.json()["sent"] == 3 and r.json()["client_ids"] == group, "group message sent once per client", r.text[:200])
+        for cid in group:
+            last = c.get(f"/api/clients/{cid}/messages").json()[-1]
+            check(last["direction"] == "OUTBOUND" and last["is_automated"] is False and last["sender_user_id"] == worker["id"]
+                  and last["content_text"] == "המשרד יהיה סגור ביום שישי" and last["ticket_id"] is None,
+                  f"client {cid}: manual message from the worker, emoji stripped, no ticket")
+
         section("Unsolicited client messages: saved silently, no bot reply")
         r = c.post("/api/clients", json={"full_name": "רונן שקט", "company_name": "שקט בע\"מ", "tax_id": "517011906",
                                          "whatsapp_phone": "0521119006", "assigned_worker_id": worker["id"]}, headers=M)
@@ -589,7 +610,7 @@ def main() -> None:
         check(c.get("/api/activity", headers=W).status_code == 403, "worker cannot read the activity log (403)")
         log = c.get("/api/activity?limit=500", headers=M).json()
         actions = {e["action"] for e in log["items"]}
-        for a in ("LOGIN", "LOGOUT", "TICKET_SENT", "MANUAL_MESSAGE_SENT", "REMINDERS_SENT", "CAMPAIGN_SENT", "TICKET_APPROVED", "TICKET_REJECTED",
+        for a in ("LOGIN", "LOGOUT", "TICKET_SENT", "MANUAL_MESSAGE_SENT", "MANUAL_BROADCAST_SENT", "REMINDERS_SENT", "CAMPAIGN_SENT", "TICKET_APPROVED", "TICKET_REJECTED",
                   "CLIENT_CREATED", "CLIENT_UPDATED", "SETTINGS_UPDATED", "USER_CREATED", "USER_UPDATED", "PASSWORD_RESET",
                   "PASSWORD_CHANGED"):
             check(a in actions, f"activity log records {a} ({log['actions'][a]})")

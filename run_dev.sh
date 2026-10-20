@@ -71,7 +71,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 info "Starting FastAPI on http://localhost:8000"
-(cd "$BACKEND" && "$PY" -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload) &
+(cd "$BACKEND" && "$PY" -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload --timeout-graceful-shutdown 3) &
 PIDS+=($!)
 
 info "Starting Vite on http://localhost:5173"

@@ -51,6 +51,7 @@ import {
   attachmentKind,
   useObjectUrl,
 } from "../components/ManualAttachment";
+import { GroupMessageModal } from "../components/GroupMessageModal";
 import { WaBubble } from "../components/WaBubble";
 import { Button, Card, Empty, Field, inputClass, Ltr, SectionTitle } from "../components/ui";
 
@@ -78,6 +79,7 @@ export function QuickDispatch() {
   const { clients, templates, selectedClientId, selectClient, toast, refreshClients, settings, user } = useApp();
   // "template": automated request with 48h follow-up; "manual": the worker's own free text / picture.
   const [mode, setMode] = useState<"template" | "manual">("template");
+  const [groupOpen, setGroupOpen] = useState(false);
   const [manualText, setManualText] = useState("");
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
@@ -427,6 +429,17 @@ export function QuickDispatch() {
                 <span className="line-clamp-2 text-[11px] text-slate-500">טקסט חופשי ותמונה או קובץ, בשמך</span>
                 <span className="text-[10px] font-medium text-slate-400">ללא תזכורות אוטומטיות</span>
               </button>
+              <button
+                onClick={() => setGroupOpen(true)}
+                className="flex flex-col items-start gap-2 rounded-xl border border-dashed border-slate-300 p-3 text-start transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                <span className="grid h-9 w-9 place-items-center rounded-lg bg-violet-50 text-violet-600">
+                  <Users className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-semibold text-slate-900">הודעה לקבוצת לקוחות</span>
+                <span className="line-clamp-2 text-[11px] text-slate-500">בוחרים לקוחות מהרשימה וכותבים הודעה אחת לכולם</span>
+                <span className="text-[10px] font-medium text-slate-400">ללא תזכורות אוטומטיות</span>
+              </button>
             </div>
           </Card>
 
@@ -690,6 +703,7 @@ export function QuickDispatch() {
           </div>
         </div>
       </div>
+      <GroupMessageModal open={groupOpen} onClose={() => setGroupOpen(false)} />
     </div>
   );
 }

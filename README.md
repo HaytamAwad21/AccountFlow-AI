@@ -53,7 +53,7 @@ Options:
 ```bash
 cd backend
 python -m venv .venv && .venv/bin/pip install -r requirements.txt   # Windows: .venv\Scripts\pip
-.venv/bin/python -m uvicorn main:app --reload --port 8000
+.venv/bin/python -m uvicorn main:app --reload --port 8000 --timeout-graceful-shutdown 3
 
 cd ../frontend
 npm install

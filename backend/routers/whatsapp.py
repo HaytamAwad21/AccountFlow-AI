@@ -9,6 +9,9 @@
 
 At least one of the text or the attachment is required. The message is logged with
 `is_automated = False` and the worker as sender, so the customer sees "הודעה מאת <worker>".
+
+`POST /api/whatsapp/manual-broadcast` (JSON `{client_ids, content_text}`) sends the same free text
+to several selected clients, one manual message each.
 """
 from __future__ import annotations
 
@@ -19,14 +22,16 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from config import settings
 from database import get_db
-from models import User
+from models import Client, User
 from routers.deps import client_ip, get_client_or_404, require_user
-from schemas import MessageOut, message_out
+from schemas import ManualBroadcastRequest, ManualBroadcastResponse, MessageOut, message_out
 from services.activity import log_activity
+from services.no_emoji import strip_emoji
 from services.ticket_engine import MAX_UPLOAD_BYTES, EngineError, send_manual_message
 
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
@@ -126,3 +131,40 @@ async def manual_send(
                  details={"message_id": msg.id, "has_media": bool(stored_url)}, ip_address=client_ip(request))
     db.commit()
     return message_out(msg)
+
+
+@router.post("/manual-broadcast", response_model=ManualBroadcastResponse, status_code=201)
+def manual_broadcast(body: ManualBroadcastRequest, request: Request, db: Session = Depends(get_db),
+                     user: User = Depends(require_user)):
+    """The same free-text message, written by the worker, to every selected client.
+
+    Each client gets their own manual message (is_automated = False, "הודעה מאת <worker>");
+    no ticket is opened and no reminders are scheduled. One activity-log entry covers the send.
+    """
+    text = (strip_emoji(body.content_text) or "").strip()
+    if not text:
+        raise HTTPException(422, "יש לכתוב הודעה")
+    ids = list(dict.fromkeys(body.client_ids))
+    clients = {c.id: c for c in db.scalars(select(Client).where(Client.id.in_(ids)))}
+    unknown = [i for i in ids if i not in clients]
+    if unknown:
+        raise HTTPException(404, f"לקוחות לא נמצאו: {', '.join(map(str, unknown))}")
+    inactive = [clients[i].full_name for i in ids if not clients[i].is_active]
+    if inactive:
+        raise HTTPException(422, f"לקוחות לא פעילים: {', '.join(inactive)}")
+
+    message_ids = []
+    for client_id in ids:
+        try:
+            msg = send_manual_message(db, client=clients[client_id], worker=user, text=text)
+        except EngineError as exc:
+            raise HTTPException(exc.status_code, str(exc)) from exc
+        message_ids.append(msg.id)
+
+    names = [clients[i].full_name for i in ids]
+    shown = ", ".join(names[:5]) + (f" ועוד {len(names) - 5}" if len(names) > 5 else "")
+    log_activity(db, user, "MANUAL_BROADCAST_SENT", f"שליחת הודעה ידנית ל-{len(ids)} לקוחות: {shown}",
+                 entity_type="client", details={"client_ids": ids, "message_ids": message_ids},
+                 ip_address=client_ip(request))
+    db.commit()
+    return ManualBroadcastResponse(sent=len(ids), client_ids=ids, message_ids=message_ids)

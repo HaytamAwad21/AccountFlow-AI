@@ -19,6 +19,7 @@ ACTION_LABELS: dict[str, str] = {
     "LOGOUT": "התנתקות מהמערכת",
     "TICKET_SENT": "שליחת בקשה ללקוח",
     "MANUAL_MESSAGE_SENT": "שליחת הודעה ידנית ללקוח",
+    "MANUAL_BROADCAST_SENT": "שליחת הודעה ידנית לקבוצת לקוחות",
     "REMINDERS_SENT": "שליחת תזכורות",
     "CAMPAIGN_SENT": "שליחת דיווח מס בתפוצה",
     "TICKET_APPROVED": "אישור חשבונית",

@@ -253,6 +253,12 @@ export const api = {
     if (imageFile) fd.append("image_file", imageFile);
     return request<Message>("/api/whatsapp/manual-send", { method: "POST", body: fd });
   },
+  /** The same free-text message from the worker to several selected clients (one manual message each). */
+  manualBroadcast: (clientIds: number[], contentText: string) =>
+    request<{ sent: number; client_ids: number[]; message_ids: number[] }>("/api/whatsapp/manual-broadcast", {
+      method: "POST",
+      ...json({ client_ids: clientIds, content_text: contentText }),
+    }),
   markRead: (clientId: number) => request<{ ok: boolean; updated: number }>(`/api/simulator/${clientId}/read`, { method: "POST" }),
 
   timeJump: (hours = 48) => request<SchedulerResult>(`/api/scheduler/simulate-time-jump?hours=${hours}`, { method: "POST" }),
