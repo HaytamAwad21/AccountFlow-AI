@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     whatsapp_token: str = ""
     whatsapp_phone_number_id: str = ""
     whatsapp_verify_token: str = "accountflow-verify"
+    # Meta App Secret (App settings ▸ Basic). Cloud API webhook posts must carry a matching
+    # X-Hub-Signature-256 header; while this is empty, every Meta webhook post is refused.
+    whatsapp_app_secret: str = ""
     whatsapp_api_version: str = "v21.0"
     default_country_code: str = "972"
     # Public https address of this API (e.g. https://api.example.com). Needed only to send a worker's

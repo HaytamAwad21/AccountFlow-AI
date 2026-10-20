@@ -12,6 +12,8 @@ PUBLIC_BASE_URL makes the upload reachable by Meta.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import re
 
@@ -28,6 +30,19 @@ log = logging.getLogger("accountflow.whatsapp")
 GRAPH_URL = "https://graph.facebook.com"
 BUTTON_TITLE_MAX = 20  # Meta limit for reply-button titles
 BODY_MAX = 1024
+
+
+def verify_webhook_signature(raw_body: bytes, header: str | None) -> bool:
+    """True when `X-Hub-Signature-256` is Meta's HMAC-SHA256 of the raw body, keyed with
+    WHATSAPP_APP_SECRET. Always False while no app secret is configured."""
+    secret = settings.whatsapp_app_secret
+    if not secret or not header:
+        return False
+    scheme, _, digest = header.strip().partition("=")
+    if scheme.lower() != "sha256" or not digest:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, digest.lower())
 
 
 def normalize_phone(raw: str, default_cc: str | None = None) -> str:
