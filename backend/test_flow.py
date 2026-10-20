@@ -8,7 +8,10 @@ offline Vision simulator, exercising every engine through the real HTTP API:
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import io
+import json
 import os
 import re
 import shutil
@@ -18,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 TMP = Path(tempfile.mkdtemp(prefix="accountflow_test_"))
+META_SECRET = "test-app-secret"
 os.environ.update(
     DATABASE_URL=f"sqlite:///{(TMP / 'test.db').as_posix()}",
     SCHEDULER_ENABLED="false",
@@ -26,6 +30,7 @@ os.environ.update(
     GEMINI_API_KEY="",
     WHATSAPP_TOKEN="",
     WHATSAPP_PHONE_NUMBER_ID="",
+    WHATSAPP_APP_SECRET=META_SECRET,
     AUTO_APPROVE_VERIFIED="false",
     UPLOAD_DIR=str(TMP / "uploads"),
 )
@@ -36,6 +41,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 
 import services.clock as clock  # noqa: E402
+from config import settings  # noqa: E402
 from main import app  # noqa: E402
 from services.vision_ocr import validate_extraction  # noqa: E402
 from sqlalchemy import func, select  # noqa: E402
@@ -86,6 +92,18 @@ def login(c: TestClient, user_id: int, password: str) -> dict:
     r = c.post("/api/auth/login", json={"user_id": user_id, "password": password}, headers=ANON)
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+def meta_post(c: TestClient, envelope: dict, secret: str = META_SECRET, signature: str | None = None):
+    """POST a Cloud API envelope the way Meta does: raw JSON, X-Hub-Signature-256, no session.
+    `signature=""` sends no signature header."""
+    raw = json.dumps(envelope).encode()
+    if signature is None:
+        signature = "sha256=" + hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+    headers = {**ANON, "Content-Type": "application/json"}
+    if signature:
+        headers["X-Hub-Signature-256"] = signature
+    return c.post("/api/webhook/whatsapp-inbound", content=raw, headers=headers)
 
 
 def main() -> None:
@@ -603,8 +621,29 @@ def main() -> None:
         envelope = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
             {"from": "972521119006", "id": "wamid.Q", "type": "text", "text": {"body": "בוקר טוב"}}]}}]}]}
         before = len(chat(quiet))
-        check(c.post("/api/webhook/whatsapp-inbound", json=envelope).json()["processed"] == 1
+        check(meta_post(c, envelope).json()["processed"] == 1
               and [m["direction"] for m in chat(quiet)[before:]] == ["INBOUND"], "Meta webhook text without a request: logged, no reply")
+
+        section("Webhook security: Meta signature, simulator needs a login")
+        sim = {"client_id": quiet, "type": "text", "text": "שלום"}
+        check(c.post("/api/webhook/whatsapp-inbound", json=sim, headers=ANON).status_code == 401,
+              "simulator text without a login is refused (401)")
+        check(c.post("/api/webhook/whatsapp-inbound", data={"client_id": str(quiet)},
+                     files={"file": ("x.png", png, "image/png")}, headers=ANON).status_code == 401,
+              "simulator upload without a login is refused (401)")
+        forged = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+            {"from": "972521119006", "id": "wamid.F", "type": "text", "text": {"body": "הודעה מזויפת"}}]}}]}]}
+        before = len(chat(quiet))
+        check(meta_post(c, forged, signature="").status_code == 403, "Meta envelope without X-Hub-Signature-256 is refused (403)")
+        check(meta_post(c, forged, secret="wrong-secret").status_code == 403, "Meta envelope signed with the wrong secret is refused")
+        check(c.post("/api/webhook/whatsapp-inbound", json=forged).status_code == 403,
+              "a logged-in session does not replace the Meta signature")
+        settings.whatsapp_app_secret = ""
+        try:
+            check(meta_post(c, forged).status_code == 403, "Meta envelopes are refused while WHATSAPP_APP_SECRET is empty")
+        finally:
+            settings.whatsapp_app_secret = META_SECRET
+        check(len(chat(quiet)) == before, "refused webhook posts add nothing to the chat")
 
         section("Activity log (manager only)")
         check(c.get("/api/activity", headers=W).status_code == 403, "worker cannot read the activity log (403)")
@@ -653,7 +692,7 @@ def main() -> None:
         check(r["is_active"] is False and r["open_ticket_count"] == 0, "manager deactivates a client; open tickets closed")
         envelope = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
             {"from": "972521119001", "id": "wamid.X", "type": "text", "text": {"body": "תודה"}}]}}]}]}
-        check(c.post("/api/webhook/whatsapp-inbound", json=envelope).json()["processed"] == 1, "Meta webhook envelope processed")
+        check(meta_post(c, envelope).json()["processed"] == 1, "Meta webhook envelope processed")
         k = c.get("/api/dashboard/kpis").json()
         check(k["auto_reminders_this_month"] > 0 and "הודעות" in k["hours_saved_basis"], f"KPIs ({k['estimated_hours_saved']} h saved)")
 

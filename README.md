@@ -131,7 +131,7 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
   - Wrong passwords are counted in a separate `login_failures` table. They never appear in the activity log.
   - A successful login clears that user's failures, and expired attempts are purged automatically.
 - **Protected endpoints:** every data endpoint requires a valid session, and `X-User-Id` headers are no longer trusted. These stay public:
-  - The WhatsApp webhook.
+  - The WhatsApp webhook, for Meta only: every Cloud API post must carry a valid `X-Hub-Signature-256` (see [WhatsApp](#whatsapp)). Simulator messages and uploads on the same path need a login.
   - The login-screen user list, which has no e-mails.
   - `/api/health`.
   - The real-time event stream, which carries only change notifications.
@@ -260,7 +260,7 @@ backend/
                           BulkTaxCampaign, BulkTaxRecipient
   schemas.py              Pydantic v2 request/response models + serializers
   seed.py                 settings, users, Hebrew templates, Hebrew / English-named clients, tickets in every state
-  test_flow.py            end-to-end verification (145 checks)
+  test_flow.py            end-to-end verification (243 checks)
   services/
     system_settings.py    live office configuration accessors
     ticket_engine.py      quick-send, button/text/media state machine, 9-digit Tax Authority validation
@@ -311,7 +311,11 @@ A network or quota failure in a provider falls back to offline mode automaticall
 
 Every outbound message goes to the in-app simulator over SSE. When `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are set, it is also sent through the Meta Cloud API as an interactive reply-button message.
 
-Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify token is `WHATSAPP_VERIFY_TOKEN`. Business-initiated messages outside the 24-hour window need Meta-approved templates. Meta also limits reply-button titles to 20 characters.
+Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify token is `WHATSAPP_VERIFY_TOKEN`.
+
+Set `WHATSAPP_APP_SECRET` to your Meta App Secret (App settings ▸ Basic). The webhook checks the `X-Hub-Signature-256` header on every Meta post: an HMAC-SHA256 of the raw body, keyed with that secret. A missing or wrong signature gets HTTP 403, and nothing is processed. While the secret is empty, every Meta post is refused.
+
+Business-initiated messages outside the 24-hour window need Meta-approved templates. Meta also limits reply-button titles to 20 characters.
 
 ## Key API endpoints
 
@@ -326,7 +330,7 @@ Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify 
 | POST | `/api/whatsapp/manual-send` | any user | Worker's manual message (multipart: `client_id`, `content_text`, `image_file` / `image_base64` / `media_url`); not automated, logged as **שליחת הודעה ידנית ללקוח** |
 | POST | `/api/tickets/{id}/approve` | any user | Approve a verified invoice |
 | POST | `/api/tickets/{id}/reject` | any user | Reject the invoice `{reason}`: the client gets the Hebrew re-prompt with the reason, and the ticket returns to NEEDS_CORRECTION |
-| POST | `/api/webhook/whatsapp-inbound` | public (webhook) | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
+| POST | `/api/webhook/whatsapp-inbound` | Meta: signed (`X-Hub-Signature-256`) · simulator: any user | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
 | POST | `/api/simulator/demo-receipt` | public | `clear`, `blurry`, `missing_number`, `wrong_supplier`, `bad_math`, `missing_allocation`, `invalid_tax_id` |
 | POST | `/api/scheduler/simulate-time-jump?hours=48` | public | Move pending reminders back, run the cycle (demo) |
 | POST | `/api/campaigns/bulk-tax-upload`, `/api/campaigns/demo-batch` | any user | Bulk "tax is ready" broadcast |
@@ -359,3 +363,4 @@ The test runs against a temporary database through the real HTTP API. It covers 
   - Bulk sheet validation.
   - Client deactivation.
   - The Meta webhook format.
+  - Webhook security: unsigned, wrongly signed or secret-less Meta posts get `403`; simulator posts without a login get `401`.

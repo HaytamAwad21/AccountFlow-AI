@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import SessionLocal, get_db
 from models import ChasingTicket, Client, DeliveryStatus, MessageDirection, User, WhatsAppMessageLog
-from routers.deps import get_client_or_404, require_user
+from routers.deps import current_user, get_client_or_404, require_user
 from schemas import DemoReceiptRequest, InboundMessage, InboundResult, ticket_out
 from services.demo_invoices import generate_invoice_image, parse_amount
 from services.events import broker, queue_event
@@ -30,7 +30,7 @@ from services.ticket_engine import (
     handle_text,
     save_upload,
 )
-from services.whatsapp import download_cloud_media, normalize_phone, parse_button_payload
+from services.whatsapp import download_cloud_media, normalize_phone, parse_button_payload, verify_webhook_signature
 
 log = logging.getLogger("accountflow.webhook")
 router = APIRouter(prefix="/api", tags=["webhook"])
@@ -149,15 +149,18 @@ def verify_webhook(
 
 
 @router.post("/webhook/whatsapp-inbound")
-async def whatsapp_inbound(request: Request):
+async def whatsapp_inbound(request: Request, user: User | None = Depends(current_user)):
     """Accepts three shapes:
-    * multipart/form-data  – file upload (fields: file, client_id | from_phone, ticket_id?, caption?)
-    * JSON {object: "whatsapp_business_account", entry: [...]}  – Meta Cloud API webhook
-    * JSON InboundMessage  – the in-app simulator (button taps & text)
+    * JSON {object: "whatsapp_business_account", entry: [...]}  – Meta Cloud API webhook; must be
+      signed with WHATSAPP_APP_SECRET (X-Hub-Signature-256), a session does not replace the signature
+    * multipart/form-data  – simulator file upload (fields: file, client_id | from_phone, ticket_id?,
+      caption?); needs a logged-in office user
+    * JSON InboundMessage  – the in-app simulator (button taps & text); needs a logged-in office user
     """
     content_type = request.headers.get("content-type", "")
     try:
         if content_type.startswith("multipart/form-data"):
+            require_user(user)
             form = await request.form()
             upload = form.get("file")
             if upload is None or not hasattr(upload, "read"):
@@ -171,9 +174,20 @@ async def whatsapp_inbound(request: Request):
             )
             return result.model_dump(mode="json")
 
-        body = await request.json()
+        raw = await request.body()
+        try:
+            body = json.loads(raw)
+        except ValueError as exc:
+            raise HTTPException(422, "גוף הבקשה אינו JSON תקין") from exc
         if isinstance(body, dict) and body.get("object") == "whatsapp_business_account":
+            if not verify_webhook_signature(raw, request.headers.get("x-hub-signature-256")):
+                if settings.whatsapp_app_secret:
+                    log.warning("Refusing a Meta webhook post: missing or invalid X-Hub-Signature-256")
+                else:
+                    log.warning("Refusing a Meta webhook post: WHATSAPP_APP_SECRET is not set")
+                raise HTTPException(403, "חתימת ה-webhook חסרה או שגויה")
             return await run_in_threadpool(_process_meta, body)
+        require_user(user)
         payload = InboundMessage.model_validate(body)
         result = await run_in_threadpool(_process_simple, payload)
         return result.model_dump(mode="json")
