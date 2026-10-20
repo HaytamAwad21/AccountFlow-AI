@@ -220,6 +220,7 @@ class MessageOut(ORMModel):
     media_url: str | None
     delivery_status: DeliveryStatus
     error_text: str | None = None
+    awaiting_window: bool = False
     created_at: UTCDateTime
 
 

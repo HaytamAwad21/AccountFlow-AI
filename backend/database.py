@@ -93,6 +93,10 @@ def _add_missing_columns() -> None:
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_whatsapp_message_logs_sender_user_id "
                                   "ON whatsapp_message_logs (sender_user_id)"))
             logging.getLogger("accountflow").warning("Added whatsapp_message_logs.sender_user_id.")
+        if "awaiting_window" not in msg_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE whatsapp_message_logs ADD COLUMN awaiting_window BOOLEAN NOT NULL DEFAULT FALSE"))
+            logging.getLogger("accountflow").warning("Added whatsapp_message_logs.awaiting_window.")
 
 
 def init_db() -> None:

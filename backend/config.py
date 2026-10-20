@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # Meta App Secret (App settings ▸ Basic). Cloud API webhook posts must carry a matching
     # X-Hub-Signature-256 header; while this is empty, every Meta webhook post is refused.
     whatsapp_app_secret: str = ""
+    # Meta-approved template sent when the client's 24-hour customer-service window is closed: the
+    # firm's messages are held until the client taps it or writes. Body variables: {{1}} client name,
+    # {{2}} firm name; one quick-reply button. Empty: messages are held until the client writes.
+    whatsapp_reengage_template: str = ""
+    whatsapp_template_language: str = "he"
     whatsapp_api_version: str = "v21.0"
     default_country_code: str = "972"
     # Public https address of this API (e.g. https://api.example.com). Needed only to send a worker's

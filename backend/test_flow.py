@@ -17,6 +17,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -41,6 +42,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 
 import services.clock as clock  # noqa: E402
+import services.whatsapp as whatsapp_service  # noqa: E402
 from config import settings  # noqa: E402
 from main import app  # noqa: E402
 from services.vision_ocr import validate_extraction  # noqa: E402
@@ -695,6 +697,98 @@ def main() -> None:
         check(meta_post(c, envelope).json()["processed"] == 1, "Meta webhook envelope processed")
         k = c.get("/api/dashboard/kpis").json()
         check(k["auto_reminders_this_month"] > 0 and "הודעות" in k["hours_saved_basis"], f"KPIs ({k['estimated_hours_saved']} h saved)")
+
+        section("Live WhatsApp: 24-hour window, held messages, re-engagement template")
+        sent: list[dict] = []
+        fail_next: list[int] = []  # Meta error codes to answer the next message sends with
+
+        class FakeResponse:
+            def __init__(self, status: int, body: dict) -> None:
+                self.status_code, self._body, self.text = status, body, json.dumps(body)
+
+            def json(self) -> dict:
+                return self._body
+
+        def fake_post(url: str, headers: dict, json: dict, timeout: float) -> FakeResponse:  # noqa: A002
+            if fail_next and json["type"] != "template":
+                return FakeResponse(400, {"error": {"code": fail_next.pop(0), "message": "Re-engagement message"}})
+            sent.append(json)
+            return FakeResponse(200, {"messages": [{"id": f"wamid.OUT{len(sent)}"}]})
+
+        def wait_sent(n: int) -> bool:
+            end = time.monotonic() + 5
+            while len(sent) < n and time.monotonic() < end:
+                time.sleep(0.05)
+            time.sleep(0.2)  # let anything unexpected arrive too
+            return len(sent) == n
+
+        live = {"whatsapp_token": "test-token", "whatsapp_phone_number_id": "1234567890",
+                "whatsapp_reengage_template": "accountflow_pending_update"}
+        saved = {k: getattr(settings, k) for k in live}
+        real_post = whatsapp_service.httpx.post
+        for k, v in live.items():
+            setattr(settings, k, v)
+        whatsapp_service.httpx.post = fake_post
+        try:
+            r = c.post("/api/clients", json={"full_name": "אבי חלון", "company_name": "חלון בע\"מ", "tax_id": "517011907",
+                                             "whatsapp_phone": "0521119007", "assigned_worker_id": worker["id"]}, headers=M)
+            check(r.status_code == 201, "client who never wrote created", r.text[:200])
+            win = r.json()["id"]
+            meta_from = "972521119007"
+
+            def held(client_id: int) -> list[dict]:
+                return [m for m in chat(client_id) if m["direction"] == "OUTBOUND" and m["awaiting_window"]]
+
+            r = c.post("/api/tickets/quick-send", headers=W, json={
+                "client_id": win, "template_id": tpl["id"],
+                "context_variables": {"supplier_name": "Mega Office Supply", "amount": "₪1,180.00", "invoice_date": "03/10/2026"}})
+            check(r.status_code == 201, "request to a client whose window is closed is accepted", r.text[:200])
+            check(wait_sent(1) and sent[0]["type"] == "template", "window closed: only the re-engagement template is sent")
+            tmpl = sent[0]["template"]
+            check(tmpl["name"] == "accountflow_pending_update" and tmpl["language"]["code"] == "he"
+                  and [p["text"] for p in tmpl["components"][0]["parameters"]] == ["אבי חלון", c.get("/api/settings").json()["firm_name"]]
+                  and tmpl["components"][1]["parameters"][0]["payload"] == "t0:show_held",
+                  "template carries the client name, firm name and the show-held button payload")
+            check(len(held(win)) == 1, "the request is held (awaiting_window) in the chat")
+            check(c.post("/api/whatsapp/manual-send", data={"client_id": str(win), "content_text": "עוד הודעה"}).status_code < 300,
+                  "manual message while the window is closed is accepted")
+            check(wait_sent(1) and len(held(win)) == 2, "second held message does not send another template")
+
+            tap = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+                {"from": meta_from, "id": "wamid.T", "type": "button", "button": {"payload": "t0:show_held", "text": "הצגת ההודעה"}}]}}]}]}
+            outbound_before = len([m for m in chat(win) if m["direction"] == "OUTBOUND"])
+            check(meta_post(c, tap).json()["processed"] == 1, "client taps the template button")
+            check(wait_sent(3) and sent[1]["type"] == "interactive" and sent[2]["type"] == "text"
+                  and "עוד הודעה" in sent[2]["text"]["body"], "held messages go out in order (request with buttons, then text)")
+            check(not held(win) and len([m for m in chat(win) if m["direction"] == "OUTBOUND"]) == outbound_before,
+                  "nothing left held, and the tap gets no extra bot reply")
+
+            check(c.post("/api/whatsapp/manual-send", data={"client_id": str(win), "content_text": "החלון פתוח"}).status_code < 300
+                  and wait_sent(4) and sent[3]["type"] == "text" and not held(win), "window open: messages are sent directly")
+
+            fail_next.append(131047)
+            c.post("/api/whatsapp/manual-send", data={"client_id": str(win), "content_text": "נדחתה ע״י Meta"})
+            check(wait_sent(5) and sent[4]["type"] == "template" and len(held(win)) == 1,
+                  "Meta error 131047 holds the message and sends the template")
+            wrote = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+                {"from": meta_from, "id": "wamid.W", "type": "text", "text": {"body": "הנה אני"}}]}}]}]}
+            meta_post(c, wrote)
+            check(wait_sent(7) and "נדחתה" in sent[5]["text"]["body"] and not held(win),
+                  "a typed reply releases held messages before the bot answers it")
+
+            settings.whatsapp_reengage_template = ""
+            r = c.post("/api/clients", json={"full_name": "דנה שקטה", "company_name": "שקטה בע\"מ", "tax_id": "517011908",
+                                             "whatsapp_phone": "0521119008", "assigned_worker_id": worker["id"]}, headers=M)
+            silent = r.json()["id"]
+            c.post("/api/whatsapp/manual-send", data={"client_id": str(silent), "content_text": "שלום"})
+            h = held(silent)
+            check(wait_sent(7) and len(h) == 1 and "WHATSAPP_REENGAGE_TEMPLATE" in (h[0]["error_text"] or ""),
+                  "no template configured: held with an explanation, nothing sent")
+            settings.whatsapp_reengage_template = live["whatsapp_reengage_template"]
+        finally:
+            whatsapp_service.httpx.post = real_post
+            for k, v in saved.items():
+                setattr(settings, k, v)
 
     print(f"\nALL {passed} CHECKS PASSED")
 

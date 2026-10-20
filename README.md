@@ -260,7 +260,7 @@ backend/
                           BulkTaxCampaign, BulkTaxRecipient
   schemas.py              Pydantic v2 request/response models + serializers
   seed.py                 settings, users, Hebrew templates, Hebrew / English-named clients, tickets in every state
-  test_flow.py            end-to-end verification (243 checks)
+  test_flow.py            end-to-end verification (257 checks)
   services/
     system_settings.py    live office configuration accessors
     ticket_engine.py      quick-send, button/text/media state machine, 9-digit Tax Authority validation
@@ -315,7 +315,31 @@ Point your Meta app webhook at `POST /api/webhook/whatsapp-inbound`. The verify 
 
 Set `WHATSAPP_APP_SECRET` to your Meta App Secret (App settings ▸ Basic). The webhook checks the `X-Hub-Signature-256` header on every Meta post: an HMAC-SHA256 of the raw body, keyed with that secret. A missing or wrong signature gets HTTP 403, and nothing is processed. While the secret is empty, every Meta post is refused.
 
-Business-initiated messages outside the 24-hour window need Meta-approved templates. Meta also limits reply-button titles to 20 characters.
+Meta also limits reply-button titles to 20 characters.
+
+#### The 24-hour window
+
+Meta accepts free-form and reply-button messages only within 24 hours of the client's last message. Requests and reminders usually go out after that window has closed, so the app handles it like this:
+
+1. **Window open** (the client wrote in the last 24 hours): messages are sent directly, as before.
+2. **Window closed:** the message is saved in the chat but held. The dashboard marks it **ממתינה ללקוח**. The app sends the client one Meta-approved template instead, which invites them to tap **הצגת ההודעה**. Further messages to the same client are held too, without another template.
+3. **The client taps the button or writes anything:** every held message goes out, oldest first, before any bot reply.
+
+If Meta still answers a send with error `131047` (window closed), the message is held the same way.
+
+Create the template in WhatsApp Manager and set its name in `WHATSAPP_REENGAGE_TEMPLATE` (language `WHATSAPP_TEMPLATE_LANGUAGE`, default `he`). Suggested template:
+
+| Field | Value |
+| --- | --- |
+| Name | `accountflow_pending_update` |
+| Category | Utility |
+| Language | Hebrew (`he`) |
+| Body | `שלום {{1}}, יש לך הודעה חדשה מ{{2}} בנוגע לתיק שלך. לחצו על הכפתור כדי לקרוא אותה.` |
+| Button | Quick reply: `הצגת ההודעה` |
+
+`{{1}}` is the client's name and `{{2}}` the firm name from הגדרות. Without a template name, closed-window messages are held until the client writes on their own, and the dashboard explains why.
+
+This applies only when the Cloud API is configured. In simulator-only mode every message appears on the simulated phone at once.
 
 ## Key API endpoints
 
@@ -364,3 +388,4 @@ The test runs against a temporary database through the real HTTP API. It covers 
   - Client deactivation.
   - The Meta webhook format.
   - Webhook security: unsigned, wrongly signed or secret-less Meta posts get `403`; simulator posts without a login get `401`.
+  - The 24-hour window, against a faked Cloud API: held messages, one re-engagement template, release in order on a tap or a reply, error `131047`, and no template configured.

@@ -9,6 +9,11 @@ Every outbound message starts with a header line that tells the customer who wro
 "הודעה אוטומטית" for bot / template / reminder / Vision AI messages, or "הודעה מאת <worker>"
 for a worker's manual message. A manual picture is sent as an image message when
 PUBLIC_BASE_URL makes the upload reachable by Meta.
+
+Meta accepts free-form and reply-button messages only within 24 hours of the client's last
+message (the customer-service window). When the window is closed, outbound messages are held
+(`awaiting_window`) and the approved WHATSAPP_REENGAGE_TEMPLATE is sent once instead; the held
+messages go out, in order, as soon as the client taps it or writes anything.
 """
 from __future__ import annotations
 
@@ -16,20 +21,28 @@ import hashlib
 import hmac
 import logging
 import re
+from datetime import timedelta
 
 import httpx
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal
-from models import Client, DeliveryStatus, WhatsAppMessageLog
-from services.events import queue_after_commit, queue_event
+from models import Client, DeliveryStatus, MessageDirection, WhatsAppMessageLog
+from services.clock import utcnow
+from services.events import queue_event, queue_in_order_after_commit
+from services.system_settings import get_system_settings
 
 log = logging.getLogger("accountflow.whatsapp")
 
 GRAPH_URL = "https://graph.facebook.com"
 BUTTON_TITLE_MAX = 20  # Meta limit for reply-button titles
 BODY_MAX = 1024
+SERVICE_WINDOW = timedelta(hours=24)  # Meta's customer-service window
+WINDOW_CLOSED_ERROR = 131047  # Cloud API: "more than 24 hours have passed since the customer last replied"
+REENGAGE_BUTTON_ID = "show_held"  # quick-reply payload of the re-engagement template's button
+REENGAGE_BUTTON_TITLE = "הצגת ההודעה"
 
 
 def verify_webhook_signature(raw_body: bytes, header: str | None) -> bool:
@@ -94,15 +107,69 @@ def with_header(header: str, text: str) -> str:
 def dispatch(db: Session, msg: WhatsAppMessageLog, client: Client, buttons: list[dict] | None, external: bool = True,
              media_mime: str | None = None) -> None:
     queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": msg.ticket_id})
-    if external and settings.whatsapp_live:
-        msg_id, phone = msg.id, client.whatsapp_phone
-        text = with_header(customer_header(msg), msg.content_text or "")
-        btns = [dict(b) for b in (buttons or [])]
-        ticket_id = msg.ticket_id
-        media_link = _public_media_link(msg.media_url)
-        if msg.media_url and not media_link:
-            log.warning("Message %s has a picture but PUBLIC_BASE_URL is not set: sending the text only", msg_id)
-        queue_after_commit(db, lambda: _send_cloud_api(msg_id, phone, text, btns, ticket_id, media_link, media_mime))
+    if not (external and settings.whatsapp_live):
+        return
+    if service_window_open(db, client.id):
+        _queue_send(db, msg, client, buttons, media_mime)
+    else:
+        _hold(db, msg, client)
+
+
+def service_window_open(db: Session, client_id: int) -> bool:
+    """True while the client's last inbound message is less than 24 hours old."""
+    last = db.scalar(select(func.max(WhatsAppMessageLog.created_at)).where(
+        WhatsAppMessageLog.client_id == client_id, WhatsAppMessageLog.direction == MessageDirection.INBOUND))
+    return last is not None and last > utcnow() - SERVICE_WINDOW
+
+
+def release_held_messages(db: Session, client: Client) -> int:
+    """The client wrote (or tapped the re-engagement template): send every held message, oldest first.
+    Call it after logging the inbound message, before any reply is dispatched."""
+    held = db.scalars(select(WhatsAppMessageLog).where(
+        WhatsAppMessageLog.client_id == client.id, WhatsAppMessageLog.awaiting_window.is_(True),
+    ).order_by(WhatsAppMessageLog.created_at, WhatsAppMessageLog.id)).all()
+    for msg in held:
+        msg.awaiting_window = False
+        msg.error_text = None
+        if settings.whatsapp_live:
+            _queue_send(db, msg, client, msg.buttons_json, None)
+    if held:
+        queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": None})
+    return len(held)
+
+
+def _has_held(db: Session, client_id: int) -> bool:
+    return db.scalar(select(WhatsAppMessageLog.id).where(
+        WhatsAppMessageLog.client_id == client_id, WhatsAppMessageLog.awaiting_window.is_(True)).limit(1)) is not None
+
+
+def _hold(db: Session, msg: WhatsAppMessageLog, client: Client) -> None:
+    """Window closed: keep the message for later and invite the client back with the approved template,
+    once per closed window (only the first held message sends it)."""
+    first = not _has_held(db, client.id)
+    msg.awaiting_window = True
+    db.flush()  # the next message held in this transaction must see this one
+    if not first:
+        return
+    if not settings.whatsapp_reengage_template:
+        log.warning("Client %s: 24-hour window closed and WHATSAPP_REENGAGE_TEMPLATE is not set; "
+                    "message %s waits until the client writes", client.id, msg.id)
+        msg.error_text = "חלון 24 השעות של WhatsApp סגור ולא הוגדרה תבנית פתיחה (WHATSAPP_REENGAGE_TEMPLATE): ההודעה תישלח כשהלקוח יכתוב"
+        return
+    msg_id, phone, name, firm = msg.id, client.whatsapp_phone, client.full_name, get_system_settings(db).firm_name
+    queue_in_order_after_commit(db, lambda: _send_reengage(msg_id, phone, name, firm))
+
+
+def _queue_send(db: Session, msg: WhatsAppMessageLog, client: Client, buttons: list[dict] | None,
+                media_mime: str | None) -> None:
+    msg_id, phone = msg.id, client.whatsapp_phone
+    text = with_header(customer_header(msg), msg.content_text or "")
+    btns = [dict(b) for b in (buttons or [])]
+    ticket_id = msg.ticket_id
+    media_link = _public_media_link(msg.media_url)
+    if msg.media_url and not media_link:
+        log.warning("Message %s has a picture but PUBLIC_BASE_URL is not set: sending the text only", msg_id)
+    queue_in_order_after_commit(db, lambda: _send_cloud_api(msg_id, phone, text, btns, ticket_id, media_link, media_mime))
 
 
 def _public_media_link(media_url: str | None) -> str | None:
@@ -139,25 +206,64 @@ def _cloud_payload(phone: str, text: str, buttons: list[dict], ticket_id: int | 
     return {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"body": text[:4096], "preview_url": True}}
 
 
+def _reengage_payload(phone: str, client_name: str, firm_name: str) -> dict:
+    return {
+        "messaging_product": "whatsapp",
+        "to": re.sub(r"\D", "", phone),
+        "type": "template",
+        "template": {
+            "name": settings.whatsapp_reengage_template,
+            "language": {"code": settings.whatsapp_template_language},
+            "components": [
+                {"type": "body", "parameters": [{"type": "text", "text": client_name}, {"type": "text", "text": firm_name}]},
+                {"type": "button", "sub_type": "quick_reply", "index": "0",
+                 "parameters": [{"type": "payload", "payload": button_payload(None, REENGAGE_BUTTON_ID)}]},
+            ],
+        },
+    }
+
+
+def _post_message(payload: dict) -> tuple[str | None, str | None, int | None]:
+    """POST one Cloud API message. Returns (external_id, error, Meta error code)."""
+    url = f"{GRAPH_URL}/{settings.whatsapp_api_version}/{settings.whatsapp_phone_number_id}/messages"
+    try:
+        resp = httpx.post(url, headers={"Authorization": f"Bearer {settings.whatsapp_token}"}, json=payload, timeout=15)
+    except httpx.HTTPError as exc:
+        return None, f"{type(exc).__name__}: {exc}", None
+    if resp.status_code >= 400:
+        try:
+            code = resp.json().get("error", {}).get("code")
+        except ValueError:
+            code = None
+        return None, f"HTTP {resp.status_code}: {resp.text[:500]}", code
+    return (resp.json().get("messages") or [{}])[0].get("id"), None, None
+
+
+def _send_reengage(msg_id: int, phone: str, client_name: str, firm_name: str) -> None:
+    _external_id, error, _code = _post_message(_reengage_payload(phone, client_name, firm_name))
+    if not error:
+        return
+    log.warning("WhatsApp re-engagement template failed for message %s: %s", msg_id, error)
+    with SessionLocal() as db:
+        msg = db.get(WhatsAppMessageLog, msg_id)
+        if msg and msg.awaiting_window:
+            msg.error_text = f"תבנית הפתיחה לא נשלחה, ההודעה תישלח כשהלקוח יכתוב: {error}"
+            queue_event(db, {"type": "message", "client_id": msg.client_id, "ticket_id": msg.ticket_id})
+            db.commit()
+
+
 def _send_cloud_api(msg_id: int, phone: str, text: str, buttons: list[dict], ticket_id: int | None,
                     media_link: str | None = None, media_mime: str | None = None) -> None:
-    url = f"{GRAPH_URL}/{settings.whatsapp_api_version}/{settings.whatsapp_phone_number_id}/messages"
-    external_id, error = None, None
-    try:
-        resp = httpx.post(url, headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
-                          json=_cloud_payload(phone, text, buttons, ticket_id, media_link, media_mime), timeout=15)
-        if resp.status_code >= 400:
-            error = f"HTTP {resp.status_code}: {resp.text[:500]}"
-        else:
-            external_id = (resp.json().get("messages") or [{}])[0].get("id")
-    except httpx.HTTPError as exc:
-        error = f"{type(exc).__name__}: {exc}"
+    external_id, error, code = _post_message(_cloud_payload(phone, text, buttons, ticket_id, media_link, media_mime))
 
     with SessionLocal() as db:
         msg = db.get(WhatsAppMessageLog, msg_id)
         if not msg:
             return
-        if error:
+        if code == WINDOW_CLOSED_ERROR:
+            # Meta's clock says the window is closed (e.g. it closed while this message was queued): hold it.
+            _hold(db, msg, msg.client)
+        elif error:
             log.warning("WhatsApp Cloud API send failed for message %s: %s", msg_id, error)
             msg.delivery_status = DeliveryStatus.FAILED
             msg.error_text = error

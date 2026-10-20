@@ -66,10 +66,17 @@ def queue_after_commit(db: Session, fn: Callable[[], None]) -> None:
     db.info.setdefault("pending_jobs", []).append(fn)
 
 
+def queue_in_order_after_commit(db: Session, fn: Callable[[], None]) -> None:
+    """Like `queue_after_commit`, but every job queued this way in one transaction runs on the same
+    worker thread, in the order queued (e.g. WhatsApp sends that must reach the client in order)."""
+    db.info.setdefault("ordered_jobs", []).append(fn)
+
+
 @sa_event.listens_for(Session, "after_commit")
 def _flush_after_commit(session: Session) -> None:
     events = session.info.pop("pending_events", [])
     jobs = session.info.pop("pending_jobs", [])
+    ordered = session.info.pop("ordered_jobs", [])
     seen: set[tuple] = set()
     for ev in events:
         key = tuple(sorted((k, str(v)) for k, v in ev.items()))
@@ -79,12 +86,20 @@ def _flush_after_commit(session: Session) -> None:
         broker.publish(ev)
     for job in jobs:
         _executor.submit(_run_job, job)
+    if ordered:
+        _executor.submit(_run_in_order, ordered)
 
 
 @sa_event.listens_for(Session, "after_rollback")
 def _discard_after_rollback(session: Session) -> None:
     session.info.pop("pending_events", None)
     session.info.pop("pending_jobs", None)
+    session.info.pop("ordered_jobs", None)
+
+
+def _run_in_order(jobs: list[Callable[[], None]]) -> None:
+    for job in jobs:
+        _run_job(job)
 
 
 def _run_job(job: Callable[[], None]) -> None:

@@ -244,6 +244,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                     buttons={m.buttons_json}
                     buttonsDisabled
                     delivery={m.delivery_status}
+                    held={m.awaiting_window}
                     mediaPath={m.media_url}
                     type={m.message_type}
                     automated={m.is_automated}

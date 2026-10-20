@@ -325,6 +325,7 @@ export function PhoneSimulator() {
                     createdAt={m.created_at}
                     buttons={m.buttons_json}
                     delivery={m.delivery_status}
+                    held={m.awaiting_window}
                     mediaPath={m.media_url}
                     type={m.message_type}
                     automated={m.is_automated}

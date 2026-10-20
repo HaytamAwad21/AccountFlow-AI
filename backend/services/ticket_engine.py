@@ -48,7 +48,7 @@ from services.templating import (
     required_variables,
 )
 from services.vision_ocr import is_nine_digits, normalize_id, verify_invoice_image
-from services.whatsapp import dispatch
+from services.whatsapp import REENGAGE_BUTTON_ID, REENGAGE_BUTTON_TITLE, dispatch, release_held_messages
 
 log = logging.getLogger("accountflow.engine")
 
@@ -248,6 +248,8 @@ def log_inbound(db: Session, client: Client, ticket: ChasingTicket | None, messa
                       message_type=message_type, text=text, sender_name=client.full_name, media_url=media_url,
                       is_automated=False)
     queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": msg.ticket_id})
+    # The client wrote, so the 24-hour window is open: messages held while it was closed go out first.
+    release_held_messages(db, client)
     return msg
 
 
@@ -421,6 +423,10 @@ def recount_campaign(db: Session, campaign: BulkTaxCampaign) -> None:
 
 
 def handle_button(db: Session, client: Client, button_id: str, ticket_id: int | None = None) -> dict:
+    if button_id == REENGAGE_BUTTON_ID:
+        # The client tapped the re-engagement template: the held messages are the whole answer.
+        log_inbound(db, client, None, MessageType.BUTTON_REPLY, REENGAGE_BUTTON_TITLE)
+        return {"ticket": None, "action": "SHOW_HELD", "reply": None}
     lang = lang_of(client)
     button = button_index(db).get(button_id)
     ticket = find_active_ticket(db, client, ticket_id)

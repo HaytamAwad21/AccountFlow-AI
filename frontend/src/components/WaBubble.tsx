@@ -1,4 +1,4 @@
-import { Bot, Check, CheckCheck, CornerUpLeft, FileText, UserRound } from "lucide-react";
+import { Bot, Check, CheckCheck, Clock, CornerUpLeft, FileText, UserRound } from "lucide-react";
 import { mediaUrl } from "../lib/api";
 import { clockTime, cx } from "../lib/format";
 import type { DeliveryStatus, MessageType, RenderedButton } from "../lib/types";
@@ -53,6 +53,7 @@ export function WaBubble({
   onButton,
   buttonsDisabled,
   delivery,
+  held = false,
   mediaPath,
   mediaKind,
   type,
@@ -67,6 +68,8 @@ export function WaBubble({
   onButton?: (b: RenderedButton) => void;
   buttonsDisabled?: boolean;
   delivery?: DeliveryStatus;
+  /** Firm messages only: held until the client writes (24-hour WhatsApp window closed). */
+  held?: boolean;
   mediaPath?: string | null;
   /** Overrides the file-extension check, e.g. for a local preview (blob: URL) before sending. */
   mediaKind?: "image" | "pdf";
@@ -109,7 +112,13 @@ export function WaBubble({
         )}
         <span className="float-end ms-2 mt-1.5 flex translate-y-0.5 items-center gap-0.5 text-[10px] text-slate-500" dir="ltr">
           {createdAt && clockTime(createdAt)}
-          {fromFirm && delivery && <Ticks status={delivery} />}
+          {fromFirm && held ? (
+            <span className="flex items-center gap-0.5 font-semibold text-amber-600" title="חלון 24 השעות של WhatsApp סגור: ההודעה תישלח כשהלקוח יגיב">
+              <Clock className="h-3 w-3" /> ממתינה ללקוח
+            </span>
+          ) : (
+            fromFirm && delivery && <Ticks status={delivery} />
+          )}
         </span>
       </div>
       {fromFirm && buttons && buttons.length > 0 && (

@@ -95,6 +95,8 @@ export interface Message {
   media_url: string | null;
   delivery_status: DeliveryStatus;
   error_text: string | null;
+  /** held: the client's 24-hour WhatsApp window is closed; sent once the client writes */
+  awaiting_window: boolean;
   created_at: string;
 }
 

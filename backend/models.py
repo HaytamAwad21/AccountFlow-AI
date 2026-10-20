@@ -233,6 +233,9 @@ class WhatsAppMessageLog(Base):
     delivery_status: Mapped[DeliveryStatus] = mapped_column(_enum(DeliveryStatus), default=DeliveryStatus.SENT)
     external_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Outbound only: held because the client's 24-hour WhatsApp window is closed. Sent through the
+    # Cloud API once the client writes or taps the re-engagement template.
+    awaiting_window: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
     ticket: Mapped[ChasingTicket | None] = relationship(back_populates="messages")
