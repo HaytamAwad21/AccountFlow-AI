@@ -390,3 +390,11 @@ The test runs against a temporary database through the real HTTP API. It covers 
   - The Meta webhook format.
   - Webhook security: unsigned, wrongly signed or secret-less Meta posts get `403`; simulator posts without a login get `401`.
   - The 24-hour window, against a faked Cloud API: held messages, one re-engagement template, release in order on a tap or a reply, error `131047`, and no template configured.
+
+## Git hooks
+
+`.githooks/commit-msg` removes any `Co-authored-by: Claude` line from commit messages, in any capitalization. Git does not run hooks from the repository by default, so enable it once in each clone:
+
+```bash
+git config core.hooksPath .githooks
+```
