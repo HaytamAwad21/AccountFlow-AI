@@ -548,8 +548,11 @@ def main() -> None:
             check(customer_header(arow) == "הודעה אוטומטית" and customer_header(mrow) == f"הודעה מאת {worker['full_name']}",
                   "customer-facing headers: automated vs worker name")
         check(with_header("הודעה אוטומטית", "גוף") == "*הודעה אוטומטית*\nגוף", "Cloud API text starts with the header line")
-        payload = _cloud_payload("+972501234567", "*הודעה מאת ראמי*", [], None, "https://x.test/uploads/out_1.png", "image/png")
-        check(payload["type"] == "image" and payload["image"]["link"].endswith(".png"), "manual picture goes to the Cloud API as an image")
+        payload = _cloud_payload("+972501234567", "*הודעה מאת ראמי*", [], None, "media.1", "image")
+        check(payload["type"] == "image" and payload["image"] == {"id": "media.1", "caption": "*הודעה מאת ראמי*"}
+              and "link" not in payload["image"], "manual picture goes to the Cloud API by media ID, not by link")
+        payload = _cloud_payload("+972501234567", "*הודעה מאת ראמי*", [], None, "media.2", "document", "out_1.pdf")
+        check(payload["type"] == "document" and payload["document"]["filename"] == "out_1.pdf", "manual PDF goes as a document")
         everything = [m for cl in c.get("/api/clients").json() for m in c.get(f"/api/clients/{cl['id']}/messages").json()]
         check(not any(has_emoji(m["content_text"]) or any(has_emoji(b.get("title")) for b in (m["buttons_json"] or [])) for m in everything),
               f"no emojis in any WhatsApp message ({len(everything)} checked)")
@@ -709,7 +712,17 @@ def main() -> None:
             def json(self) -> dict:
                 return self._body
 
-        def fake_post(url: str, headers: dict, json: dict, timeout: float) -> FakeResponse:  # noqa: A002
+        uploads: list[dict] = []  # files posted to the Cloud API /media endpoint
+        fail_upload: list[int] = []  # HTTP statuses to answer the next media uploads with
+
+        def fake_post(url: str, headers: dict, timeout: float, json: dict | None = None,  # noqa: A002
+                      data: dict | None = None, files: dict | None = None) -> FakeResponse:
+            if url.endswith("/media"):
+                if fail_upload:
+                    return FakeResponse(fail_upload.pop(0), {"error": {"code": 100, "message": "Invalid file"}})
+                name, content, mime = files["file"]
+                uploads.append({"url": url, "data": data, "name": name, "size": len(content), "mime": mime})
+                return FakeResponse(200, {"id": f"media.{len(uploads)}"})
             if fail_next and json["type"] != "template":
                 return FakeResponse(400, {"error": {"code": fail_next.pop(0), "message": "Re-engagement message"}})
             sent.append(json)
@@ -785,6 +798,23 @@ def main() -> None:
             check(wait_sent(7) and len(h) == 1 and "WHATSAPP_REENGAGE_TEMPLATE" in (h[0]["error_text"] or ""),
                   "no template configured: held with an explanation, nothing sent")
             settings.whatsapp_reengage_template = live["whatsapp_reengage_template"]
+
+            r = c.post("/api/whatsapp/manual-send", data={"client_id": str(win), "content_text": "הסיכום החודשי"},
+                       files={"image_file": ("summary.png", png, "image/png")})
+            check(r.status_code == 201 and wait_sent(8), "window open: manual picture is sent", r.text[:200])
+            check(len(uploads) == 1 and uploads[0]["url"].endswith("/1234567890/media") and uploads[0]["mime"] == "image/png"
+                  and uploads[0]["data"] == {"messaging_product": "whatsapp", "type": "image/png"} and uploads[0]["size"] == len(png),
+                  "the picture file is uploaded to the Cloud API media endpoint first")
+            check(sent[7]["type"] == "image" and sent[7]["image"]["id"] == "media.1" and "link" not in sent[7]["image"]
+                  and "הסיכום החודשי" in sent[7]["image"]["caption"] and "הודעה מאת" in sent[7]["image"]["caption"],
+                  "then sent by media ID with the worker header and text as caption (no public URL needed)")
+            fail_upload.append(400)
+            r = c.post("/api/whatsapp/manual-send", data={"client_id": str(win), "content_text": ""},
+                       files={"image_file": ("bad.png", png, "image/png")})
+            time.sleep(0.5)
+            failed = [m for m in chat(win) if m["id"] == r.json()["id"]][0]
+            check(wait_sent(8) and failed["delivery_status"] == "FAILED" and "העלאת הקובץ ל-WhatsApp נכשלה" in (failed["error_text"] or ""),
+                  "a failed upload marks the message FAILED with a Hebrew reason and sends nothing")
         finally:
             whatsapp_service.httpx.post = real_post
             for k, v in saved.items():

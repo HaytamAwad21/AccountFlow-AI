@@ -68,9 +68,6 @@ class Settings(BaseSettings):
     whatsapp_template_language: str = "he"
     whatsapp_api_version: str = "v21.0"
     default_country_code: str = "972"
-    # Public https address of this API (e.g. https://api.example.com). Needed only to send a worker's
-    # manual picture through the Cloud API: Meta downloads it from <PUBLIC_BASE_URL>/uploads/...
-    public_base_url: str = ""
 
     upload_dir: Path = BASE_DIR / "uploads"
 

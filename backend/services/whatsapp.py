@@ -7,8 +7,9 @@ after the DB commit on a worker thread, so the clerk's request returns immediate
 
 Every outbound message starts with a header line that tells the customer who wrote it:
 "הודעה אוטומטית" for bot / template / reminder / Vision AI messages, or "הודעה מאת <worker>"
-for a worker's manual message. A manual picture is sent as an image message when
-PUBLIC_BASE_URL makes the upload reachable by Meta.
+for a worker's manual message. A manual picture / PDF is first uploaded to the Cloud API media
+endpoint and then sent by its media ID, so Meta never has to reach the office computer (only the
+webhook is exposed).
 
 Meta accepts free-form and reply-button messages only within 24 hours of the client's last
 message (the customer-service window). When the window is closed, outbound messages are held
@@ -20,8 +21,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import mimetypes
 import re
 from datetime import timedelta
+from pathlib import Path
 
 import httpx
 from sqlalchemy import func, select
@@ -165,28 +168,22 @@ def _queue_send(db: Session, msg: WhatsAppMessageLog, client: Client, buttons: l
     msg_id, phone = msg.id, client.whatsapp_phone
     text = with_header(customer_header(msg), msg.content_text or "")
     btns = [dict(b) for b in (buttons or [])]
-    ticket_id = msg.ticket_id
-    media_link = _public_media_link(msg.media_url)
-    if msg.media_url and not media_link:
-        log.warning("Message %s has a picture but PUBLIC_BASE_URL is not set: sending the text only", msg_id)
-    queue_in_order_after_commit(db, lambda: _send_cloud_api(msg_id, phone, text, btns, ticket_id, media_link, media_mime))
+    ticket_id, media_url = msg.ticket_id, msg.media_url
+    queue_in_order_after_commit(db, lambda: _send_cloud_api(msg_id, phone, text, btns, ticket_id, media_url, media_mime))
 
 
-def _public_media_link(media_url: str | None) -> str | None:
-    if not media_url:
-        return None
-    if media_url.startswith("http"):
-        return media_url
-    base = settings.public_base_url.rstrip("/")
-    return f"{base}{media_url}" if base else None
+def _media_kind(mime: str | None, filename: str) -> str:
+    return "document" if (mime or "").endswith("pdf") or filename.lower().endswith(".pdf") else "image"
 
 
 def _cloud_payload(phone: str, text: str, buttons: list[dict], ticket_id: int | None,
-                   media_link: str | None = None, media_mime: str | None = None) -> dict:
+                   media_id: str | None = None, media_kind: str = "image", filename: str | None = None) -> dict:
     to = re.sub(r"\D", "", phone)
-    if media_link:
-        kind = "document" if (media_mime or "").endswith("pdf") or media_link.lower().endswith(".pdf") else "image"
-        return {"messaging_product": "whatsapp", "to": to, "type": kind, kind: {"link": media_link, "caption": text[:BODY_MAX]}}
+    if media_id:
+        media: dict = {"id": media_id, "caption": text[:BODY_MAX]}
+        if media_kind == "document" and filename:
+            media["filename"] = filename
+        return {"messaging_product": "whatsapp", "to": to, "type": media_kind, media_kind: media}
     if buttons:
         return {
             "messaging_product": "whatsapp",
@@ -252,9 +249,37 @@ def _send_reengage(msg_id: int, phone: str, client_name: str, firm_name: str) ->
             db.commit()
 
 
+def upload_cloud_media(path: Path, mime: str) -> tuple[str | None, str | None]:
+    """Upload a local file to the Cloud API media endpoint. Returns (media_id, error)."""
+    url = f"{GRAPH_URL}/{settings.whatsapp_api_version}/{settings.whatsapp_phone_number_id}/media"
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    try:
+        resp = httpx.post(url, headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
+                          data={"messaging_product": "whatsapp", "type": mime},
+                          files={"file": (path.name, content, mime)}, timeout=60)
+    except httpx.HTTPError as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+    if resp.status_code >= 400:
+        return None, f"HTTP {resp.status_code}: {resp.text[:500]}"
+    media_id = resp.json().get("id")
+    return (media_id, None) if media_id else (None, "Cloud API media upload returned no id")
+
+
 def _send_cloud_api(msg_id: int, phone: str, text: str, buttons: list[dict], ticket_id: int | None,
-                    media_link: str | None = None, media_mime: str | None = None) -> None:
-    external_id, error, code = _post_message(_cloud_payload(phone, text, buttons, ticket_id, media_link, media_mime))
+                    media_url: str | None = None, media_mime: str | None = None) -> None:
+    media_id, kind, filename, error, code = None, "image", None, None, None
+    if media_url:
+        path = settings.upload_dir / Path(media_url).name
+        mime = media_mime or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        kind, filename = _media_kind(mime, path.name), path.name
+        media_id, upload_error = upload_cloud_media(path, mime)
+        if upload_error:
+            error = f"העלאת הקובץ ל-WhatsApp נכשלה: {upload_error}"
+    if not error:
+        external_id, error, code = _post_message(_cloud_payload(phone, text, buttons, ticket_id, media_id, kind, filename))
 
     with SessionLocal() as db:
         msg = db.get(WhatsAppMessageLog, msg_id)
