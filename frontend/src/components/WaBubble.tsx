@@ -1,4 +1,4 @@
-import { Bot, Check, CheckCheck, Clock, CornerUpLeft, FileText, UserRound } from "lucide-react";
+import { Ban, Bot, Check, CheckCheck, Clock, CornerUpLeft, FileText, UserRound } from "lucide-react";
 import { mediaUrl } from "../lib/api";
 import { clockTime, cx } from "../lib/format";
 import type { DeliveryStatus, MessageType, RenderedButton } from "../lib/types";
@@ -10,8 +10,19 @@ const AUTOMATED_KIND: Partial<Record<MessageType, string>> = {
   OCR_FEEDBACK: "בדיקת Vision AI",
 };
 
-function Ticks({ status }: { status: DeliveryStatus }) {
-  if (status === "FAILED") return <span className="text-[10px] font-semibold text-red-600">נכשל</span>;
+function Ticks({ status, note }: { status: DeliveryStatus; note?: string | null }) {
+  if (status === "FAILED")
+    return (
+      <span className="text-[10px] font-semibold text-red-600" title={note ?? undefined}>
+        נכשל
+      </span>
+    );
+  if (status === "SKIPPED")
+    return (
+      <span className="flex items-center gap-0.5 font-semibold text-slate-400" title={note ?? undefined}>
+        <Ban className="h-3 w-3" /> לא נשלחה
+      </span>
+    );
   if (status === "SENT") return <Check className="h-3.5 w-3.5 text-slate-400" />;
   return <CheckCheck className={cx("h-3.5 w-3.5", status === "READ" ? "text-sky-500" : "text-slate-400")} />;
 }
@@ -53,6 +64,7 @@ export function WaBubble({
   onButton,
   buttonsDisabled,
   delivery,
+  deliveryNote,
   held = false,
   mediaPath,
   mediaKind,
@@ -68,6 +80,8 @@ export function WaBubble({
   onButton?: (b: RenderedButton) => void;
   buttonsDisabled?: boolean;
   delivery?: DeliveryStatus;
+  /** Why a message failed or was not sent (shown as a tooltip on its status). */
+  deliveryNote?: string | null;
   /** Firm messages only: held until the client writes (24-hour WhatsApp window closed). */
   held?: boolean;
   mediaPath?: string | null;
@@ -90,6 +104,7 @@ export function WaBubble({
           "relative max-w-[86%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[13.5px] leading-snug text-slate-900 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]",
           fromFirm ? "rounded-ss-none bg-white" : "rounded-se-none bg-wa-bubble",
           compact && "max-w-full",
+          delivery === "SKIPPED" && "opacity-60",
         )}
       >
         {fromFirm && <SenderHeader automated={automated} senderName={senderName} type={type} />}
@@ -117,7 +132,7 @@ export function WaBubble({
               <Clock className="h-3 w-3" /> ממתינה ללקוח
             </span>
           ) : (
-            fromFirm && delivery && <Ticks status={delivery} />
+            fromFirm && delivery && <Ticks status={delivery} note={deliveryNote} />
           )}
         </span>
       </div>

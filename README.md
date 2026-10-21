@@ -324,6 +324,7 @@ Meta accepts free-form and reply-button messages only within 24 hours of the cli
 1. **Window open** (the client wrote in the last 24 hours): messages are sent directly, as before.
 2. **Window closed:** the message is saved in the chat but held. The dashboard marks it **ממתינה ללקוח**. The app sends the client one Meta-approved template instead, which invites them to tap **הצגת ההודעה**. Further messages to the same client are held too, without another template.
 3. **The client taps the button or writes anything:** every held message goes out, oldest first, before any bot reply.
+4. **Outdated held messages are dropped, not sent:** per request, only the newest held reminder goes out. If the request itself was still held, it goes out without its reminders; if the request was closed meanwhile, none of its held messages go out. Dropped messages show **לא נשלחה** in the chat (status `SKIPPED`). Manual messages always go out.
 
 If Meta still answers a send with error `131047` (window closed), the message is held the same way.
 

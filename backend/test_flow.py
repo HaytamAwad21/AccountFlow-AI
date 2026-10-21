@@ -815,6 +815,79 @@ def main() -> None:
             failed = [m for m in chat(win) if m["id"] == r.json()["id"]][0]
             check(wait_sent(8) and failed["delivery_status"] == "FAILED" and "העלאת הקובץ ל-WhatsApp נכשלה" in (failed["error_text"] or ""),
                   "a failed upload marks the message FAILED with a Hebrew reason and sends nothing")
+
+            # Gap 1: held messages must not pile up when the client comes back.
+            from datetime import timedelta as _td
+
+            from models import Client as ClientRow
+            from services.ticket_engine import send_outbound
+            from services.whatsapp import SKIP_OLDER_REMINDER, SKIP_REQUEST_PENDING, SKIP_TICKET_CLOSED
+
+            r = c.post("/api/clients", json={"full_name": "חן מתעכב", "company_name": "מתעכב בע\"מ", "tax_id": "517011909",
+                                             "whatsapp_phone": "0521119009", "assigned_worker_id": worker["id"]}, headers=M)
+            late = r.json()["id"]
+            late_from = "972521119009"
+
+            def remind(ticket_id: int, label: str) -> None:
+                with SessionLocal() as db:
+                    tk = db.get(ChasingTicket, ticket_id)
+                    send_outbound(db, db.get(ClientRow, late), tk, f"תזכורת {label}", [{"id": "upload_photo", "title": "העלאה",
+                                                                                         "action": "REQUEST_MEDIA"}], MessageType.AUTO_REMINDER)
+                    db.commit()
+
+            def close_window(client_id: int) -> None:
+                with SessionLocal() as db:
+                    for m in db.scalars(select(WhatsAppMessageLog).where(WhatsAppMessageLog.client_id == client_id,
+                                                                           WhatsAppMessageLog.direction == MessageDirection.INBOUND)):
+                        m.created_at -= _td(hours=25)
+                    db.commit()
+
+            def by_text(client_id: int, text: str) -> dict:
+                return next(m for m in chat(client_id) if m["content_text"] == text)
+
+            base = len(sent)
+            r = c.post("/api/tickets/quick-send", headers=W, json={
+                "client_id": late, "template_id": tpl["id"],
+                "context_variables": {"supplier_name": "Late Supplies", "amount": "500", "invoice_date": "2026-10-03"}})
+            late_ticket = r.json()["ticket"]["id"]
+            remind(late_ticket, "א")
+            remind(late_ticket, "ב")
+            check(wait_sent(base + 1) and sent[base]["type"] == "template" and len(held(late)) == 3,
+                  "request + 2 reminders held, one re-engagement template sent")
+            tap_late = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+                {"from": late_from, "id": "wamid.L1", "type": "button", "button": {"payload": "t0:show_held", "text": "הצגת ההודעה"}}]}}]}]}
+            meta_post(c, tap_late)
+            check(wait_sent(base + 2) and sent[base + 1]["type"] == "interactive" and "Late Supplies" in sent[base + 1]["interactive"]["body"]["text"],
+                  "on return, only the original request is sent")
+            check(all(by_text(late, f"תזכורת {x}")["delivery_status"] == "SKIPPED"
+                      and by_text(late, f"תזכורת {x}")["error_text"] == SKIP_REQUEST_PENDING for x in ("א", "ב")) and not held(late),
+                  "its held reminders are dropped (SKIPPED, Hebrew reason)")
+
+            close_window(late)
+            base = len(sent)
+            remind(late_ticket, "ג")
+            remind(late_ticket, "ד")
+            remind(late_ticket, "ה")
+            check(wait_sent(base + 1) and sent[base]["type"] == "template" and len(held(late)) == 3,
+                  "request already delivered, window closed again: 3 reminders held")
+            wrote_late = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+                {"from": late_from, "id": "wamid.L2", "type": "text", "text": {"body": "חזרתי"}}]}}]}]}
+            meta_post(c, wrote_late)
+            check(wait_sent(base + 3) and "תזכורת ה" in sent[base + 1]["interactive"]["body"]["text"]
+                  and sent[base + 2]["type"] == "text", "only the newest reminder goes out, then the bot's reply")
+            check(by_text(late, "תזכורת ג")["error_text"] == SKIP_OLDER_REMINDER and by_text(late, "תזכורת ד")["delivery_status"] == "SKIPPED"
+                  and by_text(late, "תזכורת ה")["delivery_status"] != "SKIPPED", "older reminders are SKIPPED")
+
+            close_window(late)
+            base = len(sent)
+            remind(late_ticket, "ו")
+            check(wait_sent(base + 1) and sent[base]["type"] == "template", "reminder held for a ticket that is still open")
+            c.post(f"/api/tickets/{late_ticket}/resolve", json={"note": "טופל טלפונית"})
+            wrote_again = {"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {"messages": [
+                {"from": late_from, "id": "wamid.L3", "type": "text", "text": {"body": "שוב אני"}}]}}]}]}
+            meta_post(c, wrote_again)
+            check(wait_sent(base + 1) and by_text(late, "תזכורת ו")["error_text"] == SKIP_TICKET_CLOSED and not held(late),
+                  "ticket closed meanwhile: its held reminder is dropped, nothing sent")
         finally:
             whatsapp_service.httpx.post = real_post
             for k, v in saved.items():

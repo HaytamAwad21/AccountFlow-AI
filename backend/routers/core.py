@@ -17,6 +17,7 @@ from database import get_db
 from models import (
     ChasingTicket,
     Client,
+    DeliveryStatus,
     MessageDirection,
     MessageTemplate,
     MessageType,
@@ -459,12 +460,14 @@ def kpis(db: Session = Depends(get_db), _user: User = Depends(require_user)):
 
     auto_reminders = db.scalar(
         select(func.count(WhatsAppMessageLog.id)).where(
-            WhatsAppMessageLog.message_type == MessageType.AUTO_REMINDER, WhatsAppMessageLog.created_at >= month_start
+            WhatsAppMessageLog.message_type == MessageType.AUTO_REMINDER, WhatsAppMessageLog.created_at >= month_start,
+            WhatsAppMessageLog.delivery_status != DeliveryStatus.SKIPPED,
         )
     ) or 0
     automated_msgs = db.scalar(
         select(func.count(WhatsAppMessageLog.id)).where(
-            WhatsAppMessageLog.direction == MessageDirection.OUTBOUND, WhatsAppMessageLog.created_at >= month_start
+            WhatsAppMessageLog.direction == MessageDirection.OUTBOUND, WhatsAppMessageLog.created_at >= month_start,
+            WhatsAppMessageLog.delivery_status != DeliveryStatus.SKIPPED,
         )
     ) or 0
     ocr_checks = db.scalar(

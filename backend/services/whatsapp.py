@@ -14,7 +14,8 @@ webhook is exposed).
 Meta accepts free-form and reply-button messages only within 24 hours of the client's last
 message (the customer-service window). When the window is closed, outbound messages are held
 (`awaiting_window`) and the approved WHATSAPP_REENGAGE_TEMPLATE is sent once instead; the held
-messages go out, in order, as soon as the client taps it or writes anything.
+messages go out, in order, as soon as the client taps it or writes anything. Outdated held
+messages are dropped on release instead of piling up (see `_outdated_held`).
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ import hmac
 import logging
 import mimetypes
 import re
+from collections import defaultdict
 from datetime import timedelta
 from pathlib import Path
 
@@ -32,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal
-from models import Client, DeliveryStatus, MessageDirection, WhatsAppMessageLog
+from models import Client, DeliveryStatus, MessageDirection, MessageType, TicketStatus, WhatsAppMessageLog
 from services.clock import utcnow
 from services.events import queue_event, queue_in_order_after_commit
 from services.system_settings import get_system_settings
@@ -125,20 +127,62 @@ def service_window_open(db: Session, client_id: int) -> bool:
     return last is not None and last > utcnow() - SERVICE_WINDOW
 
 
+SKIP_OLDER_REMINDER = "לא נשלחה: נשלחה במקומה התזכורת העדכנית לאותה בקשה"
+SKIP_REQUEST_PENDING = "לא נשלחה: הבקשה המקורית עוד לא נמסרה ללקוח ונשלחה במקום התזכורת"
+SKIP_TICKET_CLOSED = "לא נשלחה: הפנייה נסגרה לפני שהלקוח חזר לשיחה"
+
+
+def _outdated_held(held: list[WhatsAppMessageLog]) -> dict[int, str]:
+    """Held messages that should not be sent when the window reopens, with the Hebrew reason.
+
+    Per ticket (manual messages and other messages without a ticket always go out):
+    - the ticket was closed meanwhile: none of its held automated messages are sent;
+    - the original request itself is held: it goes out and its held reminders are dropped
+      (a reminder about a request the client never saw is confusing);
+    - otherwise only the newest held reminder goes out.
+    """
+    by_ticket: dict[int, list[WhatsAppMessageLog]] = defaultdict(list)
+    for msg in held:
+        if msg.ticket_id and msg.is_automated:
+            by_ticket[msg.ticket_id].append(msg)
+    skip: dict[int, str] = {}
+    for msgs in by_ticket.values():
+        ticket = msgs[0].ticket
+        if ticket is None or ticket.status == TicketStatus.RESOLVED:
+            skip.update({m.id: SKIP_TICKET_CLOSED for m in msgs})
+            continue
+        reminders = [m for m in msgs if m.message_type == MessageType.AUTO_REMINDER]
+        if any(m.message_type == MessageType.TEMPLATE for m in msgs):
+            skip.update({m.id: SKIP_REQUEST_PENDING for m in reminders})
+        else:
+            skip.update({m.id: SKIP_OLDER_REMINDER for m in reminders[:-1]})
+    return skip
+
+
 def release_held_messages(db: Session, client: Client) -> int:
-    """The client wrote (or tapped the re-engagement template): send every held message, oldest first.
-    Call it after logging the inbound message, before any reply is dispatched."""
+    """The client wrote (or tapped the re-engagement template): send the held messages, oldest first,
+    except outdated ones (see `_outdated_held`), which are marked SKIPPED and never sent.
+    Call it after logging the inbound message, before any reply is dispatched. Returns how many were sent."""
     held = db.scalars(select(WhatsAppMessageLog).where(
         WhatsAppMessageLog.client_id == client.id, WhatsAppMessageLog.awaiting_window.is_(True),
     ).order_by(WhatsAppMessageLog.created_at, WhatsAppMessageLog.id)).all()
+    skip = _outdated_held(list(held))
+    released = 0
     for msg in held:
         msg.awaiting_window = False
+        if msg.id in skip:
+            msg.delivery_status = DeliveryStatus.SKIPPED
+            msg.error_text = skip[msg.id]
+            continue
         msg.error_text = None
+        released += 1
         if settings.whatsapp_live:
             _queue_send(db, msg, client, msg.buttons_json, None)
+    if skip:
+        log.info("לקוח %s: %d הודעות ממתינות שאינן עדכניות לא נשלחו", client.id, len(skip))
     if held:
         queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": None})
-    return len(held)
+    return released
 
 
 def _has_held(db: Session, client_id: int) -> bool:

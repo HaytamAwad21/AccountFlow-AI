@@ -10,7 +10,8 @@ export type TicketStatus =
 export type TicketPriority = "NORMAL" | "HIGH" | "URGENT_DEADLINE";
 export type TemplateCategory = "MISSING_INVOICE" | "MISSING_DETAIL" | "UNIDENTIFIED_CHARGE" | "TAX_READY" | "MONTHLY_FOLDER";
 export type MessageType = "TEMPLATE" | "TEXT" | "BUTTON_REPLY" | "IMAGE_UPLOAD" | "AUTO_REMINDER" | "OCR_FEEDBACK";
-export type DeliveryStatus = "SENT" | "DELIVERED" | "READ" | "FAILED";
+/** SKIPPED: held while the 24-hour window was closed and dropped as outdated; never sent. */
+export type DeliveryStatus = "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
 export type PaymentStatus = "SENT" | "VIEWED" | "CONFIRMED_PAID" | "QUESTION_ASKED";
 
 export type UserRole = "MANAGER" | "WORKER";

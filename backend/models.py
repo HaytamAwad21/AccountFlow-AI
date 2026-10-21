@@ -92,6 +92,9 @@ class DeliveryStatus(str, enum.Enum):
     DELIVERED = "DELIVERED"
     READ = "READ"
     FAILED = "FAILED"
+    # Held while the 24-hour window was closed and dropped on release (an outdated reminder, or the
+    # ticket was closed meanwhile): never sent to the client.
+    SKIPPED = "SKIPPED"
 
 
 class PaymentStatus(str, enum.Enum):
