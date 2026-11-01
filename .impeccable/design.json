@@ -1,0 +1,1250 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-01T12:15:33.272Z",
+  "title": "Design System: AccountFlow AI",
+  "extensions": {
+    "colorMeta": {
+      "field": {
+        "role": "primary",
+        "displayName": "Midnight",
+        "canonical": "rgb(13 21 51)",
+        "tonalRamp": [
+          "#070b15",
+          "#1e253b",
+          "#384366",
+          "#586589",
+          "#7b88ad",
+          "#a4adc8",
+          "#cbd1e0",
+          "#eceef4"
+        ]
+      },
+      "field-muted": {
+        "role": "primary",
+        "displayName": "Field Mist",
+        "canonical": "rgb(185 194 223)",
+        "tonalRamp": [
+          "#090b12",
+          "#212635",
+          "#3d445c",
+          "#5d657f",
+          "#8088a2",
+          "#a8adc0",
+          "#cdd1db",
+          "#edeef2"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Pale Page",
+        "canonical": "rgb(244 246 251)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252629",
+          "#434549",
+          "#64666a",
+          "#87898d",
+          "#adaeb1",
+          "#d0d1d3",
+          "#eeeeef"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "rgb(255 255 255)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d1d1d1",
+          "#eeeeee"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "canonical": "rgb(255 255 255)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d1d1d1",
+          "#eeeeee"
+        ]
+      },
+      "link": {
+        "role": "secondary",
+        "displayName": "Link Blue",
+        "canonical": "rgb(31 85 224)",
+        "tonalRamp": [
+          "#00042e",
+          "#00156f",
+          "#012bb7",
+          "#1f55e0",
+          "#4980fe",
+          "#86acfc",
+          "#bcd1fc",
+          "#e7effe"
+        ]
+      },
+      "accent": {
+        "role": "tertiary",
+        "displayName": "Cantaloupe",
+        "canonical": "rgb(255 178 122)",
+        "tonalRamp": [
+          "#190500",
+          "#3f1b00",
+          "#693503",
+          "#965214",
+          "#bc7641",
+          "#d3a280",
+          "#e7cbb7",
+          "#f7ece5"
+        ]
+      },
+      "accent-deep": {
+        "role": "tertiary",
+        "displayName": "Ripe Cantaloupe",
+        "canonical": "rgb(255 160 92)",
+        "tonalRamp": [
+          "#1b0300",
+          "#3f1b00",
+          "#6c3400",
+          "#9a4f0c",
+          "#c6702c",
+          "#dc9f76",
+          "#edc9b2",
+          "#f9ece3"
+        ]
+      },
+      "accent-ink": {
+        "role": "tertiary",
+        "displayName": "Ink on Cantaloupe",
+        "canonical": "rgb(13 21 51)",
+        "tonalRamp": [
+          "#070b15",
+          "#1e253b",
+          "#384366",
+          "#586589",
+          "#7b88ad",
+          "#a4adc8",
+          "#cbd1e0",
+          "#eceef4"
+        ]
+      },
+      "accent-ink-hover": {
+        "role": "tertiary",
+        "displayName": "Ink on Cantaloupe Hover",
+        "canonical": "rgb(26 36 80)",
+        "tonalRamp": [
+          "#070a18",
+          "#1c2442",
+          "#354270",
+          "#546395",
+          "#7787b9",
+          "#a1add0",
+          "#c9d0e5",
+          "#eceef6"
+        ]
+      },
+      "ink-50": {
+        "role": "neutral",
+        "displayName": "Ink 50",
+        "canonical": "rgb(246 247 251)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-100": {
+        "role": "neutral",
+        "displayName": "Ink 100",
+        "canonical": "rgb(238 240 246)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-200": {
+        "role": "neutral",
+        "displayName": "Ink 200",
+        "canonical": "rgb(225 229 238)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-300": {
+        "role": "neutral",
+        "displayName": "Ink 300",
+        "canonical": "rgb(201 207 222)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-400": {
+        "role": "neutral",
+        "displayName": "Ink 400",
+        "canonical": "rgb(107 117 148)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-500": {
+        "role": "neutral",
+        "displayName": "Ink 500",
+        "canonical": "rgb(90 101 133)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-600": {
+        "role": "neutral",
+        "displayName": "Ink 600",
+        "canonical": "rgb(73 84 118)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-700": {
+        "role": "neutral",
+        "displayName": "Ink 700",
+        "canonical": "rgb(51 62 95)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-800": {
+        "role": "neutral",
+        "displayName": "Ink 800",
+        "canonical": "rgb(31 41 71)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "ink-900": {
+        "role": "neutral",
+        "displayName": "Ink 900",
+        "canonical": "rgb(13 21 51)",
+        "tonalRamp": [
+          "#1f2947",
+          "#333e5f",
+          "#495476",
+          "#5a6585",
+          "#6b7594",
+          "#c9cfde",
+          "#e1e5ee",
+          "#f6f7fb"
+        ]
+      },
+      "brand-50": {
+        "role": "secondary",
+        "displayName": "Sky Tint",
+        "canonical": "rgb(238 243 255)",
+        "tonalRamp": [
+          "#183fa8",
+          "#1f4fd6",
+          "#2a62f5",
+          "#4a7bfb",
+          "#6d93fb",
+          "#9db8ff",
+          "#c3d4ff",
+          "#eef3ff"
+        ]
+      },
+      "brand-200": {
+        "role": "secondary",
+        "displayName": "Sky Line",
+        "canonical": "rgb(195 212 255)",
+        "tonalRamp": [
+          "#183fa8",
+          "#1f4fd6",
+          "#2a62f5",
+          "#4a7bfb",
+          "#6d93fb",
+          "#9db8ff",
+          "#c3d4ff",
+          "#eef3ff"
+        ]
+      },
+      "brand-300": {
+        "role": "secondary",
+        "displayName": "Sky Bar",
+        "canonical": "rgb(157 184 255)",
+        "tonalRamp": [
+          "#183fa8",
+          "#1f4fd6",
+          "#2a62f5",
+          "#4a7bfb",
+          "#6d93fb",
+          "#9db8ff",
+          "#c3d4ff",
+          "#eef3ff"
+        ]
+      },
+      "brand-500": {
+        "role": "secondary",
+        "displayName": "Focus Blue",
+        "canonical": "rgb(74 123 251)",
+        "tonalRamp": [
+          "#183fa8",
+          "#1f4fd6",
+          "#2a62f5",
+          "#4a7bfb",
+          "#6d93fb",
+          "#9db8ff",
+          "#c3d4ff",
+          "#eef3ff"
+        ]
+      },
+      "brand-600": {
+        "role": "secondary",
+        "displayName": "Electric Blue",
+        "canonical": "rgb(42 98 245)",
+        "tonalRamp": [
+          "#183fa8",
+          "#1f4fd6",
+          "#2a62f5",
+          "#4a7bfb",
+          "#6d93fb",
+          "#9db8ff",
+          "#c3d4ff",
+          "#eef3ff"
+        ]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Warning Amber",
+        "canonical": "rgb(180 83 9)",
+        "tonalRamp": [
+          "#1c0200",
+          "#431800",
+          "#6e3104",
+          "#a14903",
+          "#cb6c32",
+          "#df9c78",
+          "#efc8b3",
+          "#faebe4"
+        ]
+      },
+      "warning-mark": {
+        "role": "semantic",
+        "displayName": "Warning Mark",
+        "canonical": "rgb(217 119 6)",
+        "tonalRamp": [
+          "#1a0400",
+          "#3e1c00",
+          "#693600",
+          "#96520a",
+          "#c6701b",
+          "#df9e6b",
+          "#efc9ad",
+          "#faece1"
+        ]
+      },
+      "warning-tint": {
+        "role": "semantic",
+        "displayName": "Warning Tint",
+        "canonical": "rgb(255 251 235)",
+        "tonalRamp": [
+          "#0c0b07",
+          "#29261e",
+          "#484538",
+          "#6a6659",
+          "#8d897b",
+          "#b0aea4",
+          "#d2d1cb",
+          "#efeeec"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Alert Red",
+        "canonical": "rgb(220 38 38)",
+        "tonalRamp": [
+          "#220000",
+          "#500002",
+          "#870007",
+          "#be1218",
+          "#ec433c",
+          "#fa897c",
+          "#fdbfb7",
+          "#ffe9e6"
+        ]
+      },
+      "danger-deep": {
+        "role": "semantic",
+        "displayName": "Alert Red Hover",
+        "canonical": "rgb(185 28 28)",
+        "tonalRamp": [
+          "#220000",
+          "#4f0204",
+          "#84090c",
+          "#bb1e1e",
+          "#e25147",
+          "#f28e82",
+          "#fbc0b8",
+          "#ffe9e5"
+        ]
+      },
+      "danger-tint": {
+        "role": "semantic",
+        "displayName": "Alert Tint",
+        "canonical": "rgb(254 242 242)",
+        "tonalRamp": [
+          "#0d0a0a",
+          "#2b2525",
+          "#4c4242",
+          "#6d6363",
+          "#918686",
+          "#b3acac",
+          "#d4d0d0",
+          "#efeeee"
+        ]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Confirmed Green",
+        "canonical": "rgb(5 150 105)",
+        "tonalRamp": [
+          "#001007",
+          "#002f1e",
+          "#035238",
+          "#007954",
+          "#2aa074",
+          "#7cbf9f",
+          "#b6dbc8",
+          "#e5f2eb"
+        ]
+      },
+      "canvas-dark": {
+        "role": "neutral",
+        "displayName": "Pale Page (dark)",
+        "canonical": "rgb(10 16 41)",
+        "tonalRamp": [
+          "#080b14",
+          "#202638",
+          "#3a4461",
+          "#5b6584",
+          "#7e88a8",
+          "#a6adc4",
+          "#ccd1de",
+          "#edeef3"
+        ]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Panel White (dark)",
+        "canonical": "rgb(18 27 61)",
+        "tonalRamp": [
+          "#070a16",
+          "#1d253d",
+          "#374369",
+          "#57648d",
+          "#7a88b0",
+          "#a3adca",
+          "#cad1e1",
+          "#eceef4"
+        ]
+      },
+      "link-dark": {
+        "role": "secondary",
+        "displayName": "Link Blue (dark)",
+        "canonical": "rgb(157 184 255)",
+        "tonalRamp": [
+          "#050a1c",
+          "#17234a",
+          "#2d407d",
+          "#4c62a3",
+          "#6f86c7",
+          "#9baddb",
+          "#c6d1eb",
+          "#eaeef8"
+        ]
+      },
+      "ink-50-dark": {
+        "role": "neutral",
+        "displayName": "Ink 50 (dark)",
+        "canonical": "rgb(20 29 66)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-100-dark": {
+        "role": "neutral",
+        "displayName": "Ink 100 (dark)",
+        "canonical": "rgb(26 36 80)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-200-dark": {
+        "role": "neutral",
+        "displayName": "Ink 200 (dark)",
+        "canonical": "rgb(35 46 94)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-300-dark": {
+        "role": "neutral",
+        "displayName": "Ink 300 (dark)",
+        "canonical": "rgb(48 60 112)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-400-dark": {
+        "role": "neutral",
+        "displayName": "Ink 400 (dark)",
+        "canonical": "rgb(151 162 200)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-500-dark": {
+        "role": "neutral",
+        "displayName": "Ink 500 (dark)",
+        "canonical": "rgb(170 179 211)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-600-dark": {
+        "role": "neutral",
+        "displayName": "Ink 600 (dark)",
+        "canonical": "rgb(189 197 223)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-700-dark": {
+        "role": "neutral",
+        "displayName": "Ink 700 (dark)",
+        "canonical": "rgb(210 216 234)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-800-dark": {
+        "role": "neutral",
+        "displayName": "Ink 800 (dark)",
+        "canonical": "rgb(230 233 244)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "ink-900-dark": {
+        "role": "neutral",
+        "displayName": "Ink 900 (dark)",
+        "canonical": "rgb(255 255 255)",
+        "tonalRamp": [
+          "#1a2450",
+          "#232e5e",
+          "#303c70",
+          "#97a2c8",
+          "#aab3d3",
+          "#bdc5df",
+          "#d2d8ea",
+          "#ffffff"
+        ]
+      },
+      "brand-50-dark": {
+        "role": "secondary",
+        "displayName": "Sky Tint (dark)",
+        "canonical": "rgb(22 34 90)",
+        "tonalRamp": [
+          "#1c2c70",
+          "#27398a",
+          "#3a4fa8",
+          "#2a62f5",
+          "#4576ff",
+          "#6a88f0",
+          "#7296ff",
+          "#b7caff"
+        ]
+      },
+      "brand-200-dark": {
+        "role": "secondary",
+        "displayName": "Sky Line (dark)",
+        "canonical": "rgb(39 57 138)",
+        "tonalRamp": [
+          "#1c2c70",
+          "#27398a",
+          "#3a4fa8",
+          "#2a62f5",
+          "#4576ff",
+          "#6a88f0",
+          "#7296ff",
+          "#b7caff"
+        ]
+      },
+      "brand-300-dark": {
+        "role": "secondary",
+        "displayName": "Sky Bar (dark)",
+        "canonical": "rgb(58 79 168)",
+        "tonalRamp": [
+          "#1c2c70",
+          "#27398a",
+          "#3a4fa8",
+          "#2a62f5",
+          "#4576ff",
+          "#6a88f0",
+          "#7296ff",
+          "#b7caff"
+        ]
+      },
+      "brand-500-dark": {
+        "role": "secondary",
+        "displayName": "Focus Blue (dark)",
+        "canonical": "rgb(127 160 255)",
+        "tonalRamp": [
+          "#1c2c70",
+          "#27398a",
+          "#3a4fa8",
+          "#2a62f5",
+          "#4576ff",
+          "#6a88f0",
+          "#7296ff",
+          "#b7caff"
+        ]
+      },
+      "warning-dark": {
+        "role": "semantic",
+        "displayName": "Warning Amber (dark)",
+        "canonical": "rgb(252 211 77)",
+        "tonalRamp": [
+          "#120a00",
+          "#302500",
+          "#554300",
+          "#7b630f",
+          "#a58505",
+          "#c5ac61",
+          "#ded0a8",
+          "#f3eee0"
+        ]
+      },
+      "danger-dark": {
+        "role": "semantic",
+        "displayName": "Alert Red (dark)",
+        "canonical": "rgb(252 165 165)",
+        "tonalRamp": [
+          "#190405",
+          "#431417",
+          "#72292e",
+          "#984b4d",
+          "#be7070",
+          "#d59d9d",
+          "#e9c8c7",
+          "#f7ebeb"
+        ]
+      },
+      "success-dark": {
+        "role": "semantic",
+        "displayName": "Confirmed Green (dark)",
+        "canonical": "rgb(110 231 183)",
+        "tonalRamp": [
+          "#001007",
+          "#002f1f",
+          "#09523a",
+          "#0b7857",
+          "#1fa076",
+          "#79bfa1",
+          "#b5dbc9",
+          "#e5f2ec"
+        ]
+      },
+      "wa-header": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Header",
+        "canonical": "rgb(7 94 84)",
+        "tonalRamp": [
+          "#000f0c",
+          "#002e28",
+          "#005148",
+          "#297469",
+          "#53988d",
+          "#8cb9b0",
+          "#bed7d2",
+          "#e8f1ef"
+        ]
+      },
+      "wa-teal": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Teal",
+        "canonical": "rgb(18 140 126)",
+        "tonalRamp": [
+          "#00100c",
+          "#002e28",
+          "#015148",
+          "#14766a",
+          "#359c8e",
+          "#7fbcb1",
+          "#b8d9d3",
+          "#e6f1ef"
+        ]
+      },
+      "wa-green": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Green",
+        "canonical": "rgb(37 211 102)",
+        "tonalRamp": [
+          "#001101",
+          "#013011",
+          "#055424",
+          "#037b36",
+          "#18a44d",
+          "#6cc580",
+          "#b0dfb8",
+          "#e3f4e5"
+        ]
+      },
+      "wa-bubble": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Bubble",
+        "canonical": "rgb(220 248 198)",
+        "tonalRamp": [
+          "#070e03",
+          "#1d2b10",
+          "#374d22",
+          "#576f43",
+          "#7a9266",
+          "#a3b596",
+          "#cbd5c3",
+          "#ecf0e9"
+        ]
+      },
+      "wa-wall": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Wall",
+        "canonical": "rgb(239 231 221)",
+        "tonalRamp": [
+          "#0d0b08",
+          "#2a2620",
+          "#4a443c",
+          "#6c655c",
+          "#8f887f",
+          "#b2ada7",
+          "#d3d0cd",
+          "#efeeed"
+        ]
+      },
+      "wa-link": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Link",
+        "canonical": "rgb(2 126 181)",
+        "tonalRamp": [
+          "#000d1c",
+          "#002a40",
+          "#004a6d",
+          "#116e9c",
+          "#3292c8",
+          "#7cb6db",
+          "#b6d6ec",
+          "#e5f0f8"
+        ]
+      },
+      "wa-card": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Card",
+        "canonical": "rgb(255 255 255)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#262626",
+          "#454545",
+          "#666666",
+          "#898989",
+          "#aeaeae",
+          "#d1d1d1",
+          "#eeeeee"
+        ]
+      },
+      "wa-bar": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Bar",
+        "canonical": "rgb(240 242 245)",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252628",
+          "#434547",
+          "#646669",
+          "#87898c",
+          "#adaeb0",
+          "#d0d1d2",
+          "#eeeeef"
+        ]
+      },
+      "wa-wall-dark": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Wall (dark)",
+        "canonical": "rgb(11 20 26)",
+        "tonalRamp": [
+          "#090c0e",
+          "#21272c",
+          "#3c474e",
+          "#5d6870",
+          "#808b93",
+          "#a7afb5",
+          "#cdd2d5",
+          "#edeff0"
+        ]
+      },
+      "wa-bubble-dark": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Bubble (dark)",
+        "canonical": "rgb(0 92 75)",
+        "tonalRamp": [
+          "#000f0a",
+          "#002f25",
+          "#005242",
+          "#287563",
+          "#529986",
+          "#8cb9ac",
+          "#bed8d0",
+          "#e8f1ee"
+        ]
+      },
+      "wa-card-dark": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Card (dark)",
+        "canonical": "rgb(31 44 52)",
+        "tonalRamp": [
+          "#080c0e",
+          "#1f282d",
+          "#394750",
+          "#5a6872",
+          "#7d8c95",
+          "#a5b0b6",
+          "#ccd2d6",
+          "#edeff0"
+        ]
+      },
+      "wa-link-dark": {
+        "role": "whatsapp",
+        "displayName": "WhatsApp Link (dark)",
+        "canonical": "rgb(83 189 235)",
+        "tonalRamp": [
+          "#000e18",
+          "#012b3b",
+          "#044c65",
+          "#007094",
+          "#2a95c0",
+          "#7ab8d5",
+          "#b5d7e8",
+          "#e5f1f7"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "countdown": {
+        "displayName": "Countdown",
+        "purpose": "The days-left figure in the band."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles, the login title and tally figures."
+      },
+      "title-popup": {
+        "displayName": "Popup Title",
+        "purpose": "Popup headers."
+      },
+      "title-section": {
+        "displayName": "Section Title",
+        "purpose": "Panel and section titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Table rows, explanations and running text."
+      },
+      "body-strong": {
+        "displayName": "Body Strong",
+        "purpose": "Buttons, tabs and navigation."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Form field labels and table headers."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Hints, sub-lines and metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "wa-bubble",
+        "value": "0 1px 0.5px rgba(0,0,0,0.13)",
+        "purpose": "WhatsApp message bubbles and quick-reply buttons only. Dashboard surfaces have no shadows."
+      }
+    ],
+    "motion": [
+      {
+        "name": "colors-standard",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Colour changes on buttons, tabs, navigation and rows."
+      },
+      {
+        "name": "drawer",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "The mobile navigation drawer slide."
+      },
+      {
+        "name": "slide-in",
+        "value": "180ms ease-out",
+        "purpose": "Popups and toasts rise 8px and fade in."
+      },
+      {
+        "name": "pulse-dot",
+        "value": "1.2s infinite ease-in-out",
+        "purpose": "WhatsApp typing dots in the simulator."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "2xl",
+        "value": "1536px"
+      },
+      {
+        "name": "column-xl",
+        "value": "576px"
+      },
+      {
+        "name": "column-2xl",
+        "value": "672px"
+      },
+      {
+        "name": "column-3xl",
+        "value": "768px"
+      },
+      {
+        "name": "column-4xl",
+        "value": "896px"
+      },
+      {
+        "name": "column-5xl",
+        "value": "1024px"
+      },
+      {
+        "name": "column-6xl",
+        "value": "1152px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The clerk's next action; at most one on a view.",
+      "html": "<button class=\"ds-btn-primary\">שליחה לוואטסאפ</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border:0;border-radius:0;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);background:#ffb27a;color:#0d1533;}.ds-btn-primary:hover{background:#ffa05c;}.ds-btn-primary:focus-visible{outline:2px solid rgb(var(--brand-500, 74 123 251));outline-offset:1px;}.ds-btn-primary:disabled{background:rgb(var(--ink-200, 225 229 238));color:rgb(var(--ink-500, 90 101 133));cursor:not-allowed;}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default button on panels.",
+      "html": "<button class=\"ds-btn-secondary\">הורדת דוגמה</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border:0;border-radius:0;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);background:rgb(var(--surface, 255 255 255));color:rgb(var(--ink-900, 13 21 51));box-shadow:inset 0 0 0 1px rgb(var(--ink-300, 201 207 222));}.ds-btn-secondary:hover{background:rgb(var(--ink-100, 238 240 246));}.ds-btn-secondary:focus-visible{outline:2px solid rgb(var(--brand-500, 74 123 251));outline-offset:1px;}"
+    },
+    {
+      "name": "Field Ghost Button",
+      "kind": "button",
+      "refersTo": "button-field-ghost",
+      "description": "Page actions on the midnight band.",
+      "html": "<div class=\"ds-on-field\"><button class=\"ds-btn-field\">בדיקה עכשיו</button></div>",
+      "css": ".ds-on-field{background:rgb(var(--field, 13 21 51));padding:12px;}.ds-btn-field{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border:0;border-radius:0;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;cursor:pointer;transition:background-color .15s cubic-bezier(.4,0,.2,1),color .15s cubic-bezier(.4,0,.2,1);height:32px;padding:0 10px;font-size:0.8125rem;line-height:1.15rem;background:transparent;color:#fff;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .4);}.ds-btn-field:hover{background:rgb(255 255 255 / .1);}.ds-btn-field:focus-visible{outline:2px solid rgb(var(--brand-500, 74 123 251));outline-offset:1px;}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Square field with an inset outline and a label above.",
+      "html": "<label class=\"ds-field\" dir=\"rtl\"><span>שם הספק</span><input class=\"ds-input\" placeholder=\"לדוגמה: דלק תחנת דלק\" /></label>",
+      "css": ".ds-field{display:block;max-width:320px;}.ds-field span{display:block;margin-bottom:4px;font:700 0.8125rem/1.15rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-700, 51 62 95));}.ds-input{display:block;width:100%;border:0;background:rgb(var(--surface, 255 255 255));padding:8px 12px;font:400 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-900, 13 21 51));box-shadow:inset 0 0 0 1px rgb(var(--ink-300, 201 207 222));}.ds-input::placeholder{color:rgb(var(--ink-400, 107 117 148));}.ds-input:hover{box-shadow:inset 0 0 0 1px rgb(var(--ink-400, 107 117 148));}.ds-input:focus{outline:none;box-shadow:inset 0 0 0 2px rgb(var(--brand-500, 74 123 251));}"
+    },
+    {
+      "name": "Navigation Rail",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Plain rows on the field; the active item is filled electric blue.",
+      "html": "<nav class=\"ds-nav\" dir=\"rtl\"><a class=\"ds-nav-item ds-nav-active\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13 2 3 14h9l-1 8 10-12h-9z\"/></svg>שליחת בקשה</a><a class=\"ds-nav-item\" tabindex=\"0\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"2\" width=\"8\" height=\"4\"/><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"/></svg><span style=\"flex:1\">לוח מעקב חי</span><b>13</b></a></nav>",
+      "css": ".ds-nav{width:224px;background:rgb(var(--field, 13 21 51));padding:8px;display:grid;gap:2px;}.ds-nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--field-muted, 185 194 223));cursor:pointer;transition:background-color .15s,color .15s;}.ds-nav-item:hover{background:rgb(255 255 255 / .1);color:#fff;}.ds-nav-item:focus-visible{outline:2px solid rgb(255 255 255 / .6);}.ds-nav-active,.ds-nav-active:hover{background:rgb(var(--brand-600, 42 98 245));color:#fff;}"
+    },
+    {
+      "name": "Filter Tab",
+      "kind": "chip",
+      "refersTo": "tab-active",
+      "description": "Reversed tabs for pages and filters; counts stay inside the label.",
+      "html": "<div class=\"ds-tabs\" dir=\"rtl\"><button class=\"ds-tab ds-tab-active\">הכל <span>13</span></button><button class=\"ds-tab\">ממתין ללקוח <span>3</span></button><button class=\"ds-tab ds-tab-alert\">הוסלם <span>1</span></button></div>",
+      "css": ".ds-tabs{display:flex;gap:4px;}.ds-tab{border:0;background:transparent;padding:6px 12px;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-700, 51 62 95));cursor:pointer;transition:background-color .15s;}.ds-tab span{margin-inline-start:4px;font-weight:400;opacity:.75;}.ds-tab:hover{background:rgb(var(--ink-100, 238 240 246));}.ds-tab:focus-visible{outline:2px solid rgb(var(--brand-500, 74 123 251));outline-offset:1px;}.ds-tab-alert{color:#dc2626;}.ds-tab-active,.ds-tab-active:hover{background:rgb(var(--brand-600, 42 98 245));color:#fff;}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "A working section: a square white panel with a thin border on the pale page.",
+      "html": "<div class=\"ds-page\" dir=\"rtl\"><section class=\"ds-panel\"><h3><i>1</i>לקוח</h3><p>חיפוש לפי שם, עסק, טלפון או ח.פ</p></section></div>",
+      "css": ".ds-page{background:rgb(var(--canvas, 244 246 251));padding:16px;}.ds-panel{background:rgb(var(--surface, 255 255 255));border:1px solid rgb(var(--ink-300, 201 207 222));padding:12px;}.ds-panel h3{display:flex;align-items:center;gap:8px;margin:0;font:400 1.125rem/1.25 'Secular One', Assistant, sans-serif;color:rgb(var(--ink-900, 13 21 51));}.ds-panel h3 i{display:grid;place-items:center;width:24px;height:24px;border-radius:9999px;background:rgb(var(--brand-600, 42 98 245));color:#fff;font:400 0.8125rem/1 Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;}.ds-panel p{margin:4px 0 0;font:400 0.8125rem/1.15rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-500, 90 101 133));}"
+    },
+    {
+      "name": "Month Band",
+      "kind": "custom",
+      "refersTo": "month-band",
+      "description": "The signature band: page title, countdown and month strip with the 26 disc hanging over its edge. Outlined bars are a pending user decision.",
+      "html": "<div class=\"ds-band\" dir=\"rtl\"><h1>לוח מעקב חי</h1><div class=\"ds-count\"><p><strong>20</strong><span>ימים ל־26<br/>בנובמבר</span></p><div class=\"ds-strip\" role=\"img\" aria-label=\"20 ימים ל־26 בנובמבר\"><div class=\"ds-day\"><b class=\"\">1</b></div><div class=\"ds-day\"><i class=\"ds-bar\" style=\"height:12px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><i class=\"ds-bar\" style=\"height:20px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><i class=\"ds-bar\" style=\"height:8px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\">5</b></div><div class=\"ds-day\"><i class=\"ds-bar ds-bar-today\" style=\"height:28px\"></i><b class=\"ds-num-today\">6</b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><i class=\"ds-bar-next\" style=\"height:10px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><i class=\"ds-bar-next\" style=\"height:16px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\">10</b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><i class=\"ds-bar-next\" style=\"height:8px\"></i><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\">15</b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\">20</b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><span class=\"ds-disc ds-disc-band\">26</span></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\"></b></div><div class=\"ds-day\"><b class=\"\">30</b></div></div></div></div>",
+      "css": ".ds-band{display:grid;grid-template-columns:1fr 2fr;align-items:end;gap:24px;background:rgb(var(--field, 13 21 51));color:#fff;padding:12px 24px 24px;}.ds-band h1{align-self:center;margin:0;font:400 1.625rem/1.25 'Secular One', Assistant, sans-serif;}.ds-count{display:flex;align-items:flex-end;gap:12px;min-width:0;}.ds-count p{display:flex;align-items:flex-end;gap:8px;margin:0;flex:none;}.ds-count strong{font:400 2.75rem/.95 'Secular One', Assistant, sans-serif;}.ds-count span{font:600 0.9375rem/1.25 Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;}.ds-strip{flex:1;min-width:0;display:grid;grid-template-columns:repeat(30,minmax(0,1fr));height:56px;}.ds-day{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;}.ds-day i{display:block;width:6px;}.ds-bar{background:#fff;}.ds-bar-today{background:#ffb27a;}.ds-bar-next{box-sizing:border-box;border:1px solid rgb(255 255 255 / .7);}.ds-day b{height:16px;font:400 0.8125rem/16px Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--field-muted, 185 194 223));}.ds-day b.ds-num-today{font-weight:700;color:#ffb27a;}.ds-disc{display:grid;place-items:center;border-radius:9999px;background:#ffb27a;color:#0d1533;font-family:'Secular One', Assistant, sans-serif;line-height:1;}.ds-disc-band{position:absolute;bottom:-20px;z-index:1;width:44px;height:44px;font-size:1rem;}"
+    },
+    {
+      "name": "State Marks",
+      "kind": "custom",
+      "refersTo": "status-mark",
+      "description": "A 12px flat mark in a fixed position before its label, never a coloured pill.",
+      "html": "<ul class=\"ds-states\" dir=\"rtl\"><li><svg viewBox=\"0 0 12 12\"><circle cx=\"6\" cy=\"6\" r=\"5.5\" class=\"ds-state-link\"/></svg>ממתין ללקוח</li><li><svg viewBox=\"0 0 12 12\"><path d=\"M6 .5 11.8 11.5H.2z\" fill=\"#d97706\"/></svg>דרוש תיקון</li><li><svg viewBox=\"0 0 12 12\"><circle cx=\"6\" cy=\"6\" r=\"6\" fill=\"#ffb27a\"/><circle cx=\"6\" cy=\"6\" r=\"2.5\" fill=\"#0d1533\"/></svg>ממתין לבדיקת פקיד</li><li><svg viewBox=\"0 0 12 12\"><rect x=\"1\" y=\"1\" width=\"10\" height=\"10\" fill=\"#dc2626\"/></svg>הוסלם</li><li><svg viewBox=\"0 0 12 12\"><path d=\"M1.5 6.5 4.5 9.5 10.5 2.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"/></svg>טופל</li></ul>",
+      "css": ".ds-states{display:grid;gap:8px;margin:0;padding:0;list-style:none;font:600 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-800, 31 41 71));}.ds-states li{display:flex;align-items:center;gap:6px;}.ds-states svg{width:12px;height:12px;flex:none;}.ds-state-link{fill:rgb(var(--link, 31 85 224));}"
+    },
+    {
+      "name": "Data Table",
+      "kind": "custom",
+      "refersTo": "table-row",
+      "description": "One row size, a tinted head with a thin rule, hairlines between rows.",
+      "html": "<table class=\"ds-table\" dir=\"rtl\"><thead><tr><th>פנייה</th><th>לקוח</th><th>תזכורות</th></tr></thead><tbody><tr><td><b dir=\"ltr\">TCK-1007</b></td><td><b>אבי פרץ</b></td><td>3/3</td></tr><tr><td><b dir=\"ltr\">TCK-1005</b></td><td><b>Michael Turner</b></td><td>0/3</td></tr></tbody></table>",
+      "css": ".ds-table{width:100%;border-collapse:collapse;background:rgb(var(--surface, 255 255 255));font:400 0.9375rem/1.35rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-800, 31 41 71));}.ds-table th{background:rgb(var(--ink-50, 246 247 251));border-bottom:1px solid rgb(var(--ink-300, 201 207 222));padding:10px 12px;text-align:start;font:700 0.8125rem/1.15rem Assistant, 'Noto Sans Hebrew', system-ui, sans-serif;color:rgb(var(--ink-700, 51 62 95));}.ds-table td{padding:10px 12px;border-top:1px solid rgb(var(--ink-200, 225 229 238));}.ds-table tbody tr:first-child td{border-top:0;}.ds-table b{color:rgb(var(--ink-900, 13 21 51));}.ds-table tbody tr:hover{background:rgb(var(--ink-50, 246 247 251));}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Deadline Poster",
+    "overview": "The office lives by the 26th, so the 26th is the one shape in the product. A midnight rail and band form one L-shaped field around a pale grey-blue page, and a single cantaloupe disc hangs over the edge of that field to show where the month is heading. Flat colour and confident Hebrew from the Israeli poster and stamp tradition set the tone; badges are gone, and state reads as a small flat mark.\n\nThe world is built for a clerk who keeps it open all day. Work sits in white panels with thin borders on the tinted page, because the user asked for clear separation between sections. Panels stay square and flat, with no shadows or gradients. Rank comes from size and weight. Cantaloupe is rationed so the clerk's next action is the loudest thing on any screen, and electric blue shows where the clerk is and what is selected. One form repeats at every scale, from the logo to the month band to the login poster.\n\nThree decisions were made by the builder during review and still await the user. They are described below as built and marked **Pending user decision**: Secular One on section titles, popup titles and the countdown as well as page titles; page actions directly under the page title instead of in the title row; and outlined bars for scheduled reminders beside the white bars in the month strip.",
+    "keyCharacteristics": [
+      "An L-shaped midnight field, a pale page, white bordered panels, one cantaloupe disc.",
+      "Square corners and flat colour everywhere except the WhatsApp simulator.",
+      "Electric blue for selection and place, cantaloupe for the 26th and the next action.",
+      "Secular One for titles and headline figures, Assistant for everything else, tabular figures throughout.",
+      "Hebrew right to left first, with numbers, phones and IDs kept left to right inside it.",
+      "Light and dark themes share one set of tokens, swapped at the root."
+    ],
+    "rules": [
+      {
+        "name": "The Two Meanings Rule",
+        "body": "Cantaloupe means the 26th or the clerk's next action. That covers the disc, the strip's today marker, the primary button, the review banner, the review state mark and the \"requested a call\" share of a campaign. The text caret and text selection are the only ambient uses.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Cantaloupe Button Rule",
+        "body": "A view has at most one cantaloupe button. A disabled primary turns grey, so cantaloupe never sits on something that cannot be pressed.",
+        "section": "colors"
+      },
+      {
+        "name": "The Current Place Rule",
+        "body": "A solid electric blue fill with white text means selected or current. Step discs, avatars and the paid share of a campaign bar are the only other fills.",
+        "section": "colors"
+      },
+      {
+        "name": "The True Warning Rule",
+        "body": "Amber and red appear only for real warnings, failures and destructive actions, never for emphasis.",
+        "section": "colors"
+      },
+      {
+        "name": "The WhatsApp Quarantine Rule",
+        "body": "The `wa-*` colours, soft corners and bubble shadow exist only where the client's WhatsApp is being shown. They never leak into the dashboard, and the dashboard's rules never reshape WhatsApp.",
+        "section": "colors"
+      },
+      {
+        "name": "The Poster Voice Rule",
+        "body": "Secular One carries only page, section and popup titles, the countdown, headline tally figures, the disc numeral and the wordmark. Everything else is Assistant. It has one weight, so it is never bolded. Pending user decision: the original direction limited it to page titles; the build extends it to section titles, popup titles and the countdown.",
+        "section": "typography"
+      },
+      {
+        "name": "The Size and Weight Rule",
+        "body": "Rank comes from size and weight, with the strongest ink for the highest rank. No letter-spacing, no decorative labels above titles, no coloured headings.",
+        "section": "typography"
+      },
+      {
+        "name": "The Exact Figures Rule",
+        "body": "Tabular figures are on globally, and numbers, phones and IDs sit in left-to-right runs inside Hebrew text. A tax or money figure is never rounded, hidden or decorated.",
+        "section": "typography"
+      },
+      {
+        "name": "The L-Field Rule",
+        "body": "The rail and band are one continuous midnight field, marked only by a 10% white hairline, and every authenticated page carries the band.",
+        "section": "layout"
+      },
+      {
+        "name": "The Fixed Window Rule",
+        "body": "The band and Send Request keep their height budget. New band content must not push Send Request into a page scroll on laptop sizes.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Poster Rule",
+        "body": "No shadows or gradients on dashboard surfaces. A surface separates by colour, by a thin border or by overlap. The WhatsApp wallpaper's dot texture and bubble shadow stay as part of the WhatsApp Quarantine Rule.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Square and Disc Rule",
+        "body": "Rectangles are square; a curve is a full circle, and the toggle is the only exception. New round forms hold a number, a person's initials or a state, and a numbered cantaloupe disc always reads 26.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do let cantaloupe mark the single next action on each view, with midnight text.",
+      "Do put working sections in white panels with a 1px border on the Pale Page.",
+      "Do show state with a State Mark and a text label, in a fixed position.",
+      "Do keep every table row on one type size and, where the column allows it, one line.",
+      "Do use the Deadline Disc whenever the 26th is named visually.",
+      "Do lay pages out with container queries against the content column.",
+      "Do check every new surface in light mode, dark mode and right-to-left, with figures left to right.",
+      "Do keep the phone simulator faithful to WhatsApp, whatever the dashboard does."
+    ],
+    "donts": [
+      "Don't use coloured status pills or badges for state.",
+      "Don't add shadows, gradients or rounded rectangles to dashboard surfaces.",
+      "Don't use cantaloupe for decoration or for a second button on a view.",
+      "Don't use amber or red for emphasis without a real warning behind it.",
+      "Don't use `wa-*` tokens or WhatsApp radii outside WhatsApp views.",
+      "Don't put any number but 26 in a cantaloupe disc.",
+      "Don't use Secular One for body text, form labels, table rows or buttons.",
+      "Don't render manager-only controls as disabled or hidden elements for workers; leave them out."
+    ]
+  }
+}

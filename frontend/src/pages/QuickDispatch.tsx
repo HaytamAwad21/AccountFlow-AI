@@ -43,6 +43,8 @@ import {
   type Currency,
 } from "../lib/format";
 import type { Client } from "../lib/types";
+import { parseDdMmYyyy } from "../lib/date";
+import { DateInput } from "../components/DateInput";
 import { AmountInput, FieldError } from "../components/TypedInputs";
 import {
   AttachmentChip,
@@ -52,16 +54,23 @@ import {
   useObjectUrl,
 } from "../components/ManualAttachment";
 import { GroupMessageModal } from "../components/GroupMessageModal";
+import { PageHeader } from "../components/PageHeader";
 import { WaBubble } from "../components/WaBubble";
 import { Button, Card, Empty, Field, inputClass, Ltr, SectionTitle } from "../components/ui";
 
-const CARD_META: Record<string, { title: string; icon: ReactNode; tone: string }> = {
-  missing_supplier_invoice: { title: "חשבונית חסרה", icon: <FileQuestion className="h-5 w-5" />, tone: "text-sky-600 bg-sky-50" },
-  missing_invoice_detail: { title: "פרט חסר", icon: <FileSearch className="h-5 w-5" />, tone: "text-indigo-600 bg-indigo-50" },
-  unidentified_bank_charge: { title: "חיוב לא מזוהה", icon: <CreditCard className="h-5 w-5" />, tone: "text-amber-600 bg-amber-50" },
-  tax_ready_to_pay: { title: "דיווח מס מוכן", icon: <Landmark className="h-5 w-5" />, tone: "text-emerald-600 bg-emerald-50" },
-  monthly_folder_deadline_warning: { title: "מועד דיווח דחוף", icon: <AlertOctagon className="h-5 w-5" />, tone: "text-red-600 bg-red-50" },
+const CARD_META: Record<string, { title: string; icon: ReactNode }> = {
+  missing_supplier_invoice: { title: "חשבונית חסרה", icon: <FileQuestion className="h-4 w-4" /> },
+  missing_invoice_detail: { title: "פרט חסר", icon: <FileSearch className="h-4 w-4" /> },
+  unidentified_bank_charge: { title: "חיוב לא מזוהה", icon: <CreditCard className="h-4 w-4" /> },
+  tax_ready_to_pay: { title: "דיווח מס מוכן", icon: <Landmark className="h-4 w-4" /> },
+  monthly_folder_deadline_warning: { title: "מועד דיווח דחוף", icon: <AlertOctagon className="h-4 w-4" /> },
 };
+
+const requestButton = (active: boolean) =>
+  cx(
+    "inline-flex h-8 items-center gap-1.5 whitespace-nowrap px-2.5 text-sm font-semibold ring-1 ring-inset transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 @2xl/main:[&>svg]:hidden @4xl/main:[&>svg]:block",
+    active ? "bg-brand-600 text-white ring-brand-600" : "text-ink-800 ring-ink-300 hover:bg-ink-100",
+  );
 
 const GROSS_AMOUNT_VARS = new Set(["amount", "charge_amount"]);
 
@@ -312,7 +321,7 @@ export function QuickDispatch() {
     // The Tax Authority allocation-number threshold is in shekels; it is shown for ₪ amounts only.
     const needsAllocation = currency === "ILS" && net >= allocationThreshold;
     return (
-      <p className="mt-1 text-[11px] text-slate-500">
+      <p className="mt-1 text-xs text-ink-500">
         לפני מע״מ <bdi>{formatMoney(net, currency)}</bdi> · מע״מ {vatRate}% <bdi>{formatMoney(gross - net, currency)}</bdi>
         {needsAllocation && (
           <span className="ms-1 inline-flex items-center gap-1 font-semibold text-amber-700">
@@ -328,25 +337,26 @@ export function QuickDispatch() {
   return (
     // From @2xl/main up the page fills the window height (no page scroll); only the client list
     // and, when a long form needs it, the step 3 + preview row scroll inside.
-    <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 @2xl/main:h-full @2xl/main:min-h-[560px] @2xl/main:p-5">
-      <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 @3xl/main:text-2xl">שליחת בקשה</h1>
-          <p className="text-sm text-slate-500">בוחרים לקוח, בוחרים בקשה, ממלאים את החסר ולוחצים Enter. הבוט ימשיך לרדוף אחרי הלקוח בוואטסאפ.</p>
-        </div>
-        {lastSent && (
-          <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800 ring-1 ring-emerald-200">
-            אחרון: <b>{lastSent.ref}</b> ← {lastSent.client} · {Math.round(lastSent.ms)} אלפיות שנייה
-          </div>
-        )}
-      </header>
-
-      <div className="grid gap-4 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:grid-cols-[240px_minmax(0,1fr)] @4xl/main:grid-cols-[280px_minmax(0,1fr)] @6xl/main:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="flex flex-col @2xl/main:h-full @2xl/main:min-h-[600px]">
+      <PageHeader
+        title="שליחת בקשה"
+        hint={
+          lastSent ? (
+            <>
+              אחרון: <b className="text-ink-900">{lastSent.ref}</b> ← {lastSent.client} · {Math.round(lastSent.ms)} אלפיות שנייה
+            </>
+          ) : (
+            "בוחרים לקוח, בוחרים בקשה, ממלאים את החסר ולוחצים Enter. הבוט ימשיך לרדוף אחרי הלקוח בוואטסאפ."
+          )
+        }
+      />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:p-5">
+      <div className="grid gap-5 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:grid-cols-[240px_minmax(0,1fr)] @4xl/main:grid-cols-[280px_minmax(0,1fr)] @6xl/main:grid-cols-[320px_minmax(0,1fr)]">
         {/* Step 1 */}
-        <Card className="flex max-h-[420px] flex-col p-4 @2xl/main:max-h-none @2xl/main:min-h-0">
+        <Card className="flex max-h-[420px] flex-col p-3 @2xl/main:max-h-none @2xl/main:min-h-0">
           <SectionTitle step="1" title="לקוח" hint="חיפוש לפי שם, עסק, טלפון או ח.פ · ↑↓ Enter" />
           <div className="relative mb-3">
-            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
             <input
               ref={searchRef}
               value={query}
@@ -357,35 +367,36 @@ export function QuickDispatch() {
               dir="auto"
             />
           </div>
-          <div className="-mx-1 min-h-0 flex-1 space-y-1 overflow-y-auto px-1">
+          <div className="min-h-0 flex-1 divide-y divide-ink-200 overflow-y-auto">
             {filtered.length === 0 && <Empty icon={<Users className="h-8 w-8" />} title="לא נמצאו לקוחות" />}
-            {filtered.map((c, i) => (
-              <button
-                key={c.id}
-                onClick={() => pickClient(c)}
-                className={cx(
-                  "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-start transition",
-                  c.id === client?.id ? "bg-brand-50 ring-1 ring-brand-500" : i === highlight && query ? "bg-slate-100" : "hover:bg-slate-50",
-                )}
-              >
-                <div className="min-w-0 flex-1">
-                  <p dir="auto" className="truncate text-sm font-medium text-slate-900">
-                    {c.full_name}
-                  </p>
-                  <p dir="auto" className="truncate text-xs text-slate-500">
-                    {c.company_name}
-                  </p>
-                  <p className="truncate text-[11px] text-slate-400">
-                    <Ltr>{c.whatsapp_phone}</Ltr> · ח.פ <Ltr>{c.tax_id || "—"}</Ltr>
-                  </p>
-                </div>
-                {c.open_ticket_count > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800" title="פניות פתוחות">
-                    {c.open_ticket_count}
-                  </span>
-                )}
-              </button>
-            ))}
+            {filtered.map((c, i) => {
+              const selected = c.id === client?.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => pickClient(c)}
+                  title={`${c.whatsapp_phone} · ח.פ ${c.tax_id || "—"}`}
+                  className={cx(
+                    "flex w-full items-center gap-3 px-2.5 py-2 text-start transition-colors",
+                    selected ? "bg-brand-600 text-white" : i === highlight && query ? "bg-ink-100 text-ink-900" : "text-ink-900 hover:bg-ink-100",
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p dir="auto" className="truncate text-sm font-bold">
+                      {c.full_name}
+                    </p>
+                    <p dir="auto" className={cx("truncate text-xs", selected ? "text-white" : "text-ink-500")}>
+                      {c.company_name}
+                    </p>
+                  </div>
+                  {c.open_ticket_count > 0 && (
+                    <span className={cx("grid h-6 min-w-6 place-items-center rounded-full px-1 text-xs font-bold", selected ? "bg-white/20" : "bg-ink-200")} title="פניות פתוחות">
+                      {c.open_ticket_count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </Card>
 
@@ -393,67 +404,37 @@ export function QuickDispatch() {
           {/* Step 2 */}
           <Card className="shrink-0 p-3">
             <SectionTitle step="2" title="מה צריך מהלקוח?" hint="תבניות אוטומטיות בלחיצה אחת או הודעה ידנית חופשית · כל ההודעות נשלחות בעברית" />
-            <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @3xl:grid-cols-4">
+            <div className="flex flex-wrap gap-1.5">
               {cards.map((t) => {
                 const meta = CARD_META[t.slug];
-                const active = mode === "template" && t.id === templateId;
                 return (
                   <button
                     key={t.id}
                     onClick={() => pickTemplate(t.id)}
                     title={t.requires_media_reply ? `${templateName(t)} · אימות Vision AI` : templateName(t)}
-                    className={cx(
-                      "flex items-center gap-2 rounded-xl border px-2 py-2 text-start transition",
-                      active ? "border-brand-500 bg-brand-50/60 ring-1 ring-brand-500" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
-                    )}
+                    className={requestButton(mode === "template" && t.id === templateId)}
                   >
-                    <span className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg [&>svg]:h-4 [&>svg]:w-4", meta.tone)}>{meta.icon}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1 text-[13px] font-semibold leading-tight text-slate-900">
-                        <span>{meta.title}</span>
-                        {t.requires_media_reply && <ScanLine className="h-3 w-3 shrink-0 text-indigo-600" aria-label="אימות Vision AI" />}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">{templateName(t)}</span>
-                    </span>
+                    {meta.icon}
+                    {meta.title}
+                    {t.requires_media_reply && <ScanLine className="h-3.5 w-3.5 shrink-0 opacity-70" aria-label="אימות Vision AI" />}
                   </button>
                 );
               })}
-              <button
-                onClick={pickManual}
-                title="טקסט חופשי ותמונה או קובץ, בשמך · ללא תזכורות אוטומטיות"
-                className={cx(
-                  "flex items-center gap-2 rounded-xl border px-2 py-2 text-start transition",
-                  mode === "manual" ? "border-wa-teal bg-teal-50/60 ring-1 ring-wa-teal" : "border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50",
-                )}
-              >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-teal-50 text-wa-teal">
-                  <MessageSquare className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold leading-tight text-slate-900">הודעה ידנית חופשית</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">טקסט ותמונה בשמך · ללא תזכורות</span>
-                </span>
+              <button onClick={pickManual} title="טקסט חופשי ותמונה או קובץ, בשמך · ללא תזכורות אוטומטיות" className={requestButton(mode === "manual")}>
+                <MessageSquare className="h-4 w-4" />
+                הודעה ידנית חופשית
               </button>
-              <button
-                onClick={() => setGroupOpen(true)}
-                title="בוחרים לקוחות מהרשימה וכותבים הודעה אחת לכולם · ללא תזכורות אוטומטיות"
-                className="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-2 py-2 text-start transition hover:border-slate-400 hover:bg-slate-50"
-              >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600">
-                  <Users className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold leading-tight text-slate-900">הודעה לקבוצת לקוחות</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">הודעה אחת לכמה לקוחות</span>
-                </span>
+              <button onClick={() => setGroupOpen(true)} title="בוחרים לקוחות מהרשימה וכותבים הודעה אחת לכולם · ללא תזכורות אוטומטיות" className={requestButton(false)}>
+                <Users className="h-4 w-4" />
+                הודעה לקבוצת לקוחות
               </button>
             </div>
           </Card>
 
-          <div className="grid gap-4 @[30rem]:grid-cols-2 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:overflow-y-auto">
+          <div className="grid gap-5 @2xl/main:min-h-0 @2xl/main:flex-1 @2xl/main:auto-rows-[minmax(100%,auto)] @2xl/main:overflow-y-auto @[30rem]:grid-cols-2 @[30rem]:auto-rows-auto">
             {/* Step 3 */}
             {mode === "manual" ? (
-              <Card className="p-4">
+              <Card className="p-3">
                 <SectionTitle
                   step="3"
                   title="כותבים הודעה ללקוח"
@@ -510,11 +491,11 @@ export function QuickDispatch() {
                         צירוף תמונה או קובץ
                       </Button>
                     )}
-                    <p className="text-[11px] text-slate-400">JPG, PNG, WEBP או PDF · עד 15MB</p>
+                    <p className="text-xs text-ink-400">JPG, PNG, WEBP או PDF · עד 15MB</p>
                     {manualError && <p className="text-xs font-medium text-red-600">{manualError}</p>}
                     <Button
                       type="submit"
-                      variant="wa"
+                      variant="accent"
                       size="lg"
                       loading={sending}
                       disabled={!manualHasContent}
@@ -523,18 +504,18 @@ export function QuickDispatch() {
                     >
                       שלח הודעה ידנית ללקוח
                     </Button>
-                    <p className="text-center text-[11px] text-slate-400">Ctrl+Enter לשליחה · ההודעה נרשמת ביומן הפעילות</p>
+                    <p className="text-center text-xs text-ink-400">Ctrl+Enter לשליחה · ההודעה נרשמת ביומן הפעילות</p>
                   </form>
                 )}
               </Card>
             ) : (
-              <Card className="p-4">
+              <Card className="@container/form p-3">
                 <SectionTitle step="3" title="ממלאים רק את החסר" hint={client ? "שם הלקוח והעסק ממולאים אוטומטית" : "בחרו קודם לקוח"} />
                 {!client || !template ? (
                   <Empty icon={<Users className="h-8 w-8" />} title="בחרו לקוח ותבנית" />
                 ) : (
                   <form
-                    className="space-y-3"
+                    className="grid gap-3 @sm/form:grid-cols-2"
                     onSubmit={(e) => {
                       e.preventDefault();
                       send();
@@ -560,14 +541,14 @@ export function QuickDispatch() {
                               invalid={isMissing}
                             />
                           ) : DATE_VARS.has(v) ? (
-                            <input
+                            <DateInput
                               ref={ref}
-                              type="date"
-                              min="2000-01-01"
-                              max="2100-12-31"
-                              value={vars[v] ?? ""}
-                              onChange={(e) => setVar(v, e.target.value)}
-                              className={cx(inputClass, ringClass)}
+                              value={isoToDmy(vars[v] ?? "") ?? vars[v] ?? ""}
+                              onChange={(text) => {
+                                const date = parseDdMmYyyy(text);
+                                setVar(v, date ? isoDate(date) : text);
+                              }}
+                              className={cx(ringClass)}
                             />
                           ) : MONTH_VARS.has(v) ? (
                             <input
@@ -617,7 +598,7 @@ export function QuickDispatch() {
                                   key={off}
                                   type="button"
                                   onClick={() => setVar(v, isoDate(new Date(Date.now() + off * 86400000)))}
-                                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] text-slate-600 hover:bg-slate-200"
+                                  className="rounded bg-ink-100 px-1.5 py-0.5 text-xs text-ink-600 hover:bg-ink-200"
                                 >
                                   {off === 0 ? "היום" : off === -1 ? "אתמול" : "לפני שבוע"}
                                 </button>
@@ -632,14 +613,14 @@ export function QuickDispatch() {
                                     key={chip}
                                     type="button"
                                     onClick={() => setVars((p) => ({ ...p, missing_detail: chip }))}
-                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[10.5px] text-slate-600 hover:bg-slate-200"
+                                    className="rounded bg-ink-100 px-1.5 py-0.5 text-xs text-ink-600 hover:bg-ink-200"
                                   >
                                     {chip}
                                   </button>
                                 ))}
                               </div>
                               {/הקצאה|ח\.פ|ע\.מ|עוסק/.test(vars.missing_detail ?? "") && (
-                                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-indigo-700">
+                                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-link">
                                   <ShieldCheck className="h-3.5 w-3.5" /> תשובת הלקוח תיבדק אוטומטית: בדיוק 9 ספרות לפי הוראות רשות המסים
                                 </p>
                               )}
@@ -653,18 +634,18 @@ export function QuickDispatch() {
                         <option key={s} value={s} />
                       ))}
                     </datalist>
-                    {missing.length > 0 && <p className="text-xs font-medium text-red-600">נא למלא: {missing.map((m) => VARIABLE_LABELS[m]?.label ?? m).join(", ")}</p>}
+                    {missing.length > 0 && <p className="col-span-full text-xs font-medium text-red-600">נא למלא: {missing.map((m) => VARIABLE_LABELS[m]?.label ?? m).join(", ")}</p>}
                     <Button
                       type="submit"
-                      variant="wa"
+                      variant="accent"
                       size="lg"
                       loading={sending}
-                      className="!h-auto min-h-12 w-full py-3 text-center leading-snug"
+                      className="col-span-full !h-auto min-h-12 w-full py-3 text-center leading-snug"
                       icon={<Rocket className="h-5 w-5 shrink-0" />}
                     >
                       שליחה לוואטסאפ והפעלת מעקב {settings?.reminder_interval_hours ?? 48} שעות (Enter)
                     </Button>
-                    <p className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+                    <p className="col-span-full flex flex-wrap items-center justify-center gap-x-1.5 text-center text-xs text-ink-500">
                       <Timer className="h-3.5 w-3.5" /> תזכורת כל {settings?.reminder_interval_hours ?? 48} שעות · עד {settings?.max_reminders ?? 3} תזכורות · הסלמה לקראת
                       מועד הדיווח <Ltr>{client.next_deadline}</Ltr>
                     </p>
@@ -674,12 +655,12 @@ export function QuickDispatch() {
             )}
 
             {/* Live preview */}
-            <Card className="flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-slate-900">תצוגה מקדימה של הוואטסאפ</h3>
-                {client && <span className="text-xs text-slate-500">עברית · מימין לשמאל</span>}
+            <Card className="h-fit p-3">
+              <div className="flex items-end justify-between gap-2 pb-3">
+                <h3 className="font-display text-lg leading-tight text-ink-900">תצוגה מקדימה של הוואטסאפ</h3>
+                {client && <span className="text-xs text-ink-500">עברית · מימין לשמאל</span>}
               </div>
-              <div className="min-h-[220px] flex-1 bg-wa-wall p-4" dir="rtl">
+              <div className="min-h-[160px] bg-wa-wall p-4" dir="rtl">
                 {client && mode === "manual" ? (
                   manualHasContent ? (
                     <WaBubble
@@ -693,16 +674,16 @@ export function QuickDispatch() {
                       type={manualFile ? "IMAGE_UPLOAD" : "TEXT"}
                     />
                   ) : (
-                    <p className="py-16 text-center text-xs text-slate-500">כתבו הודעה או צרפו תמונה כדי לראות כאן את מה שהלקוח יקבל.</p>
+                    <p className="py-16 text-center text-xs text-ink-500">כתבו הודעה או צרפו תמונה כדי לראות כאן את מה שהלקוח יקבל.</p>
                   )
                 ) : client && template ? (
                   <WaBubble text={preview} fromFirm buttons={previewButtons} compact type="TEMPLATE" automated />
                 ) : (
-                  <p className="py-16 text-center text-xs text-slate-500">כאן תופיע ההודעה המדויקת שהלקוח יקבל.</p>
+                  <p className="py-16 text-center text-xs text-ink-500">כאן תופיע ההודעה המדויקת שהלקוח יקבל.</p>
                 )}
               </div>
               {mode === "template" && template && client && unfilled.length > 0 && (
-                <p className="border-t border-slate-200 px-4 py-2 text-[11px] text-amber-700">
+                <p className="pt-2 text-xs text-amber-700">
                   ”—“ מסמן שדות שעדיין לא מולאו: {unfilled.map((u) => VARIABLE_LABELS[u]?.label ?? u).join(", ")}
                 </p>
               )}
@@ -711,6 +692,7 @@ export function QuickDispatch() {
         </div>
       </div>
       <GroupMessageModal open={groupOpen} onClose={() => setGroupOpen(false)} />
+    </div>
     </div>
   );
 }

@@ -178,11 +178,11 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 
 - **Navigation order:** שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות. הגדרות is always last and visible to everyone.
 - **Profile card:** the logged-in user's avatar, name, role badge, **שינוי סיסמה** and **התנתקות** sit at the bottom of the sidebar, under the phone-simulator button.
-- **Dark mode:** click the blue robot logo at the top to switch between light and dark mode. Hovering it shows the tooltip "מעבר למצב כהה / בהיר".
+- **Dark mode:** click the moon / sun button next to the logo to switch between light and dark mode. Hovering it shows the tooltip "מעבר למצב כהה / בהיר".
   - The choice is saved in `localStorage` as `accountflow.theme`. Without a saved choice, the app follows the system setting.
   - The theme is applied before the first paint, so the page doesn't flash white on load.
   - The whole UI switches, including cards, tables, modals and inputs. The phone simulator uses WhatsApp's own dark colors.
-  - All dark colors are defined in one place, the dark-mode block in `frontend/src/index.css`.
+  - All colors are tokens in one place, `frontend/src/index.css`; dark mode only swaps their values. See `DESIGN.md`.
 
 ## Israel Tax Authority rules
 

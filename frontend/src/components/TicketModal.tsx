@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   Check,
-  CheckCircle2,
   CircleDashed,
   ExternalLink,
   FileText,
@@ -12,7 +11,7 @@ import {
   RotateCcw,
   Smartphone,
   ThumbsDown,
-  XCircle,
+  X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, mediaUrl } from "../lib/api";
@@ -87,9 +86,9 @@ const VALUE_LABELS: Record<string, string> = {
 };
 
 function CheckIcon({ value }: { value: boolean | null }) {
-  if (value === true) return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
-  if (value === false) return <XCircle className="h-4 w-4 text-red-600" />;
-  return <CircleDashed className="h-4 w-4 text-slate-300" />;
+  if (value === true) return <Check className="h-4 w-4 text-ink-500" strokeWidth={3} />;
+  if (value === false) return <X className="h-4 w-4 text-red-600" strokeWidth={3} />;
+  return <CircleDashed className="h-4 w-4 text-ink-300" />;
 }
 
 const OCR_STATUS_LABEL = { PASSED: "עבר", FAILED: "נכשל", MANUAL_REVIEW: "בדיקה ידנית" } as const;
@@ -203,7 +202,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
           <span className="flex flex-wrap items-center gap-2">
             <Ltr>{ticket.ticket_ref}</Ltr>
             <StatusBadge status={ticket.status} />
-            <PriorityLabel priority={ticket.priority} />
+            {ticket.status !== "RESOLVED" && <PriorityLabel priority={ticket.priority} />}
           </span>
         ) : (
           "טוען…"
@@ -224,8 +223,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
       ) : (
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_420px]">
           {/* timeline */}
-          <div className="border-b border-slate-200 lg:border-b-0 lg:border-e">
-            <div className="flex items-center justify-between px-5 py-3 text-xs text-slate-500">
+          <div className="border-b border-ink-200 lg:border-b-0 lg:border-e">
+            <div className="flex items-center justify-between px-5 py-3 text-xs text-ink-500">
               <span className="font-semibold">ציר הזמן בוואטסאפ · {ticket.messages.length} הודעות</span>
               <span>
                 תזכורות {ticket.reminder_count}/{ticket.max_reminders} · הבאה {relativeTime(ticket.next_reminder_at)}
@@ -234,7 +233,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
             <div className="max-h-[62vh] space-y-2 overflow-y-auto bg-wa-wall px-4 py-4">
               {ticket.messages.map((m) => (
                 <div key={m.id}>
-                  <p className={cx("mb-0.5 text-[10px] text-slate-500", m.direction === "OUTBOUND" ? "text-start" : "text-end")}>
+                  <p className={cx("mb-0.5 text-xs text-ink-500", m.direction === "OUTBOUND" ? "text-start" : "text-end")}>
                     {m.sender_name} · {fullDateTime(m.created_at)}
                   </p>
                   <WaBubble
@@ -261,7 +260,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
             <div className="flex flex-wrap gap-2">
               {ticket.status !== "RESOLVED" && kind === "call" && (
                 <Button
-                  variant="success"
+                  variant="accent"
                   icon={<Phone className="h-4 w-4" />}
                   loading={busy === "call"}
                   onClick={() =>
@@ -273,7 +272,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
               )}
               {ticket.status !== "RESOLVED" && kind === "document" && (
                 <Button
-                  variant="success"
+                  variant="accent"
                   icon={<Check className="h-4 w-4" />}
                   loading={busy === "approve"}
                   onClick={() => act("approve", () => api.approveTicket(ticket.id), "המסמך אושר והפנייה נסגרה")}
@@ -338,21 +337,21 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 </div>
               </div>
             )}
-            {ticket.resolution_note && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{ticket.resolution_note}</p>}
+            {ticket.resolution_note && <p className="rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-600">{ticket.resolution_note}</p>}
 
             {kind === "call" && (
-              <section className="rounded-lg border border-slate-200 p-3">
-                <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+              <section className="rounded-lg border border-ink-200 p-3">
+                <h4 className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink-900">
                   <PhoneCall className="h-3.5 w-3.5" /> שיחה עם הלקוח
                 </h4>
                 <a
                   href={`tel:${ticket.client_phone}`}
-                  className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100"
+                  className="inline-flex items-center gap-2 py-1.5 text-sm font-bold text-link underline underline-offset-2"
                 >
                   <Phone className="h-4 w-4" />
                   <Ltr>{ticket.client_phone}</Ltr>
                 </a>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-ink-500">
                   {callRequestedAt
                     ? `הלקוח ביקש שיחה ${relativeTime(String(callRequestedAt))}.`
                     : "לאחר השיחה עם הלקוח לוחצים על ”השיחה בוצעה - סגור פנייה“."}
@@ -362,22 +361,22 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
 
             {kind === "document" && (
             <section>
-              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-bold text-ink-900">
                 <FileText className="h-3.5 w-3.5" /> הקבלה שהועלתה
               </h4>
               {ticket.media_file_path ? (
-                <a href={mediaUrl(ticket.media_file_path) ?? "#"} target="_blank" rel="noreferrer" className="group relative block overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <a href={mediaUrl(ticket.media_file_path) ?? "#"} target="_blank" rel="noreferrer" className="group relative block overflow-hidden rounded-lg border border-ink-200 bg-ink-50">
                   {/\.pdf$/i.test(ticket.media_file_path) ? (
-                    <p className="p-6 text-center text-sm text-slate-600">מסמך PDF — פתיחה</p>
+                    <p className="p-6 text-center text-sm text-ink-600">מסמך PDF — פתיחה</p>
                   ) : (
                     <img src={mediaUrl(ticket.media_file_path) ?? ""} alt="קבלה" className="max-h-72 w-full object-contain" />
                   )}
-                  <span className="absolute end-2 top-2 rounded bg-white/90 p-1 text-slate-600 opacity-0 shadow group-hover:opacity-100">
+                  <span className="absolute end-2 top-2 rounded bg-surface/90 p-1 text-ink-600 opacity-0 shadow group-hover:opacity-100">
                     <ExternalLink className="h-3.5 w-3.5" />
                   </span>
                 </a>
               ) : (
-                <p className="rounded-lg border border-dashed border-slate-300 px-3 py-6 text-center text-xs text-slate-400">עדיין לא התקבל מסמך</p>
+                <p className="rounded-lg border border-dashed border-ink-300 px-3 py-6 text-center text-xs text-ink-400">עדיין לא התקבל מסמך</p>
               )}
             </section>
             )}
@@ -385,12 +384,12 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
             {kind === "document" && (
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-slate-500">אימות Vision AI ורשות המסים</h4>
+                <h4 className="text-xs font-bold text-ink-900">אימות Vision AI ורשות המסים</h4>
                 {ocr && (
                   <span
                     className={cx(
-                      "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                      ocr.is_valid === true ? "bg-emerald-100 text-emerald-800" : ocr.is_valid === false ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-700",
+                      "text-sm font-bold",
+                      ocr.is_valid === false ? "text-red-700" : "text-ink-900",
                     )}
                   >
                     {OCR_STATUS_LABEL[ocr.status]} · {Math.round((ocr.confidence_score ?? 0) * 100)}%
@@ -398,25 +397,25 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 )}
               </div>
               {!ocr ? (
-                <p className="text-xs text-slate-400">טרם בוצעה בדיקת OCR.</p>
+                <p className="text-xs text-ink-400">טרם בוצעה בדיקת OCR.</p>
               ) : (
                 <div className="space-y-3">
-                  <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                  <ul className="divide-y divide-ink-100 rounded-lg border border-ink-200">
                     {CHECKS.map((c) => (
                       <li key={c.key} className="flex items-center gap-2.5 px-3 py-2" title={c.hint}>
                         <CheckIcon value={ocr.checks?.[c.key] ?? null} />
-                        <span className="text-sm text-slate-800">{c.label}</span>
+                        <span className="text-sm text-ink-800">{c.label}</span>
                         {c.key === "clarity" && ocr.blur_score !== null && (
-                          <span className="ms-auto text-[11px] text-slate-400">ציון חדות {Math.round(ocr.blur_score)}</span>
+                          <span className="ms-auto text-xs text-ink-400">ציון חדות {Math.round(ocr.blur_score)}</span>
                         )}
                         {c.key === "supplier_match" && ocr.supplier_match_score !== null && (
-                          <span className="ms-auto text-[11px] text-slate-400">{Math.round(ocr.supplier_match_score * 100)}% התאמה</span>
+                          <span className="ms-auto text-xs text-ink-400">{Math.round(ocr.supplier_match_score * 100)}% התאמה</span>
                         )}
                         {c.key === "math_integrity" && ocr.vat_rate_applied !== null && (
-                          <span className="ms-auto text-[11px] text-slate-400">מע״מ {ocr.vat_rate_applied}%</span>
+                          <span className="ms-auto text-xs text-ink-400">מע״מ {ocr.vat_rate_applied}%</span>
                         )}
                         {c.key === "allocation_number" && ocr.allocation_required !== null && (
-                          <span className="ms-auto text-[11px] text-slate-400">
+                          <span className="ms-auto text-xs text-ink-400">
                             {ocr.allocation_required ? `חובה (מעל ${ils(ocr.allocation_threshold)})` : "לא נדרש"}
                           </span>
                         )}
@@ -431,7 +430,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                     <div className="grid grid-cols-2 gap-2">
                       {EDIT_FIELDS.map((f) => (
                         <label key={f.key} className={cx("block", f.key === "supplier_name" && "col-span-2")}>
-                          <span className="mb-0.5 block text-[11px] text-slate-500">{f.label}</span>
+                          <span className="mb-0.5 block text-xs text-ink-500">{f.label}</span>
                           {f.key === "invoice_date" ? (
                             <DateInput value={form[f.key] ?? ""} onChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))} className="py-1.5" />
                           ) : (
@@ -446,7 +445,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                         </label>
                       ))}
                       <div className="col-span-2 flex gap-2 pt-1">
-                        <Button variant="primary" size="sm" loading={busy === "ocr"} onClick={saveOcr}>
+                        <Button variant="secondary" size="sm" loading={busy === "ocr"} onClick={saveOcr}>
                           שמירה ובדיקה מחדש
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
@@ -455,8 +454,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                       </div>
                     </div>
                   ) : (
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y divide-slate-100">
+                    <table className="data-table">
+                      <tbody className="divide-y divide-ink-100">
                         {[
                           ["ספק", ocr.supplier_name],
                           ["ח.פ / ע.מ ספק", ocr.business_id],
@@ -468,8 +467,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                           ["סה״כ", ils(ocr.total_amount)],
                         ].map(([k, v]) => (
                           <tr key={k}>
-                            <td className="py-1.5 pe-2 text-xs text-slate-500">{k}</td>
-                            <td dir="auto" className="py-1.5 text-end font-medium text-slate-900">
+                            <td className="py-1.5 pe-2 text-xs text-ink-500">{k}</td>
+                            <td dir="auto" className="py-1.5 text-end font-medium text-ink-900">
                               {v || "—"}
                             </td>
                           </tr>
@@ -482,7 +481,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                       תיקון שדות ידני
                     </Button>
                   )}
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-ink-400">
                     מנוע: {ocr.provider}
                     {ocr.simulated ? " (סימולטור לא מקוון)" : ""}. {ocr.provider_note}
                   </p>
@@ -498,12 +497,12 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
 
             {ctxEntries.length > 0 && (
               <section>
-                <h4 className="mb-2 text-xs font-semibold text-slate-500">פרטי הבקשה</h4>
+                <h4 className="mb-2 text-xs font-bold text-ink-900">פרטי הבקשה</h4>
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                   {ctxEntries.map(([k, v]) => (
                     <div key={k} className="min-w-0">
-                      <dt className="text-slate-400">{CONTEXT_LABELS[k] ?? k.replace(/_/g, " ")}</dt>
-                      <dd dir="auto" className="truncate font-medium text-slate-800" title={String(v)}>
+                      <dt className="text-ink-400">{CONTEXT_LABELS[k] ?? k.replace(/_/g, " ")}</dt>
+                      <dd dir="auto" className="truncate font-medium text-ink-800" title={String(v)}>
                         {VALUE_LABELS[String(v)] ?? String(v)}
                       </dd>
                     </div>
@@ -511,7 +510,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                 </dl>
               </section>
             )}
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-ink-400">
               נוצר {fullDateTime(ticket.created_at)} · קשר אחרון {relativeTime(ticket.last_contacted_at)}
               {ticket.worker_name ? ` · נשלח ע״י ${ticket.worker_name}` : ""}
             </p>

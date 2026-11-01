@@ -100,13 +100,13 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
           </Field>
 
           <div>
-            <span className="mb-1 block text-xs font-medium text-slate-600">סטטוס</span>
+            <span className="mb-1 block text-xs font-medium text-ink-600">סטטוס</span>
             <Toggle
               checked={active}
               onChange={setActive}
               label={<span className={cx("font-medium", active ? "text-emerald-700" : "text-red-600")}>{active ? "פעיל" : "הושעה"}</span>}
             />
-            {!active && <p className="mt-1 text-[11px] text-slate-500">עובד/ת מושעה לא יוכל/תוכל להתחבר למערכת ולבצע פעולות.</p>}
+            {!active && <p className="mt-1 text-xs text-ink-500">עובד/ת מושעה לא יוכל/תוכל להתחבר למערכת ולבצע פעולות.</p>}
           </div>
 
           <Field label="סיסמה חדשה (אופציונלי)" hint={passwordInvalid ? "לפחות 6 תווים" : "השאירו ריק כדי לא לשנות. איפוס סיסמה מנתק את העובד/ת מכל החיבורים."}>
@@ -119,15 +119,15 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-4">
-            <span className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-2 border-t border-ink-100 pt-4">
+            <span className="flex items-center gap-2 text-xs text-ink-500">
               תצוגה: <RoleBadge role={role} />
             </span>
             <span className="flex gap-2">
               <Button type="button" variant="ghost" onClick={onClose}>
                 ביטול
               </Button>
-              <Button type="submit" variant="primary" loading={saving} disabled={!dirty || nameInvalid || passwordInvalid} icon={<Save className="h-4 w-4" />}>
+              <Button type="submit" variant="accent" loading={saving} disabled={!dirty || nameInvalid || passwordInvalid} icon={<Save className="h-4 w-4" />}>
                 שמירה
               </Button>
             </span>

@@ -50,19 +50,19 @@ export function AttachmentChip({
 }) {
   const kind = attachmentKind(file);
   return (
-    <div className={cx("flex items-center gap-2 rounded-lg bg-white p-1.5 ring-1 ring-slate-200", className)}>
+    <div className={cx("flex items-center gap-2 rounded-lg bg-surface p-1.5 ring-1 ring-ink-200", className)}>
       {kind === "image" && previewUrl ? (
         <img src={previewUrl} alt="תצוגה מקדימה של הקובץ המצורף" className="h-12 w-12 shrink-0 rounded-md object-cover" />
       ) : (
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-500">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-ink-100 text-ink-500">
           <FileText className="h-5 w-5" />
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p dir="auto" className="truncate text-xs font-medium text-slate-800">
+        <p dir="auto" className="truncate text-xs font-medium text-ink-800">
           {file.name}
         </p>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-xs text-ink-500">
           {kind === "pdf" ? "מסמך PDF" : "תמונה"} · {(file.size / 1024).toFixed(0)} KB
         </p>
       </div>
@@ -70,7 +70,7 @@ export function AttachmentChip({
         type="button"
         onClick={onRemove}
         disabled={disabled}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-40"
         title="הסרת הקובץ המצורף"
       >
         <X className="h-4 w-4" />

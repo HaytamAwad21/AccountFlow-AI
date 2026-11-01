@@ -7,7 +7,7 @@ import { inputClass } from "./ui";
 export function FieldError({ message }: { message: string | null | undefined }) {
   if (!message) return null;
   return (
-    <p role="alert" className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-600">
+    <p role="alert" className="mt-1 flex items-center gap-1 text-xs font-medium text-red-600">
       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
       {message}
     </p>
@@ -69,7 +69,7 @@ export const AmountInput = forwardRef<
             onChange={(e) => onCurrencyChange(e.target.value as Currency)}
             aria-label="מטבע"
             title="מטבע"
-            className="h-full appearance-none rounded-md border-0 bg-slate-100 py-0 pl-6 pr-2 text-xs font-semibold text-slate-700 ring-0 hover:bg-slate-200 focus:ring-2 focus:ring-brand-500"
+            className="h-full appearance-none rounded-md border-0 bg-ink-100 py-0 pl-6 pr-2 text-xs font-semibold text-ink-700 ring-0 hover:bg-ink-200 focus:ring-2 focus:ring-brand-500"
           >
             {CURRENCY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -77,7 +77,7 @@ export const AmountInput = forwardRef<
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute left-1.5 h-3.5 w-3.5 text-slate-500" />
+          <ChevronDown className="pointer-events-none absolute left-1.5 h-3.5 w-3.5 text-ink-500" />
         </div>
       </div>
       <FieldError message={shown} />

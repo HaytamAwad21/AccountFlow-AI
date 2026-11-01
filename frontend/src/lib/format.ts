@@ -171,18 +171,18 @@ export function fullDateTime(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString("he-IL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-export const STATUS_META: Record<TicketStatus, { label: string; short: string; className: string; dot: string }> = {
-  OPEN: { label: "פתוח", short: "פתוח", className: "bg-slate-100 text-slate-700 ring-slate-200", dot: "bg-slate-400" },
-  WAITING_FOR_CLIENT: { label: "ממתין ללקוח", short: "ממתין", className: "bg-sky-50 text-sky-800 ring-sky-200", dot: "bg-sky-500" },
-  SNOOZED_TONIGHT: { label: "נדחה ל-20:00", short: "נדחה", className: "bg-violet-50 text-violet-800 ring-violet-200", dot: "bg-violet-500" },
-  NEEDS_CORRECTION: { label: "דרוש תיקון", short: "תיקון", className: "bg-amber-50 text-amber-800 ring-amber-200", dot: "bg-amber-500" },
-  NEEDS_CLERK_REVIEW: { label: "ממתין לבדיקת פקיד", short: "לבדיקה", className: "bg-indigo-50 text-indigo-800 ring-indigo-200", dot: "bg-indigo-500" },
-  RESOLVED: { label: "טופל", short: "טופל", className: "bg-emerald-50 text-emerald-800 ring-emerald-200", dot: "bg-emerald-500" },
-  ESCALATED: { label: "הוסלם", short: "הוסלם", className: "bg-red-50 text-red-700 ring-red-200", dot: "bg-red-500" },
+export const STATUS_META: Record<TicketStatus, { label: string; short: string }> = {
+  OPEN: { label: "פתוח", short: "פתוח" },
+  WAITING_FOR_CLIENT: { label: "ממתין ללקוח", short: "ממתין" },
+  SNOOZED_TONIGHT: { label: "נדחה ל-20:00", short: "נדחה" },
+  NEEDS_CORRECTION: { label: "דרוש תיקון", short: "תיקון" },
+  NEEDS_CLERK_REVIEW: { label: "ממתין לבדיקת פקיד", short: "לבדיקה" },
+  RESOLVED: { label: "טופל", short: "טופל" },
+  ESCALATED: { label: "הוסלם", short: "הוסלם" },
 };
 
 export const PRIORITY_META: Record<TicketPriority, { label: string; className: string }> = {
-  NORMAL: { label: "רגיל", className: "text-slate-500" },
+  NORMAL: { label: "רגיל", className: "text-ink-500" },
   HIGH: { label: "גבוה", className: "text-amber-700 font-semibold" },
   URGENT_DEADLINE: { label: "דחוף · מועד דיווח", className: "text-red-600 font-semibold" },
 };

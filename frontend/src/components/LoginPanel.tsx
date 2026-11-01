@@ -83,26 +83,19 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
           submit();
         }}
       >
-        <button type="button" onClick={() => setPicked(null)} className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800">
+        <button type="button" onClick={() => setPicked(null)} className="flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-800">
           <ArrowRight className="h-3.5 w-3.5" /> בחירת משתמש אחר
         </button>
         <div className="flex items-center gap-3 rounded-xl border border-brand-500 bg-brand-50 px-4 py-3">
-          <span
-            className={cx(
-              "grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold",
-              picked.role === "MANAGER" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800",
-            )}
-          >
-            {picked.avatar_initials}
-          </span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">{picked.avatar_initials}</span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-slate-900">{parts.name}</span>
-            <span className="block truncate text-xs text-slate-500">{picked.job_title || parts.title || ROLE_LABEL[picked.role]}</span>
+            <span className="block truncate text-sm font-semibold text-ink-900">{parts.name}</span>
+            <span className="block truncate text-xs text-ink-500">{picked.job_title || parts.title || ROLE_LABEL[picked.role]}</span>
           </span>
           <RoleBadge role={picked.role} />
         </div>
         <label className="block">
-          <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-600">
             <KeyRound className="h-3.5 w-3.5" /> סיסמה
           </span>
           <PasswordInput
@@ -116,7 +109,7 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
           />
         </label>
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
-        <Button type="submit" variant="primary" size="lg" className="w-full" loading={submitting} disabled={!password} icon={<LogIn className="h-5 w-5 -scale-x-100" />}>
+        <Button type="submit" variant="accent" size="lg" className="w-full" loading={submitting} disabled={!password} icon={<LogIn className="h-5 w-5 -scale-x-100" />}>
           התחברות
         </Button>
       </form>
@@ -136,27 +129,20 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
             onClick={() => pick(u)}
             className={cx(
               "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start transition",
-              current ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
-              !u.is_active && "cursor-not-allowed opacity-50 hover:bg-white",
+              current ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-ink-200 hover:border-ink-300 hover:bg-ink-50",
+              !u.is_active && "cursor-not-allowed opacity-50 hover:bg-surface",
             )}
           >
-            <span
-              className={cx(
-                "grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold",
-                u.role === "MANAGER" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800",
-              )}
-            >
-              {u.avatar_initials}
-            </span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">{u.avatar_initials}</span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-slate-900">{parts.name}</span>
-              <span className="block truncate text-xs text-slate-500">{u.job_title || parts.title || ROLE_LABEL[u.role]}</span>
+              <span className="block truncate text-sm font-semibold text-ink-900">{parts.name}</span>
+              <span className="block truncate text-xs text-ink-500">{u.job_title || parts.title || ROLE_LABEL[u.role]}</span>
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1">
               <RoleBadge role={u.role} />
-              {!u.is_active && <span className="text-[10.5px] font-semibold text-red-600">הושעה</span>}
+              {!u.is_active && <span className="text-xs font-semibold text-red-600">הושעה</span>}
               {current && (
-                <span className="flex items-center gap-1 text-[10.5px] font-semibold text-brand-600">
+                <span className="flex items-center gap-1 text-xs font-semibold text-link">
                   <Check className="h-3 w-3" /> מחובר/ת כעת
                 </span>
               )}
@@ -164,7 +150,7 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
           </button>
         );
       })}
-      <p className="pt-2 text-[11px] leading-snug text-slate-500">בחרו את המשתמש/ת שלכם והקלידו את הסיסמה האישית. כל פעולה במערכת נרשמת ביומן הפעילות.</p>
+      <p className="pt-2 text-xs leading-snug text-ink-500">בחרו את המשתמש/ת שלכם והקלידו את הסיסמה האישית. כל פעולה במערכת נרשמת ביומן הפעילות.</p>
     </div>
   );
 }

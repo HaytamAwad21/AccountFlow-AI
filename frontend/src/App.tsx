@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bot, ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
+import { ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { cx, splitUserName } from "./lib/format";
 import { PhoneSimulator } from "./components/PhoneSimulator";
 import { LoginPanel } from "./components/LoginPanel";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
+import { DeadlineDisc } from "./components/PageHeader";
 import { Modal, RoleBadge, Spinner, Toaster } from "./components/ui";
 import { useTheme } from "./lib/theme";
 import { QuickDispatch } from "./pages/QuickDispatch";
@@ -17,13 +18,13 @@ import { ActivityLog } from "./pages/ActivityLog";
 type Tab = "trigger" | "board" | "bulk" | "clients" | "settings" | "activity";
 
 /** Sidebar order — "הגדרות" always last. Manager-only tabs are not rendered at all for workers. */
-const TABS: { key: Tab; label: string; sub: string; icon: ReactNode; managerOnly?: boolean }[] = [
-  { key: "trigger", label: "שליחת בקשה", sub: "עמדת שליחה מהירה", icon: <Zap className="h-4 w-4" /> },
-  { key: "board", label: "לוח מעקב חי", sub: "מצב הפניות והבוט", icon: <ClipboardList className="h-4 w-4" /> },
-  { key: "bulk", label: "הדיווח מוכן", sub: "הודעות מס בתפוצה", icon: <Megaphone className="h-4 w-4" /> },
-  { key: "clients", label: "לקוחות ותבניות", sub: "לקוחות ונוסחי הודעות", icon: <Users className="h-4 w-4" /> },
-  { key: "activity", label: "יומן פעילות", sub: "פעולות צוות המשרד", icon: <History className="h-4 w-4" />, managerOnly: true },
-  { key: "settings", label: "הגדרות", sub: "הגדרות המשרד", icon: <SettingsIcon className="h-4 w-4" /> },
+const TABS: { key: Tab; label: string; icon: ReactNode; managerOnly?: boolean }[] = [
+  { key: "trigger", label: "שליחת בקשה", icon: <Zap className="h-4 w-4" /> },
+  { key: "board", label: "לוח מעקב חי", icon: <ClipboardList className="h-4 w-4" /> },
+  { key: "bulk", label: "הדיווח מוכן", icon: <Megaphone className="h-4 w-4" /> },
+  { key: "clients", label: "לקוחות ותבניות", icon: <Users className="h-4 w-4" /> },
+  { key: "activity", label: "יומן פעילות", icon: <History className="h-4 w-4" />, managerOnly: true },
+  { key: "settings", label: "הגדרות", icon: <SettingsIcon className="h-4 w-4" /> },
 ];
 
 const MANAGER_ONLY_TABS = new Set<Tab>(TABS.filter((t) => t.managerOnly).map((t) => t.key));
@@ -36,15 +37,14 @@ function readTab(): Tab {
 /** Full-page login shown whenever there is no valid session. */
 function LoginScreen() {
   return (
-    <div dir="rtl" className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-brand-900 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-5 flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/30">
-            <Bot className="h-6 w-6" />
-          </span>
+    <div dir="rtl" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-field p-4 @container lg:justify-start lg:ps-[12vw]">
+      <DeadlineDisc className="pointer-events-none absolute -bottom-[14vh] -end-[8vw] hidden h-[78vh] w-[78vh] text-[34vh] lg:grid" />
+      <div className="relative w-full max-w-md bg-surface p-7">
+        <div className="mb-6 flex items-center gap-3">
+          <DeadlineDisc className="h-11 w-11 text-lg" />
           <div>
-            <h1 className="text-xl font-bold text-slate-900">התחברות למערכת</h1>
-            <p className="text-xs text-slate-500" dir="ltr">
+            <h1 className="font-display text-2xl leading-tight text-ink-900">התחברות למערכת</h1>
+            <p className="text-xs text-ink-500" dir="ltr">
               AccountFlow AI
             </p>
           </div>
@@ -65,36 +65,20 @@ function ProfileSwitcher() {
   if (!user) return null;
   const { name } = splitUserName(user.full_name);
   return (
-    <div className="space-y-1.5">
-      <button
-        onClick={() => setOpen(true)}
-        className={cx(
-          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start ring-1 transition",
-          user.role === "MANAGER" ? "bg-amber-400/10 ring-amber-400/40 hover:bg-amber-400/20" : "bg-sky-400/10 ring-sky-400/40 hover:bg-sky-400/20",
-        )}
-        title="התחברות למערכת כמשתמש אחר"
-      >
-        <span
-          className={cx(
-            "grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold",
-            user.role === "MANAGER" ? "bg-amber-400 text-amber-950" : "bg-sky-400 text-sky-950",
-          )}
-        >
-          {user.avatar_initials}
-        </span>
+    <div className="space-y-1">
+      <button onClick={() => setOpen(true)} className="flex w-full items-center gap-3 px-2 py-2 text-start transition-colors hover:bg-white/10" title="התחברות למערכת כמשתמש אחר">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#fff] text-sm font-bold text-accent-ink">{user.avatar_initials}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-white">{name}</span>
-          <span className="mt-0.5 block">
-            <RoleBadge role={user.role} />
-          </span>
+          <span className="block truncate text-sm font-bold text-white">{name}</span>
+          <RoleBadge role={user.role} className="text-field-muted" />
         </span>
-        <LogIn className="h-4 w-4 shrink-0 text-slate-400" />
+        <LogIn className="h-4 w-4 shrink-0 text-field-muted" />
       </button>
-      <div className="flex gap-1 text-[11px]">
-        <button onClick={() => setChangingPassword(true)} className="flex flex-1 items-center justify-center gap-1 rounded-md py-1 text-slate-400 hover:bg-white/5 hover:text-white">
+      <div className="flex gap-1 text-xs">
+        <button onClick={() => setChangingPassword(true)} className="flex flex-1 items-center justify-center gap-1 py-1 text-field-muted transition-colors hover:bg-white/10 hover:text-white">
           <KeyRound className="h-3.5 w-3.5" /> שינוי סיסמה
         </button>
-        <button onClick={() => logout()} className="flex flex-1 items-center justify-center gap-1 rounded-md py-1 text-slate-400 hover:bg-white/5 hover:text-white">
+        <button onClick={() => logout()} className="flex flex-1 items-center justify-center gap-1 py-1 text-field-muted transition-colors hover:bg-white/10 hover:text-white">
           <LogOut className="h-3.5 w-3.5 -scale-x-100" /> התנתקות
         </button>
       </div>
@@ -136,7 +120,7 @@ export default function App() {
 
   if (!authChecked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
+      <div className="flex h-screen items-center justify-center bg-field">
         <Spinner className="h-8 w-8 text-white" />
       </div>
     );
@@ -144,72 +128,58 @@ export default function App() {
   if (!user) return <LoginScreen />;
 
   return (
-    <div dir="rtl" className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
-      {navOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden />}
+    <div dir="rtl" className="flex h-screen overflow-hidden bg-canvas text-ink-800">
+      {navOpen && <div className="fixed inset-0 z-40 bg-[#0d1533]/70 lg:hidden" onClick={() => setNavOpen(false)} aria-hidden />}
       <nav
         className={cx(
-          "fixed inset-y-0 start-0 z-50 flex w-64 shrink-0 flex-col border-e border-slate-200 bg-slate-950 text-slate-300 transition-transform",
+          "fixed inset-y-0 start-0 z-50 flex w-64 shrink-0 flex-col border-e border-white/10 bg-field text-field-muted transition-transform",
           "lg:static lg:z-auto lg:w-56 lg:translate-x-0 2xl:w-64",
           navOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
-        <div className="flex items-center gap-2.5 px-5 py-5">
+        <div className="flex items-center gap-2 px-3 pb-5 pt-4">
+          <DeadlineDisc className="h-9 w-9 text-sm" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-end font-display text-base leading-tight text-white" dir="ltr">
+              AccountFlow
+            </p>
+            <p className="text-xs leading-tight text-field-muted">{settings?.firm_name ?? "מעקב לקוחות"}</p>
+          </div>
           <button
             type="button"
             onClick={toggleTheme}
             title="מעבר למצב כהה / בהיר"
             aria-label={dark ? "מעבר למצב בהיר" : "מעבר למצב כהה"}
             aria-pressed={dark}
-            className="group relative grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="grid h-8 w-8 shrink-0 place-items-center text-field-muted transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           >
-            <Bot className="h-5 w-5" />
-            <span className="absolute -bottom-1 -start-1 grid h-4 w-4 place-items-center rounded-full bg-slate-950 text-amber-300 ring-1 ring-white/10">
-              {dark ? <Sun className="h-2.5 w-2.5" /> : <Moon className="h-2.5 w-2.5" />}
-            </span>
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-white" dir="ltr">
-              AccountFlow AI
-            </p>
-            <p className="truncate text-[11px] text-slate-500">{settings?.firm_name ?? "מעקב לקוחות"}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNavOpen(false)}
-            aria-label="סגירת התפריט"
-            className="ms-auto grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white lg:hidden"
-          >
+          <button type="button" onClick={() => setNavOpen(false)} aria-label="סגירת התפריט" className="grid h-8 w-8 shrink-0 place-items-center text-field-muted hover:bg-white/10 hover:text-white lg:hidden">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-1 overflow-y-auto px-3">
+        <div className="flex-1 space-y-0.5 overflow-y-auto px-2">
           {TABS.filter((t) => !t.managerOnly || isManager).map((t) => (
             <button
               key={t.key}
               onClick={() => go(t.key)}
+              aria-current={tab === t.key ? "page" : undefined}
               className={cx(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition",
-                tab === t.key ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white",
+                "flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm font-semibold transition-colors",
+                tab === t.key ? "bg-brand-600 text-white" : "hover:bg-white/10 hover:text-white",
               )}
             >
-              <span className={cx("grid h-7 w-7 place-items-center rounded-md", tab === t.key ? "bg-brand-600 text-white" : "bg-white/5")}>{t.icon}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{t.label}</span>
-                <span className="block truncate text-[11px] text-slate-500">{t.sub}</span>
-              </span>
-              {t.key === "board" && openCount > 0 && (
-                <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] font-semibold text-amber-300">{openCount}</span>
-              )}
+              {t.icon}
+              <span className="min-w-0 flex-1 truncate">{t.label}</span>
+              {t.key === "board" && openCount > 0 && <span className="text-sm font-bold">{openCount}</span>}
             </button>
           ))}
         </div>
 
-        <div className="space-y-3 border-t border-white/10 p-3 text-[11px]">
-          <button
-            onClick={() => setPhoneOpen(!phoneOpen)}
-            className="flex w-full items-center gap-2 rounded-lg bg-wa-teal/20 px-3 py-2 font-medium text-emerald-300 hover:bg-wa-teal/30"
-          >
+        <div className="space-y-2 p-2">
+          <button onClick={() => setPhoneOpen(!phoneOpen)} className="flex w-full items-center gap-2 px-3 py-2 text-sm font-semibold text-white ring-1 ring-inset ring-white/40 transition-colors hover:bg-white/10">
             <Smartphone className="h-4 w-4" /> {phoneOpen ? "הסתרת" : "הצגת"} הטלפון של הלקוח
           </button>
           <ProfileSwitcher />
@@ -217,21 +187,17 @@ export default function App() {
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setNavOpen(true)}
-            aria-label="פתיחת התפריט"
-            className="grid h-9 w-9 place-items-center rounded-lg text-slate-600 hover:bg-slate-100"
-          >
+        <header className="flex items-center gap-2 bg-field px-3 pt-2 text-white lg:hidden">
+          <button type="button" onClick={() => setNavOpen(true)} aria-label="פתיחת התפריט" className="grid h-9 w-9 place-items-center hover:bg-white/10">
             <Menu className="h-5 w-5" />
           </button>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{TABS.find((t) => t.key === tab)?.label}</span>
+          <DeadlineDisc className="h-7 w-7 text-xs" />
+          <span className="min-w-0 flex-1" />
           <button
             type="button"
             onClick={() => setPhoneOpen(!phoneOpen)}
             aria-label={phoneOpen ? "הסתרת הטלפון של הלקוח" : "הצגת הטלפון של הלקוח"}
-            className="grid h-9 w-9 place-items-center rounded-lg text-wa-teal hover:bg-slate-100"
+            className="grid h-9 w-9 place-items-center hover:bg-white/10"
           >
             <Smartphone className="h-5 w-5" />
           </button>

@@ -123,7 +123,7 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
         </section>
 
         <section>
-          <span className="mb-1.5 block text-xs font-medium text-slate-600">הרשאה</span>
+          <span className="mb-1.5 block text-xs font-medium text-ink-600">הרשאה</span>
           <div className="grid gap-2 sm:grid-cols-2">
             {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
               <button
@@ -132,11 +132,11 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
                 onClick={() => setRole(r)}
                 className={cx(
                   "rounded-xl border p-3 text-start transition",
-                  role === r ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-slate-200 hover:bg-slate-50",
+                  role === r ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-ink-200 hover:bg-ink-50",
                 )}
               >
                 <RoleBadge role={r} />
-                <span className="mt-1.5 block text-[11px] leading-snug text-slate-500">{ROLE_HELP[r]}</span>
+                <span className="mt-1.5 block text-xs leading-snug text-ink-500">{ROLE_HELP[r]}</span>
               </button>
             ))}
           </div>
@@ -152,7 +152,7 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
         </section>
 
         <section>
-          <span className="mb-1 block text-xs font-medium text-slate-600">סטטוס</span>
+          <span className="mb-1 block text-xs font-medium text-ink-600">סטטוס</span>
           <Toggle
             checked={active}
             onChange={setActive}
@@ -160,11 +160,11 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
           />
         </section>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+        <div className="flex justify-end gap-2 border-t border-ink-100 pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
             ביטול
           </Button>
-          <Button type="submit" variant="primary" loading={saving} disabled={touched && hasErrors} icon={<UserPlus className="h-4 w-4" />}>
+          <Button type="submit" variant="accent" loading={saving} disabled={touched && hasErrors} icon={<UserPlus className="h-4 w-4" />}>
             הוספת עובד/ת
           </Button>
         </div>

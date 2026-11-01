@@ -63,7 +63,7 @@ export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose:
           <Button type="button" variant="ghost" onClick={onClose}>
             ביטול
           </Button>
-          <Button type="submit" variant="primary" loading={saving} disabled={!current || !next || !confirm || !!problem} icon={<KeyRound className="h-4 w-4" />}>
+          <Button type="submit" variant="accent" loading={saving} disabled={!current || !next || !confirm || !!problem} icon={<KeyRound className="h-4 w-4" />}>
             עדכון סיסמה
           </Button>
         </div>

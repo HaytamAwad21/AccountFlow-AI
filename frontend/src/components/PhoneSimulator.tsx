@@ -21,7 +21,7 @@ import { api, ApiError } from "../lib/api";
 import { cx, dayLabel, initials, STATUS_META } from "../lib/format";
 import type { InboundResult, Message, RenderedButton, Ticket } from "../lib/types";
 import { AttachmentChip, MANUAL_ATTACHMENT_ACCEPT, attachmentError, useObjectUrl } from "./ManualAttachment";
-import { Ltr, Spinner } from "./ui";
+import { inputClass, Ltr, Spinner } from "./ui";
 import { WaBubble } from "./WaBubble";
 
 const DONE_STATUSES = new Set(["RESOLVED"]);
@@ -214,7 +214,7 @@ export function PhoneSimulator() {
     return (
       <button
         onClick={() => setPhoneOpen(true)}
-        className="fixed end-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 rounded-s-xl bg-wa-header px-2 py-4 text-white shadow-lg hover:bg-wa-teal"
+        className="fixed end-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 bg-field px-2 py-4 text-white transition-colors hover:bg-brand-500"
         title="פתיחת סימולטור הוואטסאפ של הלקוח"
       >
         <Smartphone className="h-5 w-5" />
@@ -233,27 +233,22 @@ export function PhoneSimulator() {
   const canSend = asWorker ? !!text.trim() || workerFile !== null : !!text.trim();
 
   return (
-    <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-slate-200 bg-slate-100 shadow-xl xl:static xl:z-auto xl:w-[340px] xl:shadow-none 2xl:w-[400px]">
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
-        <Smartphone className="h-4 w-4 text-wa-teal" />
+    <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-ink-300 bg-ink-100 xl:static xl:z-auto xl:w-[340px] 2xl:w-[400px]">
+      <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-slate-900">סימולטור וואטסאפ חי של הלקוח</p>
-          <p className="flex items-center gap-1 text-[11px] text-slate-500">
+          <p className="text-sm font-bold text-ink-900">סימולטור וואטסאפ חי של הלקוח</p>
+          <p className="flex items-center gap-1 text-[11px] text-ink-500">
             {live ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
             {live ? "מחובר בזמן אמת" : "מתחבר מחדש (רענון תקופתי)"}
           </p>
         </div>
-        <button onClick={() => setPhoneOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="כיווץ">
+        <button onClick={() => setPhoneOpen(false)} className="p-1 text-ink-500 hover:bg-ink-200 hover:text-ink-900" title="כיווץ">
           <ChevronLeft className="h-4 w-4 rotate-180" />
         </button>
       </div>
 
-      <div className="px-3 pt-2.5">
-        <select
-          value={client?.id ?? ""}
-          onChange={(e) => selectClient(Number(e.target.value))}
-          className="w-full rounded-lg border-0 bg-white py-1.5 pe-8 ps-2 text-xs text-slate-800 ring-1 ring-slate-300 focus:ring-2 focus:ring-wa-teal"
-        >
+      <div className="px-3">
+        <select value={client?.id ?? ""} onChange={(e) => selectClient(Number(e.target.value))} className={cx(inputClass, "py-1.5 pe-8 ps-2")}>
           {clients
             .filter((c) => c.is_active)
             .map((c) => (
@@ -266,11 +261,11 @@ export function PhoneSimulator() {
       </div>
 
       <div className="flex min-h-0 flex-1 items-stretch justify-center p-3">
-        <div className="flex w-full max-w-[370px] flex-col overflow-hidden rounded-[2.2rem] border-[7px] border-slate-900 bg-slate-900 shadow-2xl">
+        <div className="flex w-full max-w-[370px] flex-col overflow-hidden rounded-[2.2rem] border-[7px] border-[#0b0f1a] bg-[#0b0f1a]">
           {/* status bar */}
           <div className="relative flex h-6 items-center justify-between bg-wa-header px-5 text-[10px] font-semibold text-white" dir="ltr">
             <span>{new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</span>
-            <span className="absolute left-1/2 top-0 h-4 w-24 -translate-x-1/2 rounded-b-xl bg-slate-900" />
+            <span className="absolute left-1/2 top-0 h-4 w-24 -translate-x-1/2 rounded-b-[12px] bg-[#0b0f1a]" />
             <span>5G ▮▮▮</span>
           </div>
           {/* chat header */}
@@ -300,7 +295,7 @@ export function PhoneSimulator() {
             }}
           >
             {client && (
-              <div className="mx-auto mb-2 flex max-w-[90%] items-center justify-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-center text-[10.5px] text-amber-900 shadow-sm">
+              <div className="mx-auto mb-2 flex max-w-[90%] items-center justify-center gap-1 rounded-[6px] bg-amber-50 px-2 py-1 text-center text-[10.5px] text-amber-900 shadow-sm">
                 <Lock className="h-3 w-3 shrink-0" /> הודעות אל <Ltr>{client.whatsapp_phone}</Ltr> · בעברית
               </div>
             )}
@@ -310,12 +305,12 @@ export function PhoneSimulator() {
               </div>
             )}
             {!loading && messages.length === 0 && (
-              <p className="py-10 text-center text-xs text-slate-500">אין עדיין הודעות. שלחו בקשה מעמדת ”שליחת בקשה“.</p>
+              <p className="py-10 text-center text-xs text-ink-500">אין עדיין הודעות. שלחו בקשה מעמדת ”שליחת בקשה“.</p>
             )}
             {groups.map((g) => (
               <div key={g.day} className="space-y-1.5">
                 <div className="sticky top-0 z-10 flex justify-center py-1">
-                  <span className="rounded-md bg-sky-50/95 px-2 py-0.5 text-[10.5px] font-medium text-slate-600 shadow-sm">{g.day}</span>
+                  <span className="rounded-[6px] bg-brand-50/95 px-2 py-0.5 text-[10.5px] font-medium text-ink-600 shadow-sm">{g.day}</span>
                 </div>
                 {g.items.map((m) => (
                   <WaBubble
@@ -339,9 +334,9 @@ export function PhoneSimulator() {
             ))}
             {busy && (
               <div className={cx("flex", busy === "worker" ? "items-start opacity-70" : "items-start")}>
-                <div className="flex items-center gap-1 rounded-lg rounded-ss-none bg-white px-3 py-2 shadow-sm">
+                <div className="flex items-center gap-1 rounded-[8px] rounded-ss-none bg-wa-card px-3 py-2 shadow-sm">
                   {busy.startsWith("demo") || busy === "upload" ? (
-                    <span className="flex items-center gap-1.5 text-[11px] text-indigo-700">
+                    <span className="flex items-center gap-1.5 text-[11px] text-link">
                       <ScanLine className="h-3.5 w-3.5 animate-pulse" /> Vision AI בודק את הצילום…
                     </span>
                   ) : busy === "worker" ? (
@@ -350,7 +345,7 @@ export function PhoneSimulator() {
                     </span>
                   ) : (
                     [0, 1, 2].map((i) => (
-                      <span key={i} className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-slate-400" style={{ animationDelay: `${i * 0.2}s` }} />
+                      <span key={i} className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-ink-400" style={{ animationDelay: `${i * 0.2}s` }} />
                     ))
                   )}
                 </div>
@@ -360,8 +355,8 @@ export function PhoneSimulator() {
 
           {/* demo actions: the customer's side only */}
           {!asWorker && (
-            <div className="space-y-1 bg-[#f0f2f5] px-2 pt-2">
-              <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500">
+            <div className="space-y-1 bg-wa-bar px-2 pt-2">
+              <div className="flex items-center justify-between px-0.5 text-[10px] text-ink-500">
                 <span className="font-semibold">הדגמת Vision AI</span>
                 <span className="truncate ps-2" dir="rtl">
                   {activeTicket ? `${activeTicket.ticket_ref} · ${activeTicket.context_variables_json.supplier_name ?? activeTicket.template_name}` : "אין בקשה פתוחה"}
@@ -370,7 +365,7 @@ export function PhoneSimulator() {
               <DemoButton
                 icon={<ScanLine className="h-3.5 w-3.5" />}
                 label="הדמיה: הלקוח שולח חשבונית תקינה וברורה"
-                className="bg-emerald-600 hover:bg-emerald-700"
+                className="text-emerald-700"
                 loading={busy === "demo-clear"}
                 disabled={!client || busy !== null}
                 onClick={() => demo("clear")}
@@ -378,7 +373,7 @@ export function PhoneSimulator() {
               <DemoButton
                 icon={<CloudFog className="h-3.5 w-3.5" />}
                 label="הדמיה: הלקוח שולח קבלה מטושטשת"
-                className="bg-amber-500 hover:bg-amber-600"
+                className="text-amber-700"
                 loading={busy === "demo-blurry"}
                 disabled={!client || busy !== null}
                 onClick={() => demo("blurry")}
@@ -386,7 +381,7 @@ export function PhoneSimulator() {
               <DemoButton
                 icon={<FileX2 className="h-3.5 w-3.5" />}
                 label="הדמיה: חשבונית ללא מספר חשבונית"
-                className="bg-rose-600 hover:bg-rose-700"
+                className="text-red-600"
                 loading={busy === "demo-missing_number"}
                 disabled={!client || busy !== null}
                 onClick={() => demo("missing_number")}
@@ -395,20 +390,20 @@ export function PhoneSimulator() {
           )}
 
           {/* composer mode switch */}
-          <div className="bg-[#f0f2f5] px-2 pt-2">
+          <div className="bg-wa-bar px-2 pt-2">
             <ComposerSwitch value={composeAs} onChange={switchComposer} disabled={!client || busy !== null} />
           </div>
 
           {/* pending worker attachment (sent together with the text) */}
           {asWorker && workerFile && (
-            <div className="bg-[#f0f2f5] px-2 pt-2">
+            <div className="bg-wa-bar px-2 pt-2">
               <AttachmentChip file={workerFile} previewUrl={workerPreviewUrl} onRemove={() => setWorkerFile(null)} disabled={busy !== null} />
             </div>
           )}
 
           {/* composer */}
           <form
-            className="flex items-center gap-1.5 bg-[#f0f2f5] px-2 pb-3 pt-2"
+            className="flex items-center gap-1.5 bg-wa-bar px-2 pb-3 pt-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (asWorker) sendAsWorker();
@@ -426,7 +421,7 @@ export function PhoneSimulator() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={!client || busy !== null}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 hover:bg-white disabled:opacity-40"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink-500 hover:bg-wa-card disabled:opacity-40"
               title={asWorker ? "צירוף תמונה או קובץ להודעה מהמשרד" : "העלאת צילום / PDF אמיתי מהמחשב בשם הלקוח"}
             >
               <Paperclip className="h-4 w-4" />
@@ -439,7 +434,7 @@ export function PhoneSimulator() {
               placeholder={!client ? "בחרו לקוח" : asWorker ? `הודעה ללקוח בשם ${workerName}…` : `השב כ${client.full_name}…`}
               disabled={!client}
               className={cx(
-                "h-9 min-w-0 flex-1 rounded-full border-0 bg-white px-3.5 text-[13px] text-slate-900 ring-0 placeholder:text-slate-400 focus:ring-1",
+                "h-9 min-w-0 flex-1 rounded-full border-0 bg-wa-card px-3.5 text-[13px] text-ink-900 ring-0 placeholder:text-ink-400 focus:ring-1",
                 asWorker ? "ring-1 ring-emerald-300 focus:ring-emerald-500" : "focus:ring-wa-teal",
               )}
             />
@@ -458,9 +453,9 @@ export function PhoneSimulator() {
         </div>
       </div>
       {client && (
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-500">
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600">{initials(client.full_name)}</span>
-          <span dir="auto" className="truncate font-medium text-slate-700">
+        <div className="flex items-center gap-2 px-3 pb-2 text-[11px] text-ink-500">
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white">{initials(client.full_name)}</span>
+          <span dir="auto" className="truncate font-medium text-ink-700">
             {client.full_name}
           </span>
           <span className="ms-auto shrink-0">{tickets.filter((t) => !DONE_STATUSES.has(t.status)).length} בקשות פתוחות</span>
@@ -477,12 +472,12 @@ export function PhoneSimulator() {
 function ComposerSwitch({ value, onChange, disabled }: { value: ComposeAs; onChange: (v: ComposeAs) => void; disabled: boolean }) {
   const asWorker = value === "worker";
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5 text-[11px] ring-1 ring-slate-200">
+    <div className="flex items-center justify-between gap-2 rounded-[8px] bg-wa-card px-2 py-1.5 text-[11px] ring-1 ring-black/10">
       <button
         type="button"
         onClick={() => onChange("client")}
         disabled={disabled}
-        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-slate-400" : "text-wa-teal")}
+        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-ink-400" : "text-wa-teal")}
       >
         <Smartphone className="h-3.5 w-3.5" />
         מענה כלקוח (סימולטור)
@@ -501,7 +496,7 @@ function ComposerSwitch({ value, onChange, disabled }: { value: ComposeAs; onCha
       >
         <span
           className={cx(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+            "absolute top-0.5 h-4 w-4 rounded-full bg-wa-card shadow transition-all",
             asWorker ? "start-[1.125rem]" : "start-0.5",
           )}
         />
@@ -510,7 +505,7 @@ function ComposerSwitch({ value, onChange, disabled }: { value: ComposeAs; onCha
         type="button"
         onClick={() => onChange("worker")}
         disabled={disabled}
-        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-emerald-700" : "text-slate-400")}
+        className={cx("flex items-center gap-1 font-semibold transition disabled:opacity-50", asWorker ? "text-emerald-700" : "text-ink-400")}
       >
         <UserRound className="h-3.5 w-3.5" />
         שליחה כעובד משרד (ידני)
@@ -539,12 +534,9 @@ function DemoButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cx(
-        "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[11.5px] font-semibold text-white shadow-sm transition disabled:opacity-50",
-        className,
-      )}
+      className="flex w-full items-center gap-2 rounded-[8px] bg-wa-card px-2.5 py-1.5 text-start text-[11.5px] font-semibold text-ink-800 transition hover:bg-black/5 disabled:opacity-50"
     >
-      {loading ? <Spinner className="!h-3.5 !w-3.5 text-white" /> : icon}
+      <span className={cx("shrink-0", className)}>{loading ? <Spinner className="!h-3.5 !w-3.5" /> : icon}</span>
       <span className="truncate">{label}</span>
     </button>
   );

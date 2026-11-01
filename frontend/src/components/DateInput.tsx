@@ -119,8 +119,8 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
         aria-label="פתיחת לוח שנה"
         title="בחירה מלוח שנה"
         className={cx(
-          "absolute left-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-brand-600",
-          open && "bg-slate-100 text-brand-600",
+          "absolute left-1.5 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-md text-ink-400 hover:bg-ink-100 hover:text-link",
+          open && "bg-ink-100 text-link",
         )}
       >
         <CalendarDays className="h-4 w-4" />
@@ -134,20 +134,20 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
             role="dialog"
             aria-label="לוח שנה"
             style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999 }}
-            className="fixed z-[100] w-[272px] rounded-xl bg-white p-3 text-sm shadow-xl ring-1 ring-slate-200"
+            className="fixed z-[100] w-[272px] rounded-xl bg-surface p-3 text-sm shadow-xl ring-1 ring-ink-200"
           >
             <div className="mb-2 flex items-center justify-between">
-              <button type="button" onClick={() => shift(-1)} aria-label="החודש הקודם" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100">
+              <button type="button" onClick={() => shift(-1)} aria-label="החודש הקודם" className="grid h-7 w-7 place-items-center rounded-md text-ink-500 hover:bg-ink-100">
                 <ChevronRight className="h-4 w-4" />
               </button>
-              <span className="font-semibold text-slate-900">{MONTH_FMT.format(view)}</span>
-              <button type="button" onClick={() => shift(1)} aria-label="החודש הבא" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100">
+              <span className="font-semibold text-ink-900">{MONTH_FMT.format(view)}</span>
+              <button type="button" onClick={() => shift(1)} aria-label="החודש הבא" className="grid h-7 w-7 place-items-center rounded-md text-ink-500 hover:bg-ink-100">
                 <ChevronLeft className="h-4 w-4" />
               </button>
             </div>
             <div className="grid grid-cols-7 gap-0.5 text-center">
               {WEEKDAYS.map((w) => (
-                <span key={w} className="py-1 text-[11px] font-medium text-slate-400">
+                <span key={w} className="py-1 text-xs font-medium text-ink-400">
                   {w}
                 </span>
               ))}
@@ -162,8 +162,8 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
                       sameDay(selected, d)
                         ? "bg-brand-600 font-semibold text-white"
                         : sameDay(today, d)
-                          ? "font-semibold text-brand-600 ring-1 ring-inset ring-brand-300 hover:bg-slate-100"
-                          : "text-slate-700 hover:bg-slate-100",
+                          ? "font-semibold text-link ring-1 ring-inset ring-brand-300 hover:bg-ink-100"
+                          : "text-ink-700 hover:bg-ink-100",
                     )}
                   >
                     {d.getDate()}
@@ -173,8 +173,8 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
                 ),
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
-              <button type="button" onClick={() => pick(new Date())} className="rounded-md px-2 py-1 font-medium text-brand-600 hover:bg-slate-100">
+            <div className="mt-2 flex items-center justify-between border-t border-ink-100 pt-2 text-xs">
+              <button type="button" onClick={() => pick(new Date())} className="rounded-md px-2 py-1 font-medium text-link hover:bg-ink-100">
                 היום
               </button>
               {value && (
@@ -184,7 +184,7 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
                     onChange("");
                     setOpen(false);
                   }}
-                  className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                  className="rounded-md px-2 py-1 text-ink-500 hover:bg-ink-100"
                 >
                   ניקוי
                 </button>

@@ -4,8 +4,9 @@ import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
 import { cx, FREQUENCY_LABEL, hasArabic, localizedButtons, NAME_LANGUAGE_ERROR, renderTemplate, splitUserName, templateName, VAT_DEADLINE_DAY } from "../lib/format";
 import type { Client, ClientInput, ReportingFrequency, Template, TemplateButton } from "../lib/types";
+import { PageHeader } from "../components/PageHeader";
 import { WaBubble } from "../components/WaBubble";
-import { Button, Card, Empty, Field, inputClass, Ltr, Modal } from "../components/ui";
+import { Button, Card, Empty, Field, inputClass, Ltr, Modal, TabButton } from "../components/ui";
 
 const NINE_DIGITS = /^\d{9}$/;
 
@@ -159,7 +160,7 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
         <Button type="button" variant="ghost" onClick={onCancel}>
           ביטול
         </Button>
-        <Button type="submit" variant="primary" loading={saving} icon={<Save className="h-4 w-4" />}>
+        <Button type="submit" variant="accent" loading={saving} icon={<Save className="h-4 w-4" />}>
           {initial ? "שמירת שינויים" : "הוספת לקוח"}
         </Button>
       </div>
@@ -167,10 +168,9 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
   );
 }
 
-function ClientsPanel() {
+function ClientsPanel({ editing, setEditing }: { editing: Client | "new" | null; setEditing: (c: Client | "new" | null) => void }) {
   const { clients, refreshClients, toast, selectClient, isManager } = useApp();
   const [q, setQ] = useState("");
-  const [editing, setEditing] = useState<Client | "new" | null>(null);
   const [confirming, setConfirming] = useState<Client | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
@@ -195,86 +195,73 @@ function ClientsPanel() {
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 p-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-ink-300 p-3">
         <div className="relative w-full @xl:w-72">
-          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="חיפוש לקוחות…" className={cx(inputClass, "py-1.5 ps-9")} dir="auto" />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+        <label className="flex items-center gap-1.5 text-xs text-ink-600">
           <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> הצגת לקוחות לא פעילים
         </label>
-        {isManager && (
-          <div className="ms-auto">
-            <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>
-              הוספת לקוח
-            </Button>
-          </div>
-        )}
       </div>
       {list.length === 0 ? (
         <Empty icon={<Users className="h-10 w-10" />} title="אין לקוחות" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="data-table">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500">
+              <tr className="data-head">
                 <th className="px-4 py-2.5 text-start">לקוח</th>
+                <th className="hidden px-3 py-2.5 text-start @5xl:table-cell">עסק</th>
                 <th className="px-3 py-2.5 text-start">ח.פ / ע.מ</th>
                 <th className="px-3 py-2.5 text-start">וואטסאפ</th>
-                <th className="px-3 py-2.5 text-start">תדירות דיווח</th>
+                <th className="hidden px-3 py-2.5 text-start @5xl:table-cell">תדירות דיווח</th>
                 <th className="px-3 py-2.5 text-start">מועד הדיווח הבא</th>
-                <th className="px-3 py-2.5 text-start">עובד/ת אחראי/ת</th>
+                <th className="whitespace-nowrap px-3 py-2.5 text-start">עובד/ת אחראי/ת</th>
                 <th className="px-3 py-2.5 text-start">פתוחות</th>
                 {isManager && <th className="px-3 py-2.5 text-start">פעולות</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-ink-200">
               {list.map((c) => (
-                <tr key={c.id} className={cx("hover:bg-slate-50", !c.is_active && "opacity-50")}>
-                  <td className="px-4 py-2.5">
-                    <button className="text-start" onClick={() => selectClient(c.id, true)} title="פתיחת שיחת הוואטסאפ">
-                      <p dir="auto" className="font-medium text-slate-900">
-                        {c.full_name}
-                      </p>
-                      <p dir="auto" className="text-xs text-slate-500">
-                        {c.company_name}
-                      </p>
+                <tr key={c.id} className={cx("hover:bg-ink-50", !c.is_active && "opacity-50")}>
+                  <td className="max-w-[180px] px-4 py-2.5">
+                    <button dir="auto" className="block max-w-full truncate text-start font-bold text-ink-900" onClick={() => selectClient(c.id, true)} title={`${c.company_name} · פתיחת שיחת הוואטסאפ`}>
+                      {c.full_name}
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs">
+                  <td dir="auto" className="hidden max-w-[180px] truncate px-3 py-2.5 text-ink-600 @5xl:table-cell" title={c.company_name}>
+                    {c.company_name}
+                  </td>
+                  <td className="px-3 py-2.5">
                     <Ltr>{c.tax_id || "—"}</Ltr>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs">
+                  <td className="px-3 py-2.5">
                     <Ltr>{c.whatsapp_phone}</Ltr>
                   </td>
-                  <td className="px-3 py-2.5 text-xs">
-                    <span
-                      className={cx(
-                        "rounded-full px-2 py-0.5 font-medium",
-                        c.reporting_frequency === "MONTHLY" ? "bg-sky-50 text-sky-800" : "bg-violet-50 text-violet-800",
-                      )}
-                    >
-                      {FREQUENCY_LABEL[c.reporting_frequency]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs">
+                  <td className="hidden whitespace-nowrap px-3 py-2.5 @5xl:table-cell">{FREQUENCY_LABEL[c.reporting_frequency]}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5">
                     <Ltr>{c.next_deadline}</Ltr> ·{" "}
-                    <span className={cx(c.days_to_deadline <= 3 ? "font-semibold text-red-600" : "text-slate-500")}>
+                    <span className={cx(c.days_to_deadline <= 3 ? "font-semibold text-red-600" : "text-ink-500")}>
                       עוד <Ltr>{c.days_to_deadline}</Ltr> ימים
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600">{c.assigned_worker_name ? splitUserName(c.assigned_worker_name).name : "—"}</td>
-                  <td className="px-3 py-2.5 text-xs">{c.open_ticket_count}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-ink-600">{c.assigned_worker_name ? splitUserName(c.assigned_worker_name).name : "—"}</td>
+                  <td className="px-3 py-2.5">{c.open_ticket_count}</td>
                   {isManager && (
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <span className="flex gap-1">
-                        <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(c)}>
-                          עריכה
-                        </Button>
+                        <Button size="sm" variant="ghost" className="w-8 !px-0" title="עריכה" aria-label="עריכה" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(c)} />
                         {c.is_active && (
-                          <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" icon={<UserX className="h-3.5 w-3.5" />} onClick={() => setConfirming(c)}>
-                            מחיקת / השבתת לקוח
-                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-8 !px-0 hover:bg-red-50 hover:text-red-700"
+                            title="מחיקת / השבתת לקוח"
+                            aria-label="מחיקת / השבתת לקוח"
+                            icon={<UserX className="h-3.5 w-3.5" />}
+                            onClick={() => setConfirming(c)}
+                          />
                         )}
                       </span>
                     </td>
@@ -301,7 +288,7 @@ function ClientsPanel() {
       <Modal open={confirming !== null} onClose={() => setConfirming(null)} title="השבתת לקוח">
         {confirming && (
           <div className="space-y-4 p-6">
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-ink-700">
               להשבית את <b dir="auto">{confirming.full_name}</b> ({confirming.company_name})? כל הפניות הפתוחות שלו ייסגרו והבוט יפסיק לשלוח לו תזכורות.
               היסטוריית ההודעות נשמרת, וניתן להפעיל את הלקוח מחדש בעריכה.
             </p>
@@ -348,11 +335,11 @@ function TemplateEditor({ template }: { template: Template }) {
   };
 
   return (
-    <Card className="min-w-0">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-3">
+    <Card className="min-w-0 p-4">
+      <div className="flex flex-wrap items-center gap-2 border-b border-ink-300 pb-2">
         <div className="min-w-0">
-          <p className="font-semibold text-slate-900">{templateName(template)}</p>
-          <p className="font-mono text-[11px] text-slate-400">
+          <p className="font-display text-lg leading-tight text-ink-900">{templateName(template)}</p>
+          <p className="tabular-nums text-xs text-ink-400">
             <Ltr>{template.slug}</Ltr>
             {template.requires_media_reply ? " · נסגר לאחר אימות Vision AI" : " · נסגר בלחיצת כפתור"}
           </p>
@@ -363,19 +350,19 @@ function TemplateEditor({ template }: { template: Template }) {
             <Button variant="ghost" size="sm" disabled={!dirty} onClick={() => setDraft(template)}>
               ביטול שינויים
             </Button>
-            <Button variant="primary" size="sm" disabled={!dirty} loading={saving} icon={<Save className="h-3.5 w-3.5" />} onClick={save}>
+            <Button variant="accent" size="sm" disabled={!dirty} loading={saving} icon={<Save className="h-3.5 w-3.5" />} onClick={save}>
               שמירה
             </Button>
           </div>
         )}
       </div>
-      <div className="flex flex-wrap gap-1 px-4 pt-3">
-        <span className="text-[11px] text-slate-500">משתנים:</span>
+      <div className="flex flex-wrap gap-1 pt-3">
+        <span className="text-xs text-ink-500">משתנים:</span>
         {template.variables.map((v) => (
-          <code key={v} dir="ltr" className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">{`{{${v}}}`}</code>
+          <code key={v} dir="ltr" className="rounded bg-ink-100 px-1.5 py-0.5 text-xs text-ink-700">{`{{${v}}}`}</code>
         ))}
       </div>
-      <div className={cx("grid gap-4 p-4", isManager && "@5xl:grid-cols-[minmax(0,1fr)_340px]")}>
+      <div className={cx("grid gap-4 pt-4", isManager && "@5xl:grid-cols-[minmax(0,1fr)_340px]")}>
         {isManager && (
         <div className="min-w-0 space-y-2" dir="rtl">
           <Field label="שם התבנית">
@@ -392,11 +379,11 @@ function TemplateEditor({ template }: { template: Template }) {
               rows={9}
               value={draft.body_he}
               onChange={(e) => setDraft((d) => ({ ...d, body_he: e.target.value }))}
-              className={cx(inputClass, "font-sans text-[13px] leading-relaxed")}
+              className={cx(inputClass, "font-sans text-sm leading-relaxed")}
             />
           </Field>
           <div>
-            <span className="mb-1 block text-xs font-medium text-slate-600">כפתורי תגובה מהירה</span>
+            <span className="mb-1 block text-xs font-medium text-ink-600">כפתורי תגובה מהירה</span>
             <div className="space-y-1">
               {draft.buttons_json.map((b, i) => (
                 <input
@@ -413,7 +400,7 @@ function TemplateEditor({ template }: { template: Template }) {
         </div>
         )}
         <div className={cx(!isManager && "max-w-md")}>
-          <span className="mb-1 block text-xs font-medium text-slate-600">{isManager ? "תצוגה מקדימה" : "נוסח ההודעה בוואטסאפ"}</span>
+          <span className="mb-1 block text-xs font-medium text-ink-600">{isManager ? "תצוגה מקדימה" : "נוסח ההודעה בוואטסאפ"}</span>
           <div className="rounded-lg bg-wa-wall p-3" dir="rtl">
             <WaBubble text={renderTemplate(draft.body_he, SAMPLE_VARS)} fromFirm compact buttons={localizedButtons(draft)} type="TEMPLATE" />
           </div>
@@ -430,20 +417,20 @@ function TemplatesPanel() {
   return (
     <div className="space-y-4">
       <div className="grid gap-5 @3xl:grid-cols-[260px_minmax(0,1fr)]">
-        <Card className="h-fit p-2">
+        <div className="h-fit divide-y divide-ink-200 border border-ink-300 bg-surface">
           {templates.map((t) => (
             <button
               key={t.id}
               onClick={() => setActiveId(t.id)}
-              className={cx("flex w-full items-start gap-2 rounded-lg px-3 py-2 text-start transition", active?.id === t.id ? "bg-brand-50 ring-1 ring-brand-500" : "hover:bg-slate-50")}
+              className={cx("flex w-full items-start gap-2 px-3 py-2.5 text-start transition-colors", active?.id === t.id ? "bg-brand-600 text-white" : "hover:bg-ink-100")}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-900">{t.name_he}</p>
+                <p className="truncate text-sm font-semibold">{t.name_he}</p>
               </div>
-              {t.is_system && <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-label="תבנית מערכת של Vision AI" />}
+              {t.is_system && <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" aria-label="תבנית מערכת של Vision AI" />}
             </button>
           ))}
-        </Card>
+        </div>
         {active && <TemplateEditor template={active} />}
       </div>
     </div>
@@ -451,24 +438,34 @@ function TemplatesPanel() {
 }
 
 export function ClientsTemplates() {
+  const { isManager } = useApp();
   const [tab, setTab] = useState<"clients" | "templates">("clients");
+  const [editing, setEditing] = useState<Client | "new" | null>(null);
   const TABS = { clients: "לקוחות", templates: "תבניות הודעה" } as const;
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-4 @3xl:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">לקוחות ותבניות הודעה</h1>
-          <p className="text-sm text-slate-500">פרטי הלקוח קובעים את תדירות הדיווח והעובד האחראי. כל ההודעות ללקוחות נשלחות בוואטסאפ בעברית.</p>
-        </div>
-        <div className="flex rounded-lg bg-slate-200/70 p-1">
+    <>
+      <PageHeader
+        title="לקוחות ותבניות הודעה"
+        hint="פרטי הלקוח קובעים את תדירות הדיווח והעובד האחראי. כל ההודעות ללקוחות נשלחות בוואטסאפ בעברית."
+        actions={
+          isManager &&
+          tab === "clients" && (
+            <Button variant="accent" icon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>
+              הוספת לקוח
+            </Button>
+          )
+        }
+      />
+      <div className="mx-auto max-w-7xl space-y-4 p-4 @3xl:p-6">
+        <div className="flex gap-1">
           {(["clients", "templates"] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={cx("rounded-md px-3 py-1.5 text-sm font-medium", tab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}>
+            <TabButton key={t} active={tab === t} onClick={() => setTab(t)}>
               {TABS[t]}
-            </button>
+            </TabButton>
           ))}
         </div>
-      </header>
-      {tab === "clients" ? <ClientsPanel /> : <TemplatesPanel />}
-    </div>
+        {tab === "clients" ? <ClientsPanel editing={editing} setEditing={setEditing} /> : <TemplatesPanel />}
+      </div>
+    </>
   );
 }

@@ -19,12 +19,12 @@ function Ticks({ status, note }: { status: DeliveryStatus; note?: string | null 
     );
   if (status === "SKIPPED")
     return (
-      <span className="flex items-center gap-0.5 font-semibold text-slate-400" title={note ?? undefined}>
+      <span className="flex items-center gap-0.5 font-semibold text-ink-400" title={note ?? undefined}>
         <Ban className="h-3 w-3" /> לא נשלחה
       </span>
     );
-  if (status === "SENT") return <Check className="h-3.5 w-3.5 text-slate-400" />;
-  return <CheckCheck className={cx("h-3.5 w-3.5", status === "READ" ? "text-sky-500" : "text-slate-400")} />;
+  if (status === "SENT") return <Check className="h-3.5 w-3.5 text-ink-400" />;
+  return <CheckCheck className={cx("h-3.5 w-3.5", status === "READ" ? "text-link" : "text-ink-400")} />;
 }
 
 /** The header every firm message carries on the customer's phone: automated, or written by a named worker. */
@@ -32,7 +32,7 @@ function SenderHeader({ automated, senderName, type }: { automated: boolean; sen
   if (!automated) {
     return (
       <div className="mb-1 flex items-center">
-        <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-200">
+        <span className="inline-flex max-w-full items-center gap-1 rounded-[6px] bg-emerald-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-emerald-800 ring-1 ring-inset ring-emerald-200">
           <UserRound className="h-3 w-3 shrink-0" />
           <span className="truncate">הודעה מאת {senderName || "עובד/ת המשרד"}</span>
         </span>
@@ -42,11 +42,11 @@ function SenderHeader({ automated, senderName, type }: { automated: boolean; sen
   const kind = type ? AUTOMATED_KIND[type] : undefined;
   return (
     <div className="mb-1 flex items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+      <span className="inline-flex items-center gap-1 rounded-[6px] bg-black/5 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-700 ring-1 ring-inset ring-black/10">
         <Bot className="h-3 w-3 shrink-0" />
         הודעה אוטומטית
       </span>
-      {kind && <span className="text-[10px] font-medium text-slate-400">{kind}</span>}
+      {kind && <span className="text-[10px] font-medium text-ink-400">{kind}</span>}
     </div>
   );
 }
@@ -101,17 +101,17 @@ export function WaBubble({
     <div className={cx("flex w-full flex-col", fromFirm ? "items-start" : "items-end")}>
       <div
         className={cx(
-          "relative max-w-[86%] rounded-lg px-2.5 pb-1.5 pt-1.5 text-[13.5px] leading-snug text-slate-900 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]",
-          fromFirm ? "rounded-ss-none bg-white" : "rounded-se-none bg-wa-bubble",
+          "relative max-w-[86%] rounded-[8px] px-2.5 pb-1.5 pt-1.5 text-[13.5px] leading-snug text-ink-900 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]",
+          fromFirm ? "rounded-ss-none bg-wa-card" : "rounded-se-none bg-wa-bubble",
           compact && "max-w-full",
           delivery === "SKIPPED" && "opacity-60",
         )}
       >
         {fromFirm && <SenderHeader automated={automated} senderName={senderName} type={type} />}
         {src && (
-          <a href={src} target="_blank" rel="noreferrer" className="mb-1 block overflow-hidden rounded-md bg-slate-100">
+          <a href={src} target="_blank" rel="noreferrer" className="mb-1 block overflow-hidden rounded-[6px] bg-ink-100">
             {isPdf ? (
-              <span className="flex items-center gap-2 p-3 text-xs text-slate-700">
+              <span className="flex items-center gap-2 p-3 text-xs text-ink-700">
                 <FileText className="h-4 w-4" /> מסמך PDF
               </span>
             ) : (
@@ -119,13 +119,13 @@ export function WaBubble({
             )}
           </a>
         )}
-        {isButtonReply && <CornerUpLeft className="me-1 inline h-3 w-3 text-slate-500" />}
+        {isButtonReply && <CornerUpLeft className="me-1 inline h-3 w-3 text-ink-500" />}
         {text && (
           <span dir="auto" className="whitespace-pre-wrap break-words [unicode-bidi:plaintext]">
             {text}
           </span>
         )}
-        <span className="float-end ms-2 mt-1.5 flex translate-y-0.5 items-center gap-0.5 text-[10px] text-slate-500" dir="ltr">
+        <span className="float-end ms-2 mt-1.5 flex translate-y-0.5 items-center gap-0.5 text-[10px] text-ink-500" dir="ltr">
           {createdAt && clockTime(createdAt)}
           {fromFirm && held ? (
             <span className="flex items-center gap-0.5 font-semibold text-amber-600" title="חלון 24 השעות של WhatsApp סגור: ההודעה תישלח כשהלקוח יגיב">
@@ -146,8 +146,8 @@ export function WaBubble({
               onClick={() => onButton?.(b)}
               dir="auto"
               className={cx(
-                "rounded-lg bg-white px-3 py-1.5 text-center text-[13px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] transition",
-                buttonsDisabled || !onButton ? "cursor-default text-slate-400" : "text-wa-link hover:bg-slate-50 active:scale-[0.99]",
+                "rounded-[8px] bg-wa-card px-3 py-1.5 text-center text-[13px] font-medium shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] transition",
+                buttonsDisabled || !onButton ? "cursor-default text-ink-400" : "text-wa-link hover:bg-ink-50 active:scale-[0.99]",
               )}
             >
               {b.title}

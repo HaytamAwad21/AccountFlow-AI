@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BellRing, Building2, Cpu, Landmark, Pencil, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Pencil, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
 import { cx, formatNumber, fullDateTime, splitUserName, VAT_DEADLINE_DAY } from "../lib/format";
 import type { EditableSettings, User } from "../lib/types";
 import { EditWorkerModal } from "../components/EditWorkerModal";
 import { AddWorkerModal } from "../components/AddWorkerModal";
+import { PageHeader } from "../components/PageHeader";
 import { Button, Card, Field, inputClass, RoleBadge, Toggle } from "../components/ui";
 
 type NumericKey = "vat_rate" | "allocation_number_threshold_nis" | "reminder_interval_hours" | "max_reminders";
@@ -21,7 +22,7 @@ const LIMITS: Record<NumericKey, { min: number; max: number; step: number; label
  *  so digits, separators, "%" and "₪" never reorder the surrounding RTL text. */
 function Num({ value, prefix = "", suffix = "", className }: { value: number; prefix?: string; suffix?: string; className?: string }) {
   return (
-    <span dir="ltr" className={cx("inline-block font-semibold tabular-nums text-slate-900", className)}>
+    <span dir="ltr" className={cx("inline-block font-semibold tabular-nums text-ink-900", className)}>
       {prefix}
       {formatNumber(value)}
       {suffix}
@@ -29,15 +30,12 @@ function Num({ value, prefix = "", suffix = "", className }: { value: number; pr
   );
 }
 
-function Section({ icon, title, hint, children }: { icon: ReactNode; title: string; hint: string; children: ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (
     <Card className="p-5">
-      <div className="mb-4 flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600">{icon}</span>
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <p className="text-xs text-slate-500">{hint}</p>
-        </div>
+      <div className="mb-4">
+        <h2 className="font-display text-lg leading-tight text-ink-900">{title}</h2>
+        <p className="mt-0.5 text-xs text-ink-500">{hint}</p>
       </div>
       {children}
     </Card>
@@ -69,10 +67,10 @@ function NumberInput({
         onChange={(e) => onChange(e.target.value === "" ? NaN : Number(e.target.value))}
         disabled={disabled}
         readOnly={disabled}
-        className={cx(inputClass, "pl-14 pr-3 text-right tabular-nums", disabled && "cursor-not-allowed bg-slate-50 text-slate-600")}
+        className={cx(inputClass, "pl-14 pr-3 text-right tabular-nums", disabled && "cursor-not-allowed bg-ink-50 text-ink-600")}
       />
       {/* physical sides: the LTR number sits on the right, the unit on the left — never overlapping */}
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">{suffix}</span>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">{suffix}</span>
     </div>
   );
 }
@@ -117,7 +115,7 @@ export function Settings() {
   // no team management. Managers edit everything.
   const readOnly = !isManager;
   if (!settings || !draft) {
-    return <div className="p-6 text-sm text-slate-500">טוען הגדרות…</div>;
+    return <div className="p-6 text-sm text-ink-500">טוען הגדרות…</div>;
   }
 
   const set = <K extends keyof EditableSettings>(k: K, v: EditableSettings[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
@@ -154,52 +152,53 @@ export function Settings() {
   const exampleTotal = exampleThreshold * (1 + exampleRate / 100);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 @3xl:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">הגדרות המשרד</h1>
-          <p className="text-sm text-slate-500">
-            {readOnly
-              ? "הכללים שהמשרד מפעיל כרגע על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ. רק מנהל/ת המשרד יכול/ה לשנות אותם."
-              : "הערכים כאן משפיעים מיידית על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ."}
-            {settings.updated_by_name && (
-              <span className="ms-1 text-slate-400">
-                עודכן לאחרונה ע״י {splitUserName(settings.updated_by_name).name} · {fullDateTime(settings.updated_at)}
-              </span>
-            )}
-          </p>
-        </div>
-        {!readOnly && (
-          <div className="flex items-center gap-2">
-            {dirty && <span className="text-xs text-amber-600">יש שינויים שלא נשמרו</span>}
-            <Button
-              variant="ghost"
-              disabled={!dirty}
-              onClick={() =>
-                setDraft({
-                  firm_name: settings.firm_name,
-                  vat_rate: settings.vat_rate,
-                  allocation_number_threshold_nis: settings.allocation_number_threshold_nis,
-                  reminder_interval_hours: settings.reminder_interval_hours,
-                  max_reminders: settings.max_reminders,
-                  auto_approve_verified: settings.auto_approve_verified,
-                })
-              }
-            >
-              ביטול שינויים
-            </Button>
-            <Button variant="primary" icon={<Save className="h-4 w-4" />} loading={saving} disabled={!dirty || invalid.length > 0} onClick={save}>
-              שמירת הגדרות
-            </Button>
-          </div>
-        )}
-      </header>
+    <>
+      <PageHeader
+        title="הגדרות המשרד"
+        hint={
+          readOnly
+            ? "הכללים שהמשרד מפעיל כרגע על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ. רק מנהל/ת המשרד יכול/ה לשנות אותם."
+            : "הערכים כאן משפיעים מיידית על בדיקות Vision AI, על קצב התזכורות של הבוט ועל ההודעות בוואטסאפ."
+        }
+        actions={
+          !readOnly && (
+            <>
+              <Button variant="accent" icon={<Save className="h-4 w-4" />} loading={saving} disabled={!dirty || invalid.length > 0} onClick={save}>
+                שמירת הגדרות
+              </Button>
+              <Button
+                variant="fieldGhost"
+                disabled={!dirty}
+                onClick={() =>
+                  setDraft({
+                    firm_name: settings.firm_name,
+                    vat_rate: settings.vat_rate,
+                    allocation_number_threshold_nis: settings.allocation_number_threshold_nis,
+                    reminder_interval_hours: settings.reminder_interval_hours,
+                    max_reminders: settings.max_reminders,
+                    auto_approve_verified: settings.auto_approve_verified,
+                  })
+                }
+              >
+                ביטול שינויים
+              </Button>
+              {dirty && <span className="text-sm font-semibold text-white">יש שינויים שלא נשמרו</span>}
+            </>
+          )
+        }
+      />
+    <div className="mx-auto max-w-5xl space-y-6 p-4 @3xl:p-6">
+      {settings.updated_by_name && (
+        <p className="text-xs text-ink-500">
+          עודכן לאחרונה ע״י {splitUserName(settings.updated_by_name).name} · {fullDateTime(settings.updated_at)}
+        </p>
+      )}
 
       {!readOnly && invalid.length > 0 && (
         <p className="rounded-lg bg-red-50 px-4 py-2 text-xs text-red-700">ערכים לא תקינים: {invalid.join(" · ")}</p>
       )}
 
-      <Section icon={<Landmark className="h-5 w-5" />} title="הגדרות מס ורגולציה" hint="כללי רשות המסים שהבוט ו-Vision AI אוכפים על כל חשבונית">
+      <Section title="הגדרות מס ורגולציה" hint="כללי רשות המסים שהבוט ו-Vision AI אוכפים על כל חשבונית">
         <div className="grid gap-4 @2xl:grid-cols-3">
           <Field label="שיעור מע״מ נוכחי (%)" hint="משמש לבדיקת התאמת המע״מ בכל חשבונית ובתצוגות המס">
             <NumberInput value={draft.vat_rate} onChange={(v) => set("vat_rate", v)} suffix="%" limits={LIMITS.vat_rate} disabled={readOnly} />
@@ -214,27 +213,27 @@ export function Settings() {
             />
           </Field>
           <div>
-            <span className="mb-1 block text-xs font-medium text-slate-600">מועד דיווח מע״מ</span>
-            <div className="flex h-9 items-center gap-2 rounded-lg bg-slate-100 px-3 text-sm text-slate-700 ring-1 ring-inset ring-slate-200">
+            <span className="mb-1 block text-xs font-bold text-ink-700">מועד דיווח מע״מ</span>
+            <div className="flex h-[38px] items-center gap-2 bg-ink-100 px-3 text-sm text-ink-700">
               ה-<Num value={settings.vat_deadline_day ?? VAT_DEADLINE_DAY} /> בכל חודש דיווח
             </div>
-            <span className="mt-1 block text-[11px] text-slate-400">קבוע לפי חוק; לקוחות דו חודשיים מדווחים בחודשים האי-זוגיים</span>
+            <span className="mt-1 block text-xs text-ink-400">קבוע לפי חוק; לקוחות דו חודשיים מדווחים בחודשים האי-זוגיים</span>
           </div>
         </div>
-        <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
-          <p className="mb-1 font-semibold text-slate-700">דוגמה חיה לפי הערכים הנוכחיים</p>
+        <div className="mt-4 bg-ink-100 px-4 py-3 text-sm leading-relaxed text-ink-700">
+          <p className="mb-1 font-bold text-ink-900">דוגמה חיה לפי הערכים הנוכחיים</p>
           <p>
             חשבונית בסך <Num value={exampleThreshold} prefix="₪" /> לפני מע״מ (סף ההקצאה) · מע״מ <Num value={exampleRate} suffix="%" /> בסך{" "}
             <Num value={exampleVat} prefix="₪" /> · סה״כ כולל מע״מ <Num value={exampleTotal} prefix="₪" />
           </p>
           <p className="mt-1">
-            מחשבונית זו ומעלה (לפני מע״מ) נדרש <span className="font-semibold text-amber-700">מספר הקצאה</span> בן <Num value={9} /> ספרות; מתחת לסף —
-            <span className="font-semibold text-emerald-700"> מספר הקצאה אינו נדרש</span>.
+            מחשבונית זו ומעלה (לפני מע״מ) נדרש <span className="font-semibold text-ink-900">מספר הקצאה</span> בן <Num value={9} /> ספרות; מתחת לסף —
+            <span className="font-semibold text-ink-900"> מספר הקצאה אינו נדרש</span>.
           </p>
         </div>
       </Section>
 
-      <Section icon={<BellRing className="h-5 w-5" />} title="הגדרות בוט ותזכורות" hint="קצב המעקב האוטומטי אחרי לקוחות שלא השיבו">
+      <Section title="הגדרות בוט ותזכורות" hint="קצב המעקב האוטומטי אחרי לקוחות שלא השיבו">
         <div className="grid gap-4 @xl:grid-cols-2">
           <Field label="מרווח זמן בין תזכורות אוטומטיות (שעות)" hint="חל על פניות חדשות ועל התזכורת הבאה בפניות פתוחות">
             <NumberInput value={draft.reminder_interval_hours} onChange={(v) => set("reminder_interval_hours", v)} suffix="שעות" limits={LIMITS.reminder_interval_hours} disabled={readOnly} />
@@ -254,7 +253,6 @@ export function Settings() {
       </Section>
 
       <Section
-        icon={<Building2 className="h-5 w-5" />}
         title={readOnly ? "פרטי המשרד" : "פרטי המשרד וניהול צוות"}
         hint="שם המשרד מוצג ללקוחות בכותרת הוואטסאפ ובכל הודעה"
       >
@@ -265,7 +263,7 @@ export function Settings() {
               onChange={(e) => set("firm_name", e.target.value)}
               disabled={readOnly}
               readOnly={readOnly}
-              className={cx(inputClass, readOnly && "cursor-not-allowed bg-slate-50 text-slate-600")}
+              className={cx(inputClass, readOnly && "cursor-not-allowed bg-ink-50 text-ink-600")}
               dir="auto"
             />
           </Field>
@@ -273,13 +271,13 @@ export function Settings() {
 
         {isManager && (
         <div className="mt-6">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <h3 className="mb-2 flex items-center gap-2 font-bold text-ink-900">
             <Users className="h-4 w-4" /> עובדי המשרד
           </h3>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto border border-ink-300">
+            <table className="data-table">
               <thead>
-                <tr className="bg-slate-50 text-[11px] font-semibold text-slate-500">
+                <tr className="data-head">
                   <th className="px-3 py-2 text-start">עובד/ת</th>
                   <th className="px-3 py-2 text-start">אימייל</th>
                   <th className="px-3 py-2 text-start">תפקיד</th>
@@ -287,29 +285,27 @@ export function Settings() {
                   <th className="px-3 py-2 text-start">פעולות</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-ink-200">
                 {users.map((u) => (
                   <tr key={u.id} className={cx(!u.is_active && "opacity-50")}>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{u.avatar_initials}</span>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-slate-900">{splitUserName(u.full_name).name}</p>
-                          <p className="truncate text-[11px] text-slate-500">
-                            {u.job_title || splitUserName(u.full_name).title}
-                            {u.id === user?.id && <span className="ms-1 font-semibold text-brand-600">(את/ה)</span>}
-                          </p>
-                        </div>
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">{u.avatar_initials}</span>
+                        <span className="whitespace-nowrap">
+                          <b className="text-ink-900">{splitUserName(u.full_name).name}</b>
+                          <span className="ms-2 text-ink-600">{u.job_title || splitUserName(u.full_name).title}</span>
+                          {u.id === user?.id && <span className="ms-1 font-semibold text-link">(את/ה)</span>}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs text-slate-600" dir="ltr">
+                    <td className="px-3 py-2 text-ink-600" dir="ltr">
                       <span className="block text-end">{u.email}</span>
                     </td>
                     <td className="px-3 py-2">
                       <RoleBadge role={u.role} />
                     </td>
-                    <td className="px-3 py-2 text-xs">
-                      <span className={cx("font-medium", u.is_active ? "text-emerald-700" : "text-red-600")}>{u.is_active ? "פעיל" : "הושעה"}</span>
+                    <td className="px-3 py-2">
+                      <span className={cx("font-semibold", u.is_active ? "text-ink-900" : "text-red-600")}>{u.is_active ? "פעיל" : "הושעה"}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2">
                       <Button size="sm" variant="secondary" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditingWorker(u)}>
@@ -322,26 +318,26 @@ export function Settings() {
             </table>
           </div>
 
-          <Button variant="primary" className="mt-3" icon={<UserPlus className="h-4 w-4" />} onClick={() => setAddingWorker(true)}>
+          <Button variant="secondary" className="mt-3" icon={<UserPlus className="h-4 w-4" />} onClick={() => setAddingWorker(true)}>
             הוספת עובד/ת
           </Button>
         </div>
         )}
       </Section>
 
-      <Section icon={<Cpu className="h-5 w-5" />} title="מצב המערכת" hint="מידע לקריאה בלבד">
+      <Section title="מצב המערכת" hint="מידע לקריאה בלבד">
         <dl className="grid gap-3 text-sm @xl:grid-cols-3">
           <div>
-            <dt className="text-xs text-slate-500">מנוע Vision AI</dt>
-            <dd className="font-medium text-slate-900">{settings.vision_provider === "local" ? "סימולטור לא מקוון" : settings.vision_provider}</dd>
+            <dt className="text-xs text-ink-500">מנוע Vision AI</dt>
+            <dd className="font-medium text-ink-900">{settings.vision_provider === "local" ? "סימולטור לא מקוון" : settings.vision_provider}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">וואטסאפ</dt>
-            <dd className="font-medium text-slate-900">{settings.whatsapp_live ? "Meta Cloud API + סימולטור" : "סימולטור בלבד"}</dd>
+            <dt className="text-xs text-ink-500">וואטסאפ</dt>
+            <dd className="font-medium text-ink-900">{settings.whatsapp_live ? "Meta Cloud API + סימולטור" : "סימולטור בלבד"}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">מנוע התזכורות</dt>
-            <dd className={cx("flex items-center gap-1 font-medium", settings.scheduler.running ? "text-emerald-700" : "text-amber-700")}>
+            <dt className="text-xs text-ink-500">מנוע התזכורות</dt>
+            <dd className={cx("flex items-center gap-1 font-medium", settings.scheduler.running ? "text-ink-900" : "text-amber-700")}>
               <ShieldCheck className="h-4 w-4" />
               {settings.scheduler.running ? `פעיל · בדיקה כל ${settings.scheduler.interval_seconds} שניות` : "מושהה"}
             </dd>
@@ -355,5 +351,6 @@ export function Settings() {
         </>
       )}
     </div>
+    </>
   );
 }

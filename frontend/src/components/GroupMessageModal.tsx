@@ -106,16 +106,16 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
       onClose={onClose}
       title={
         <span className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-wa-teal" /> הודעה לקבוצת לקוחות
+          <Users className="h-5 w-5 text-link" /> הודעה לקבוצת לקוחות
         </span>
       }
       subtitle={step === "select" ? "שלב 1 מתוך 2 · בוחרים לקוחות" : `שלב 2 מתוך 2 · כותבים הודעה ל-${chosen.length} לקוחות`}
     >
       {step === "select" ? (
         <div className="flex max-h-[70vh] flex-col">
-          <div className="space-y-2 border-b border-slate-200 px-6 py-3">
+          <div className="space-y-2 border-b border-ink-200 px-6 py-3">
             <div className="relative">
-              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
               <input
                 ref={searchRef}
                 value={query}
@@ -125,17 +125,17 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
                 dir="auto"
               />
             </div>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-ink-50 px-3 py-2 text-sm font-medium text-ink-800">
               <input
                 ref={selectAllRef}
                 type="checkbox"
                 checked={allVisibleSelected}
                 onChange={toggleAllVisible}
                 disabled={!visible.length}
-                className="h-4 w-4 rounded border-slate-300 text-wa-teal focus:ring-wa-teal"
+                className="h-4 w-4 rounded border-ink-300 text-wa-teal focus:ring-wa-teal"
               />
               {q ? `בחירת כל תוצאות החיפוש (${visible.length})` : `בחירת כל הלקוחות (${visible.length})`}
-              <span className="ms-auto text-xs font-normal text-slate-500">נבחרו {selected.size}</span>
+              <span className="ms-auto text-xs font-normal text-ink-500">נבחרו {selected.size}</span>
             </label>
           </div>
 
@@ -151,24 +151,24 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
                       <label
                         className={cx(
                           "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition",
-                          on ? "bg-teal-50 ring-1 ring-inset ring-teal-200" : "hover:bg-slate-50",
+                          on ? "bg-brand-50 ring-1 ring-inset ring-brand-200" : "hover:bg-ink-50",
                         )}
                       >
                         <input
                           type="checkbox"
                           checked={on}
                           onChange={() => toggle(c.id)}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-wa-teal focus:ring-wa-teal"
+                          className="h-4 w-4 shrink-0 rounded border-ink-300 text-wa-teal focus:ring-wa-teal"
                         />
                         <div className="min-w-0 flex-1">
-                          <p dir="auto" className="truncate text-sm font-medium text-slate-900">
+                          <p dir="auto" className="truncate text-sm font-medium text-ink-900">
                             {c.full_name}
                           </p>
-                          <p dir="auto" className="truncate text-xs text-slate-500">
+                          <p dir="auto" className="truncate text-xs text-ink-500">
                             {c.company_name}
                           </p>
                         </div>
-                        <span className="shrink-0 text-[11px] text-slate-400">
+                        <span className="shrink-0 text-xs text-ink-400">
                           <Ltr>{c.whatsapp_phone}</Ltr>
                         </span>
                       </label>
@@ -179,8 +179,8 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
-            <span className="text-sm text-slate-600">
+          <div className="flex items-center justify-between gap-3 border-t border-ink-200 px-6 py-3">
+            <span className="text-sm text-ink-600">
               {selected.size ? `נבחרו ${selected.size} לקוחות` : "לא נבחרו לקוחות"}
             </span>
             <div className="flex gap-2">
@@ -189,7 +189,7 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
                   ניקוי הבחירה
                 </Button>
               )}
-              <Button variant="wa" disabled={!selected.size} onClick={goCompose}>
+              <Button variant="accent" disabled={!selected.size} onClick={goCompose}>
                 המשך לכתיבת ההודעה
               </Button>
             </div>
@@ -205,14 +205,14 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
         >
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-600">נמענים ({chosen.length})</span>
-              <button type="button" onClick={() => setStep("select")} className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline">
+              <span className="text-xs font-medium text-ink-600">נמענים ({chosen.length})</span>
+              <button type="button" onClick={() => setStep("select")} className="flex items-center gap-1 text-xs font-medium text-link hover:underline">
                 <ArrowRight className="h-3.5 w-3.5" /> חזרה לבחירת לקוחות
               </button>
             </div>
             <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
               {chosen.map((c) => (
-                <span key={c.id} dir="auto" className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                <span key={c.id} dir="auto" className="rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-700">
                   {c.full_name}
                 </span>
               ))}
@@ -220,7 +220,7 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-600">תוכן ההודעה</span>
+            <span className="mb-1 block text-xs font-medium text-ink-600">תוכן ההודעה</span>
             <textarea
               ref={textRef}
               value={text}
@@ -241,14 +241,14 @@ export function GroupMessageModal({ open, onClose }: { open: boolean; onClose: (
 
           {text.trim() && (
             <div className="rounded-lg bg-wa-wall p-3" dir="rtl">
-              <p className="mb-1.5 text-[11px] text-slate-500">כך תופיע ההודעה אצל כל לקוח:</p>
+              <p className="mb-1.5 text-xs text-ink-500">כך תופיע ההודעה אצל כל לקוח:</p>
               <WaBubble text={text.trim()} fromFirm compact automated={false} senderName={workerName} type="TEXT" />
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
-            <span className="text-[11px] text-slate-400">Ctrl+Enter לשליחה · ללא תזכורות אוטומטיות</span>
-            <Button type="submit" variant="wa" loading={sending} disabled={!text.trim()} icon={<Send className="h-4 w-4 -scale-x-100" />}>
+          <div className="flex items-center justify-between gap-3 border-t border-ink-200 pt-3">
+            <span className="text-xs text-ink-400">Ctrl+Enter לשליחה · ללא תזכורות אוטומטיות</span>
+            <Button type="submit" variant="accent" loading={sending} disabled={!text.trim()} icon={<Send className="h-4 w-4 -scale-x-100" />}>
               שליחה ל-{chosen.length} לקוחות
             </Button>
           </div>
