@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal, get_db
-from models import ChasingTicket, Client, DeliveryStatus, MessageDirection, User, WhatsAppMessageLog
+from models import ChasingTicket, Client, DeliveryStatus, MessageDirection, MessageType, User, WhatsAppMessageLog
 from routers.deps import current_user, get_client_or_404, require_user
 from schemas import DemoReceiptRequest, InboundMessage, InboundResult, ticket_out
 from services.demo_invoices import generate_invoice_image, parse_amount
@@ -28,12 +28,18 @@ from services.ticket_engine import (
     handle_button,
     handle_media,
     handle_text,
+    log_unsolicited,
     save_upload,
 )
 from services.whatsapp import download_cloud_media, normalize_phone, parse_button_payload, verify_webhook_signature
 
 log = logging.getLogger("accountflow.webhook")
 router = APIRouter(prefix="/api", tags=["webhook"])
+
+# What the office sees in the chat for messages the app cannot show.
+PLACEHOLDERS = {"audio": "[הודעה קולית]", "video": "[סרטון]", "sticker": "[מדבקה]", "location": "[מיקום]", "contacts": "[איש קשר]"}
+UNKNOWN_PLACEHOLDER = "[הודעה שלא ניתן להציג]"
+STATUS_RANK = {DeliveryStatus.SENT: 1, DeliveryStatus.DELIVERED: 2, DeliveryStatus.READ: 3}
 
 
 def _resolve_client(db: Session, client_id: int | None, from_phone: str | None) -> Client:
@@ -59,7 +65,7 @@ def _result(out: dict, started: float, action: str | None = None) -> InboundResu
     )
 
 
-def _process_simple(payload: InboundMessage) -> InboundResult:
+def _process_simple(payload: InboundMessage, message_id: str | None = None) -> InboundResult:
     started = time.perf_counter()
     with SessionLocal() as db:
         client = _resolve_client(db, payload.client_id, payload.from_phone)
@@ -70,22 +76,22 @@ def _process_simple(payload: InboundMessage) -> InboundResult:
                 ticket_id = ticket_id or parsed_ticket
             if not button_id:
                 raise HTTPException(422, "חסר מזהה כפתור (button_id)")
-            out = handle_button(db, client, button_id, ticket_id)
+            out = handle_button(db, client, button_id, ticket_id, external_id=message_id)
         else:
             if not (payload.text or "").strip():
                 raise HTTPException(422, "חסר טקסט הודעה")
-            out = handle_text(db, client, payload.text.strip(), payload.ticket_id)
+            out = handle_text(db, client, payload.text.strip(), payload.ticket_id, external_id=message_id)
         db.commit()
         return _result(out, started)
 
 
 def _process_upload(client_id: int | None, from_phone: str | None, ticket_id: int | None,
-                    content: bytes, filename: str, mime: str, caption: str) -> InboundResult:
+                    content: bytes, filename: str, mime: str, caption: str, message_id: str | None = None) -> InboundResult:
     started = time.perf_counter()
     with SessionLocal() as db:
         client = _resolve_client(db, client_id, from_phone)
         path, url, mime = save_upload(content, filename, mime)
-        out = handle_media(db, client, path, url, mime, ticket_id, caption)
+        out = handle_media(db, client, path, url, mime, ticket_id, caption, external_id=message_id)
         db.commit()
         return _result(out, started)
 
@@ -115,26 +121,52 @@ def _apply_status(status: dict) -> None:
         return
     with SessionLocal() as db:
         msg = db.scalar(select(WhatsAppMessageLog).where(WhatsAppMessageLog.external_id == status.get("id")))
-        if msg:
+        # Meta does not guarantee the order of status updates: a late "delivered" must not undo "read".
+        if msg and (new == DeliveryStatus.FAILED or STATUS_RANK[new] > STATUS_RANK.get(msg.delivery_status, 0)):
             msg.delivery_status = new
             queue_event(db, {"type": "message", "client_id": msg.client_id, "ticket_id": msg.ticket_id})
             db.commit()
 
 
+def _already_processed(message_id: str | None) -> bool:
+    """Meta may deliver a message more than once, and repeats a whole batch after a failed response."""
+    if not message_id:
+        return False
+    with SessionLocal() as db:
+        return db.scalar(select(WhatsAppMessageLog.id).where(
+            WhatsAppMessageLog.external_id == message_id, WhatsAppMessageLog.direction == MessageDirection.INBOUND).limit(1)) is not None
+
+
+def _log_placeholder(phone: str, text: str, message_id: str | None) -> None:
+    """A message the app cannot process still reaches the office and counts as the client writing."""
+    with SessionLocal() as db:
+        log_unsolicited(db, _resolve_client(db, None, phone), MessageType.TEXT, text, external_id=message_id)
+        db.commit()
+
+
 def _process_meta_message(m: dict) -> None:
     phone = "+" + m.get("from", "").lstrip("+")
     kind = m.get("type")
+    message_id = m.get("id")
+    if _already_processed(message_id):
+        return
     if kind == "text":
-        _process_simple(InboundMessage(from_phone=phone, type="text", text=m["text"]["body"]))
+        _process_simple(InboundMessage(from_phone=phone, type="text", text=m["text"]["body"]), message_id)
     elif kind == "button":
-        _process_simple(InboundMessage(from_phone=phone, type="button", payload=m["button"].get("payload") or m["button"].get("text")))
+        _process_simple(InboundMessage(from_phone=phone, type="button", payload=m["button"].get("payload") or m["button"].get("text")), message_id)
     elif kind == "interactive":
         reply = m["interactive"].get("button_reply") or m["interactive"].get("list_reply") or {}
-        _process_simple(InboundMessage(from_phone=phone, type="button", payload=reply.get("id")))
+        _process_simple(InboundMessage(from_phone=phone, type="button", payload=reply.get("id")), message_id)
     elif kind in ("image", "document"):
         media = m[kind]
+        filename = media.get("filename") or f"{media['id']}"
         content, mime = download_cloud_media(media["id"])
-        _process_upload(None, phone, None, content, media.get("filename") or f"{media['id']}", mime, media.get("caption", ""))
+        try:
+            _process_upload(None, phone, None, content, filename, mime, media.get("caption", ""), message_id)
+        except EngineError:
+            _log_placeholder(phone, f"[קובץ שלא ניתן לפתוח: {filename}]", message_id)
+    elif kind != "reaction":
+        _log_placeholder(phone, PLACEHOLDERS.get(kind, UNKNOWN_PLACEHOLDER), message_id)
 
 
 @router.get("/webhook/whatsapp-inbound", response_class=PlainTextResponse)

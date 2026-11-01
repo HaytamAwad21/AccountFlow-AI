@@ -84,6 +84,9 @@ AWAITING_CLIENT_STATUSES = (
 )
 # Request types whose answer is a photo / PDF even without requires_media_reply.
 MEDIA_REQUEST_CATEGORIES = {TemplateCategory.MISSING_INVOICE, TemplateCategory.MISSING_DETAIL}
+# Old buttons stay tappable in WhatsApp. These restart the chase, which makes no sense once the
+# answer is already with the clerk.
+ACTIONS_BLOCKED_IN_REVIEW = {"REQUEST_MEDIA", "SNOOZE_TONIGHT", "TYPE_DETAIL"}
 REPROMPT_SLUG = "blurry_or_wrong_receipt_reprompt"
 DEADLINE_SLUG = "monthly_folder_deadline_warning"
 TAX_SLUG = "tax_ready_to_pay"
@@ -174,6 +177,7 @@ def log_message(
     media_url: str | None = None,
     is_automated: bool = True,
     sender_user: User | None = None,
+    external_id: str | None = None,
 ) -> WhatsAppMessageLog:
     if direction == MessageDirection.OUTBOUND:
         # Strict no-emoji policy: everything the firm sends is clean Hebrew text.
@@ -190,6 +194,7 @@ def log_message(
         content_text=text,
         buttons_json=buttons or None,
         media_url=media_url,
+        external_id=external_id,
         created_at=utcnow(),
     )
     db.add(msg)
@@ -243,10 +248,10 @@ def send_manual_message(
 
 
 def log_inbound(db: Session, client: Client, ticket: ChasingTicket | None, message_type: MessageType,
-                text: str, media_url: str | None = None) -> WhatsAppMessageLog:
+                text: str, media_url: str | None = None, external_id: str | None = None) -> WhatsAppMessageLog:
     msg = log_message(db, client=client, ticket=ticket, direction=MessageDirection.INBOUND,
                       message_type=message_type, text=text, sender_name=client.full_name, media_url=media_url,
-                      is_automated=False)
+                      is_automated=False, external_id=external_id)
     queue_event(db, {"type": "message", "client_id": client.id, "ticket_id": msg.ticket_id})
     # The client wrote, so the 24-hour window is open: messages held while it was closed go out first.
     release_held_messages(db, client)
@@ -320,9 +325,9 @@ def create_and_send_ticket(
 def find_active_ticket(db: Session, client: Client, ticket_id: int | None = None,
                        for_media: bool = False) -> ChasingTicket | None:
     if ticket_id:
+        # A button belongs to one request: when that request is closed, the tap must not land on another.
         tk = db.get(ChasingTicket, ticket_id)
-        if tk and tk.client_id == client.id and tk.status != TicketStatus.RESOLVED:
-            return tk
+        return tk if tk and tk.client_id == client.id and tk.status != TicketStatus.RESOLVED else None
     candidates = list(
         db.scalars(
             select(ChasingTicket).where(
@@ -393,10 +398,10 @@ def find_awaiting_ticket(db: Session, client: Client, ticket_id: int | None = No
 
 
 def log_unsolicited(db: Session, client: Client, message_type: MessageType, text: str,
-                    media_url: str | None = None) -> dict:
+                    media_url: str | None = None, external_id: str | None = None) -> dict:
     """Silent logging: the message / photo is saved to the chat history for the office, and
     nothing else happens: no Vision AI check, no ticket change, no automated reply."""
-    log_inbound(db, client, None, message_type, text, media_url=media_url)
+    log_inbound(db, client, None, message_type, text, media_url=media_url, external_id=external_id)
     kind = "תמונה / מסמך" if media_url else "הודעת טקסט"
     log.info("%s מהלקוח %s ללא בקשה פתוחה מתאימה: נשמרה ביומן השיחה ללא מענה אוטומטי", kind, client.full_name)
     return {"ticket": None, "reply": None, "ocr": None, "unsolicited": True}
@@ -422,22 +427,28 @@ def recount_campaign(db: Session, campaign: BulkTaxCampaign) -> None:
     campaign.pending_count = campaign.total_clients - campaign.confirmed_count
 
 
-def handle_button(db: Session, client: Client, button_id: str, ticket_id: int | None = None) -> dict:
+def handle_button(db: Session, client: Client, button_id: str, ticket_id: int | None = None,
+                  external_id: str | None = None) -> dict:
     if button_id == REENGAGE_BUTTON_ID:
         # The client tapped the re-engagement template: the held messages are the whole answer.
-        log_inbound(db, client, None, MessageType.BUTTON_REPLY, REENGAGE_BUTTON_TITLE)
+        log_inbound(db, client, None, MessageType.BUTTON_REPLY, REENGAGE_BUTTON_TITLE, external_id=external_id)
         return {"ticket": None, "action": "SHOW_HELD", "reply": None}
     lang = lang_of(client)
     button = button_index(db).get(button_id)
     ticket = find_active_ticket(db, client, ticket_id)
     title = (button or {}).get("he") or button_id
     action = (button or {}).get("action", "UNKNOWN")
-    log_inbound(db, client, ticket, MessageType.BUTTON_REPLY, title)
+    log_inbound(db, client, ticket, MessageType.BUTTON_REPLY, title, external_id=external_id)
 
     if ticket is None:
-        reply = t("no_open_ticket", lang)
+        reply = t("ticket_already_closed" if ticket_id else "no_open_ticket", lang)
         send_outbound(db, client, None, reply, None, MessageType.TEXT)
         return {"ticket": None, "action": action, "reply": reply}
+
+    if ticket.status == TicketStatus.NEEDS_CLERK_REVIEW and action in ACTIONS_BLOCKED_IN_REVIEW:
+        reply = t("already_in_review", lang)
+        send_outbound(db, client, ticket, reply, None, MessageType.TEXT)
+        return {"ticket": ticket, "action": action, "reply": reply}
 
     now = utcnow()
     ctx = dict(ticket.context_variables_json or {})
@@ -528,12 +539,13 @@ def _validate_typed_identifier(db: Session, client: Client, ticket: ChasingTicke
     return {"ticket": ticket, "reply": reply, "validation": {"field": kind, "valid": True, "value": value}}
 
 
-def handle_text(db: Session, client: Client, text: str, ticket_id: int | None = None) -> dict:
+def handle_text(db: Session, client: Client, text: str, ticket_id: int | None = None,
+                external_id: str | None = None) -> dict:
     lang = lang_of(client)
     ticket = find_awaiting_ticket(db, client, ticket_id)
     if ticket is None:
-        return log_unsolicited(db, client, MessageType.TEXT, text)
-    log_inbound(db, client, ticket, MessageType.TEXT, text)
+        return log_unsolicited(db, client, MessageType.TEXT, text, external_id=external_id)
+    log_inbound(db, client, ticket, MessageType.TEXT, text, external_id=external_id)
 
     ctx = ticket.context_variables_json or {}
     kind = ctx.get("detail_kind")
@@ -575,12 +587,12 @@ def media_path(media_url: str | None) -> Path | None:
 
 
 def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: str,
-                 ticket_id: int | None = None, caption: str = "") -> dict:
+                 ticket_id: int | None = None, caption: str = "", external_id: str | None = None) -> dict:
     lang = lang_of(client)
     ticket = find_awaiting_ticket(db, client, ticket_id, for_media=True)
     if ticket is None:
-        return log_unsolicited(db, client, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
-    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url)
+        return log_unsolicited(db, client, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url, external_id=external_id)
+    log_inbound(db, client, ticket, MessageType.IMAGE_UPLOAD, caption or "", media_url=media_url, external_id=external_id)
 
     now = utcnow()
     ctx = _set_ctx(ticket, awaiting_media=False,
@@ -684,6 +696,8 @@ def resolve_ticket(db: Session, ticket: ChasingTicket, note: str = "") -> Chasin
 
 
 def reopen_ticket(db: Session, ticket: ChasingTicket) -> ChasingTicket:
+    if not ticket.client.is_active:
+        raise EngineError(f"הלקוח '{ticket.client.full_name}' אינו פעיל: יש להפעיל אותו מחדש לפני פתיחת הפנייה")
     now = utcnow()
     ticket.status = TicketStatus.WAITING_FOR_CLIENT
     ticket.reminder_count = 0

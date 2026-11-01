@@ -29,8 +29,8 @@ import {
   autoVariables,
   cx,
   formatMoney,
+  defaultTaxPeriod,
   isoDate,
-  isoMonth,
   isoToDmy,
   localizedButtons,
   monthToMy,
@@ -156,11 +156,7 @@ export function QuickDispatch() {
         next.days_left = auto.days_left;
         next.open_items_count = auto.open_items_count;
       }
-      if ("tax_period" in next && !next.tax_period) {
-        const d = new Date();
-        const m = d.getDate() > 15 ? d : new Date(d.getFullYear(), d.getMonth() - 1, 1);
-        next.tax_period = isoMonth(m);
-      }
+      if ("tax_period" in next && !next.tax_period) next.tax_period = defaultTaxPeriod();
       if ("due_date" in next && !next.due_date) {
         const d = new Date();
         const day = VAT_DEADLINE_DAY;

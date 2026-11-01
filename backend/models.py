@@ -136,6 +136,7 @@ class Client(Base):
     company_name: Mapped[str] = mapped_column(String(200), default="")
     tax_id: Mapped[str] = mapped_column(String(9), index=True, default="")  # 9-digit ח.פ / ע.מ
     whatsapp_phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    last_reengage_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Legacy column kept for existing databases; WhatsApp contact is Hebrew-only, so it is always "he".
     preferred_language: Mapped[Language] = mapped_column(_enum(Language), default=Language.HE)
     # VAT deadline is always the 26th; frequency decides which months have one.

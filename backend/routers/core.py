@@ -466,8 +466,8 @@ def kpis(db: Session = Depends(get_db), _user: User = Depends(require_user)):
     ) or 0
     automated_msgs = db.scalar(
         select(func.count(WhatsAppMessageLog.id)).where(
-            WhatsAppMessageLog.direction == MessageDirection.OUTBOUND, WhatsAppMessageLog.created_at >= month_start,
-            WhatsAppMessageLog.delivery_status != DeliveryStatus.SKIPPED,
+            WhatsAppMessageLog.direction == MessageDirection.OUTBOUND, WhatsAppMessageLog.is_automated.is_(True),
+            WhatsAppMessageLog.created_at >= month_start, WhatsAppMessageLog.delivery_status != DeliveryStatus.SKIPPED,
         )
     ) or 0
     ocr_checks = db.scalar(

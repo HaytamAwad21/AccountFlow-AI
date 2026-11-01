@@ -58,7 +58,7 @@ fi
 
 if $RUN_TESTS; then
   info "Running backend end-to-end checks (test_flow.py)"
-  (cd "$BACKEND" && PYTHONIOENCODING=utf-8 "$PY" test_flow.py | grep -v " INFO ")
+  (cd "$BACKEND" && PYTHONIOENCODING=utf-8 "$PY" test_flow.py | grep -v " INFO " && PYTHONIOENCODING=utf-8 "$PY" test_regressions.py)
 fi
 
 # ── Start servers ────────────────────────────────────────────────────────────

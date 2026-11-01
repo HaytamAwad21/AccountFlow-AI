@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from database import SessionLocal
-from models import ChasingTicket, MessageTemplate, MessageType, TemplateCategory, TicketPriority, TicketStatus
+from models import ChasingTicket, Client, MessageTemplate, MessageType, TemplateCategory, TicketPriority, TicketStatus
 from services.activity import log_activity
 from services.clock import days_until_deadline, utcnow
 from services.events import queue_event
@@ -44,7 +44,8 @@ def _reminder_text(ticket: ChasingTicket, lang: str) -> str:
     ctx = ticket.context_variables_json or {}
     kwargs = {**ctx, "n": ticket.reminder_count, "max": ticket.max_reminders, "ticket_ref": ticket.ticket_ref}
     if ticket.status == TicketStatus.NEEDS_CORRECTION:
-        return t("reminder_correction", lang, **kwargs)
+        typed = ctx.get("awaiting_text") and not ctx.get("awaiting_media")
+        return t("reminder_correction_typed" if typed else "reminder_correction", lang, **kwargs)
     category = ticket.template.category
     if ticket.template.slug == DEADLINE_SLUG:
         category = TemplateCategory.MONTHLY_FOLDER
@@ -65,13 +66,25 @@ def _action(kind: str, ticket: ChasingTicket, text: str = "") -> dict:
     }
 
 
+def _clear_passed_urgency(db: Session, now) -> None:
+    """The urgent label belongs to one deadline: once that has passed the ticket is normal again."""
+    urgent = db.scalars(select(ChasingTicket).where(
+        ChasingTicket.priority == TicketPriority.URGENT_DEADLINE, ChasingTicket.status != TicketStatus.RESOLVED)).all()
+    for ticket in urgent:
+        if days_until_deadline(ticket.client.reporting_frequency, now) > settings.urgent_deadline_days:
+            ticket.priority = TicketPriority.NORMAL
+            touch(db, ticket)
+
+
 def run_reminder_cycle(db: Session, now=None) -> list[dict]:
     now = now or utcnow()
     actions: list[dict] = []
+    _clear_passed_urgency(db, now)
 
     # 1) Snoozed "remind me tonight" tickets whose 20:00 slot has arrived
     snoozed = db.scalars(
-        select(ChasingTicket).where(
+        select(ChasingTicket).join(Client).where(
+            Client.is_active.is_(True),
             ChasingTicket.status == TicketStatus.SNOOZED_TONIGHT,
             ChasingTicket.next_reminder_at.is_not(None),
             ChasingTicket.next_reminder_at <= now,
@@ -91,7 +104,9 @@ def run_reminder_cycle(db: Session, now=None) -> list[dict]:
     due = db.scalars(
         select(ChasingTicket)
         .join(MessageTemplate)
+        .join(Client)
         .where(
+            Client.is_active.is_(True),
             ChasingTicket.status.in_(CHASE_STATUSES),
             ChasingTicket.next_reminder_at.is_not(None),
             ChasingTicket.next_reminder_at <= now,

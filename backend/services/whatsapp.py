@@ -70,16 +70,15 @@ def normalize_phone(raw: str, default_cc: str | None = None) -> str:
     digits = re.sub(r"\D", "", raw)
     if not digits:
         return ""
-    if raw.startswith("+"):
-        return f"+{digits}"
     if digits.startswith("00"):
-        return f"+{digits[2:]}"
-    if digits.startswith("0"):
-        return f"+{default_cc}{digits[1:]}"
-    if digits.startswith(default_cc):
-        return f"+{digits}"
-    if len(digits) <= 9:
-        return f"+{default_cc}{digits}"
+        digits = digits[2:]
+    elif not raw.startswith("+"):
+        if digits.startswith("0"):
+            digits = f"{default_cc}{digits[1:]}"
+        elif not digits.startswith(default_cc) and len(digits) <= 9:
+            digits = f"{default_cc}{digits}"
+    if digits.startswith(f"{default_cc}0"):  # "+972-050-...": the local trunk zero does not follow the country code
+        digits = f"{default_cc}{digits[len(default_cc) + 1:]}"
     return f"+{digits}"
 
 
@@ -190,19 +189,27 @@ def _has_held(db: Session, client_id: int) -> bool:
         WhatsAppMessageLog.client_id == client_id, WhatsAppMessageLog.awaiting_window.is_(True)).limit(1)) is not None
 
 
+def _reengage_due(client: Client) -> bool:
+    last = client.last_reengage_at
+    return last is None or utcnow() - last >= timedelta(hours=settings.whatsapp_reengage_interval_hours)
+
+
 def _hold(db: Session, msg: WhatsAppMessageLog, client: Client) -> None:
-    """Window closed: keep the message for later and invite the client back with the approved template,
-    once per closed window (only the first held message sends it)."""
+    """Window closed: keep the message for later and invite the client back with the approved template.
+    The first held message sends it; a client who stays silent is invited again after
+    WHATSAPP_REENGAGE_INTERVAL_HOURS, so later requests are not held without any notice."""
     first = not _has_held(db, client.id)
     msg.awaiting_window = True
     db.flush()  # the next message held in this transaction must see this one
-    if not first:
-        return
     if not settings.whatsapp_reengage_template:
-        log.warning("Client %s: 24-hour window closed and WHATSAPP_REENGAGE_TEMPLATE is not set; "
-                    "message %s waits until the client writes", client.id, msg.id)
-        msg.error_text = "חלון 24 השעות של WhatsApp סגור ולא הוגדרה תבנית פתיחה (WHATSAPP_REENGAGE_TEMPLATE): ההודעה תישלח כשהלקוח יכתוב"
+        if first:
+            log.warning("Client %s: 24-hour window closed and WHATSAPP_REENGAGE_TEMPLATE is not set; "
+                        "message %s waits until the client writes", client.id, msg.id)
+            msg.error_text = "חלון 24 השעות של WhatsApp סגור ולא הוגדרה תבנית פתיחה (WHATSAPP_REENGAGE_TEMPLATE): ההודעה תישלח כשהלקוח יכתוב"
         return
+    if not (first or _reengage_due(client)):
+        return
+    client.last_reengage_at = utcnow()
     msg_id, phone, name, firm = msg.id, client.whatsapp_phone, client.full_name, get_system_settings(db).firm_name
     queue_in_order_after_commit(db, lambda: _send_reengage(msg_id, phone, name, firm))
 
@@ -288,6 +295,7 @@ def _send_reengage(msg_id: int, phone: str, client_name: str, firm_name: str) ->
     with SessionLocal() as db:
         msg = db.get(WhatsAppMessageLog, msg_id)
         if msg and msg.awaiting_window:
+            msg.client.last_reengage_at = None  # not delivered: the next held message tries again
             msg.error_text = f"תבנית הפתיחה לא נשלחה, ההודעה תישלח כשהלקוח יכתוב: {error}"
             queue_event(db, {"type": "message", "client_id": msg.client_id, "ticket_id": msg.ticket_id})
             db.commit()

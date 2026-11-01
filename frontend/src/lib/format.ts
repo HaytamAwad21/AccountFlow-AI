@@ -120,6 +120,11 @@ export function isoMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** The period a VAT report due on the next 26th covers: the month before it, as "YYYY-MM". */
+export function defaultTaxPeriod(now: Date = new Date()): string {
+  return isoMonth(new Date(now.getFullYear(), now.getMonth() + (now.getDate() <= VAT_DEADLINE_DAY ? -1 : 0), 1));
+}
+
 /** "2026-09" -> "09/2026"; null when invalid. */
 export function monthToMy(value: string): string | null {
   const m = /^(\d{4})-(\d{2})$/.exec(value.trim());

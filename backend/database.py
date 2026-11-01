@@ -78,6 +78,11 @@ def _add_missing_columns() -> None:
                         conn.execute(text("UPDATE users SET full_name = :n, job_title = :t WHERE id = :i"),
                                      {"n": name.strip(), "t": title.strip(), "i": user_id})
             logging.getLogger("accountflow").warning("Added users.job_title and split existing 'name - title' values.")
+    if "clients" in inspector.get_table_names():
+        if "last_reengage_at" not in {c["name"] for c in inspector.get_columns("clients")}:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE clients ADD COLUMN last_reengage_at TIMESTAMP"))
+            logging.getLogger("accountflow").warning("Added clients.last_reengage_at.")
     if "whatsapp_message_logs" in inspector.get_table_names():
         msg_cols = {c["name"] for c in inspector.get_columns("whatsapp_message_logs")}
         if "is_automated" not in msg_cols:

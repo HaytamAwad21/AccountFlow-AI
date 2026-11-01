@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     # firm's messages are held until the client taps it or writes. Body variables: {{1}} client name,
     # {{2}} firm name; one quick-reply button. Empty: messages are held until the client writes.
     whatsapp_reengage_template: str = ""
+    whatsapp_reengage_interval_hours: int = 72  # repeat the template for a client who has not answered
     whatsapp_template_language: str = "he"
     whatsapp_api_version: str = "v21.0"
     default_country_code: str = "972"

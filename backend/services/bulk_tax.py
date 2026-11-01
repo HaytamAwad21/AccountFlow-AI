@@ -101,6 +101,19 @@ def parse_due_date(value: str) -> str:
         raise ValueError(f"invalid due_date '{value}'") from exc
 
 
+def parse_period(value: str) -> str:
+    """Excel turns a typed 10/2026 into a date, which reads "2026-10-01 00:00:00" here. Dates become
+    MM/YYYY; a period written in words stays as it is."""
+    value = (value or "").strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y-%m", "%m/%Y"):
+        try:
+            parsed = datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+        return f"{parsed.month:02d}/{parsed.year}"
+    return value
+
+
 def _digits(value: str) -> str:
     return re.sub(r"\D", "", value or "")
 
@@ -114,18 +127,27 @@ def _tax_id(value: str) -> str:
     return digits
 
 
-def match_or_create_client(db: Session, row: dict) -> tuple[Client, bool]:
+def _find_client(db: Session, tax_id: str, phone: str) -> Client | None:
+    """Active records win: a deactivated client can share its ח.פ with the client that replaced it."""
+    matches: list[Client] = []
+    if tax_id:
+        matches += db.scalars(select(Client).where(Client.tax_id == tax_id).order_by(Client.id)).all()
+    if phone:
+        matches += db.scalars(select(Client).where(Client.whatsapp_phone == phone)).all()
+    return next((c for c in matches if c.is_active), matches[0] if matches else None)
+
+
+def match_or_create_client(db: Session, row: dict) -> tuple[Client | None, bool]:
+    """(client, created). Client is None for a new client without a usable WhatsApp number."""
     tax_id = _tax_id(row.get("client_tax_id", ""))
     phone = normalize_phone(row.get("client_phone", ""))
-    client = None
-    if tax_id:
-        client = next((c for c in db.scalars(select(Client).where(Client.tax_id != "")) if c.tax_id == tax_id), None)
-    if client is None and phone:
-        client = db.scalar(select(Client).where(Client.whatsapp_phone == phone))
+    client = _find_client(db, tax_id, phone)
     if client:
         if not client.is_active:
             client.is_active = True
         return client, False
+    if len(phone) < 8:
+        return None, False
 
     name = row.get("client_name", "").strip()
     frequency = (row.get("reporting_frequency") or "").strip().upper()
@@ -167,10 +189,10 @@ def _validate_row(index: int, row: dict) -> tuple[dict | None, str | None]:
     except ValueError:
         return None, f"שורה {line}: תאריך תשלום לא תקין '{row.get('due_date', '')}'"
     ni = parse_amount(row.get("national_insurance")) or 0.0
-    period = row.get("tax_period", "").strip()
+    period = parse_period(row.get("tax_period", ""))
     if not period:
         return None, f"שורה {line}: חסרה תקופת דיווח (tax_period)"
-    return {**row, "_vat": vat, "_advance": advance, "_ni": ni, "_due": due, "_period": period}, None
+    return {**row, "_line": line, "_vat": vat, "_advance": advance, "_ni": ni, "_due": due, "_period": period}, None
 
 
 def run_bulk_campaign(db: Session, rows: list[dict], title: str | None = None, worker_id: int | None = None,
@@ -194,9 +216,14 @@ def run_bulk_campaign(db: Session, rows: list[dict], title: str | None = None, w
     db.flush()
 
     created_clients = 0
+    sent = 0
     for row in valid:
         client, created = match_or_create_client(db, row)
+        if client is None:
+            errors.append(f"שורה {row['_line']}: לקוח חדש חייב מספר וואטסאפ תקין (client_phone)")
+            continue
         created_clients += int(created)
+        sent += 1
         variables = {
             "tax_period": row["_period"],
             "vat_amount": fmt_ils(row["_vat"]),
@@ -220,10 +247,12 @@ def run_bulk_campaign(db: Session, rows: list[dict], title: str | None = None, w
             due_date=row["_due"],
             payment_status=PaymentStatus.SENT,
         ))
+    if not sent:
+        raise EngineError("אין שורות תקינות: " + "; ".join(errors[:5]))
     db.flush()
     db.refresh(campaign)
     recount_campaign(db, campaign)
-    return {"campaign": campaign, "errors": errors, "created_clients": created_clients, "sent": len(valid)}
+    return {"campaign": campaign, "errors": errors, "created_clients": created_clients, "sent": sent}
 
 
 def default_period_and_due() -> tuple[str, str]:
