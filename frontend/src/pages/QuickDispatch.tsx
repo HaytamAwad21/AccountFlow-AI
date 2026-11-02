@@ -39,7 +39,8 @@ import {
   templateBody,
   templateName,
   variableError,
-  VAT_DEADLINE_DAY,
+  DEFAULT_VAT_DEADLINE_DAY,
+  nextDeadlineDate,
   type Currency,
 } from "../lib/format";
 import type { Client } from "../lib/types";
@@ -156,13 +157,9 @@ export function QuickDispatch() {
         next.days_left = auto.days_left;
         next.open_items_count = auto.open_items_count;
       }
-      if ("tax_period" in next && !next.tax_period) next.tax_period = defaultTaxPeriod();
-      if ("due_date" in next && !next.due_date) {
-        const d = new Date();
-        const day = VAT_DEADLINE_DAY;
-        const due = d.getDate() <= day ? new Date(d.getFullYear(), d.getMonth(), day) : new Date(d.getFullYear(), d.getMonth() + 1, day);
-        next.due_date = isoDate(due);
-      }
+      const deadlineDay = settings?.vat_deadline_day ?? DEFAULT_VAT_DEADLINE_DAY;
+      if ("tax_period" in next && !next.tax_period) next.tax_period = defaultTaxPeriod(deadlineDay);
+      if ("due_date" in next && !next.due_date) next.due_date = isoDate(nextDeadlineDate(deadlineDay));
       return next;
     });
   }, [template?.id, client?.id]); // eslint-disable-line react-hooks/exhaustive-deps

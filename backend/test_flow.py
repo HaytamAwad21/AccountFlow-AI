@@ -18,7 +18,7 @@ import shutil
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 TMP = Path(tempfile.mkdtemp(prefix="accountflow_test_"))
@@ -152,7 +152,7 @@ def main() -> None:
         check(s["firm_name"] == "כהן ושות׳ - רואי חשבון" and s["vat_rate"] == 18.0, "system_settings defaults (firm, 18% VAT)")
         check(s["allocation_number_threshold_nis"] == 10000 and s["reminder_interval_hours"] == 48 and s["max_reminders"] == 3,
               "allocation threshold 10,000 ₪ · 48h · 3 reminders")
-        check(s["vat_deadline_day"] == 26 and "default_deadline_day" not in s, "VAT deadline fixed to the 26th (no setting)")
+        check(s["vat_deadline_day"] == 26 and "default_deadline_day" not in s, "VAT deadline day defaults to the 26th")
         check({cl["reporting_frequency"] for cl in c.get("/api/clients").json()} == {"MONTHLY", "BIMONTHLY"},
               "seeded clients report monthly and bi-monthly")
 
@@ -210,7 +210,7 @@ def main() -> None:
         c.put(f"/api/clients/{new_clients['he2']['id']}", json={"reporting_frequency": "MONTHLY"}, headers=M)
         for day, freq, expected in ((10, "MONTHLY", 16), (26, "MONTHLY", 0), (27, "MONTHLY", None)):
             freeze_day(day)
-            left = clock.days_until_deadline(freq)
+            left = clock.days_until_deadline(26, freq)
             check(left == expected if expected is not None else left >= 27, f"day {day}: {left} days to the 26th")
         freeze_day(None)
         check(c.put(f"/api/clients/{new_clients['en']['id']}", json={"notes": "VIP"}, headers=M).json()["notes"] == "VIP",
@@ -234,6 +234,8 @@ def main() -> None:
         check(c.get("/api/auth/me", headers=INTERN).status_code == 401, "suspended user's session is rejected by the API")
         check(c.post("/api/auth/login", json={"user_id": intern["id"], "password": "yossi123"}, headers=ANON).status_code == 403,
               "suspended user cannot log in")
+        check(intern["id"] not in {u["id"] for u in c.get("/api/auth/users", headers=ANON).json()}, "suspended user is hidden from the login list")
+        check(intern["id"] in {u["id"] for u in c.get("/api/users", headers=M).json()}, "suspended user stays in the manager's staff list")
         check(c.put(f"/api/users/{intern['id']}", json={"is_active": True}, headers=M).json()["is_active"] is True, "manager reactivates the worker")
         INTERN = login(c, intern["id"], "yossi123")
         check(c.put(f"/api/users/{intern['id']}", json={"password": "short"}, headers=M).status_code == 422, "reset password needs ≥ 6 characters")
@@ -413,9 +415,41 @@ def main() -> None:
               "OCR validator now checks VAT at 17%")
         last = c.get(f"/api/clients/{new_clients['he']['id']}/messages").json()[-1]
         check(last["sender_name"] == "כהן ושות׳ - רו״ח", "WhatsApp sender uses the new firm name")
-        r = c.put("/api/settings", headers=M, json={"default_deadline_day": 5}).json()
-        check("default_deadline_day" not in r and r["vat_deadline_day"] == 26, "deadline day cannot be changed (always the 26th)")
         c.put("/api/settings", headers=M, json={"vat_rate": 18, "allocation_number_threshold_nis": 10000, "reminder_interval_hours": 48, "max_reminders": 3})
+
+        section("Settings — editable VAT deadline day")
+        check(c.put("/api/settings", headers=W, json={"vat_deadline_day": 15}).status_code == 403, "worker cannot change the deadline day (403)")
+        for bad in (0, 32, 15.5, "abc", True):
+            r = c.put("/api/settings", headers=M, json={"vat_deadline_day": bad})
+            check(r.status_code == 422 and "1 עד 31" in r.json()["detail"][0]["msg"], f"deadline day {bad!r} rejected in Hebrew", r.text[:200])
+        check(c.get("/api/settings").json()["vat_deadline_day"] == 26, "rejected values leave the day unchanged")
+        r = c.put("/api/settings", headers=M, json={"vat_deadline_day": 15})
+        check(r.status_code == 200 and r.json()["vat_deadline_day"] == 15, "manager changes the deadline day to 15")
+        r = c.get("/api/auth/deadline-day", headers=ANON)
+        check(r.status_code == 200 and r.json() == {"vat_deadline_day": 15}, "login screen reads the live deadline day without a session", r.text[:200])
+        changed = c.get("/api/activity?action=SETTINGS_UPDATED&limit=1", headers=M).json()["items"][0]
+        check(changed["details"]["vat_deadline_day"] == [26, 15] and "יום דיווח מע״מ: 26 ← 15" in changed["description"],
+              "activity log keeps the old and new deadline day")
+        freeze_day(2)
+        moved = next(x for x in c.get("/api/clients").json() if x["id"] == new_clients["he"]["id"])
+        check(moved["next_deadline"].startswith("15/") and moved["days_to_deadline"] == 13, "the next deadline moves to the 15th")
+        ticket = c.post("/api/tickets/quick-send", headers=W, json={"client_id": new_clients["he"]["id"], "template_slug": "missing_supplier_invoice",
+                                                                    "context_variables": {"supplier_name": "Paz", "amount": "₪80", "invoice_date": "01/10/2026"}}).json()["ticket"]
+        kinds = {a["kind"] for a in c.post("/api/scheduler/simulate-time-jump?hours=48").json()["actions"] if a["ticket_id"] == ticket["id"]}
+        check("URGENT_DEADLINE_WARNING" not in kinds, "13 days before the 15th: no urgent warning")
+        freeze_day(13)
+        kinds = {a["kind"] for a in c.post("/api/scheduler/simulate-time-jump?hours=48").json()["actions"] if a["ticket_id"] == ticket["id"]}
+        check("URGENT_DEADLINE_WARNING" in kinds, "2 days before the 15th: the urgent window moved with the day")
+        c.post(f"/api/tickets/{ticket['id']}/resolve", headers=W, json={"note": ""})
+        freeze_day(None)
+        noon = lambda y, m, d: datetime(y, m, d, 12)
+        check(clock.next_deadline(31, "MONTHLY", noon(2026, 11, 10)) == date(2026, 11, 30), "day 31 clamps to the 30th in a 30-day month")
+        check(clock.next_deadline(31, "MONTHLY", noon(2027, 2, 10)) == date(2027, 2, 28), "day 31 clamps to the 28th in February")
+        check(clock.next_deadline(31, "MONTHLY", noon(2028, 2, 10)) == date(2028, 2, 29), "day 31 clamps to the 29th in a leap February")
+        check(clock.next_deadline(31, "MONTHLY", noon(2026, 11, 30)) == date(2026, 11, 30), "the clamped last day is still this month's deadline")
+        check(clock.next_deadline(31, "MONTHLY", noon(2026, 12, 1)) == date(2026, 12, 31), "the day after a clamped deadline moves to the next month")
+        check(clock.next_deadline(15, "BIMONTHLY", noon(2026, 1, 20)) == date(2026, 3, 15), "bi-monthly deadlines follow the setting")
+        check(c.put("/api/settings", headers=M, json={"vat_deadline_day": 26}).json()["vat_deadline_day"] == 26, "deadline day restored to 26")
 
         section("Real uploads, buttons, escalation")
         sharp = Image.new("RGB", (1000, 1300), "white")

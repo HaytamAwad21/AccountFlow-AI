@@ -24,8 +24,8 @@ def list_campaigns(db: Session = Depends(get_db), _user: User = Depends(require_
 
 
 @router.get("/sample-sheet")
-def download_sample(format: str = Query("csv", pattern="^(csv|xlsx)$"), _user: User = Depends(require_user)):
-    content, filename, media_type = sample_sheet(format)
+def download_sample(format: str = Query("csv", pattern="^(csv|xlsx)$"), db: Session = Depends(get_db), _user: User = Depends(require_user)):
+    content, filename, media_type = sample_sheet(db, format)
     return Response(content, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 

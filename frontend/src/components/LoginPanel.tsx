@@ -38,7 +38,6 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
   }, [picked]);
 
   const pick = (u: LoginUser) => {
-    if (!u.is_active) return;
     setPicked(u);
     setPassword("");
     setError(null);
@@ -125,22 +124,19 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
           <button
             key={u.id}
             type="button"
-            disabled={!u.is_active}
             onClick={() => pick(u)}
             className={cx(
               "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start transition",
               current ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-ink-200 hover:border-ink-300 hover:bg-ink-50",
-              !u.is_active && "cursor-not-allowed opacity-50 hover:bg-surface",
             )}
           >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">{u.avatar_initials}</span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-ink-900">{parts.name}</span>
-              <span className="block truncate text-xs text-ink-500">{u.job_title || parts.title || ROLE_LABEL[u.role]}</span>
+              <span className="block break-words text-sm font-bold text-ink-900">{parts.name}</span>
+              <span className="block break-words text-xs text-ink-500">{u.job_title || parts.title || ROLE_LABEL[u.role]}</span>
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1">
               <RoleBadge role={u.role} />
-              {!u.is_active && <span className="text-xs font-semibold text-red-600">הושעה</span>}
               {current && (
                 <span className="flex items-center gap-1 text-xs font-semibold text-link">
                   <Check className="h-3 w-3" /> מחובר/ת כעת

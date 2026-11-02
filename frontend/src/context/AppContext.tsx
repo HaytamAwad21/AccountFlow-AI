@@ -221,7 +221,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Keep shared lists fresh when the server reports changes.
   useEffect(() => {
     if (!tickTypes.length || loggedInId === null) return;
-    if (tickTypes.some((t) => ["message", "ticket", "client", "campaign", "scheduler"].includes(t))) refreshClients().catch(() => undefined);
+    if (tickTypes.some((t) => ["message", "ticket", "client", "campaign", "scheduler", "settings"].includes(t))) refreshClients().catch(() => undefined);
     if (tickTypes.includes("template")) refreshTemplates().catch(() => undefined);
     if (tickTypes.includes("settings")) refreshSettings().catch(() => undefined);
     if (tickTypes.includes("users")) {

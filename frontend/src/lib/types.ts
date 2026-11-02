@@ -260,6 +260,7 @@ export type EditableSettings = Pick<
   | "allocation_number_threshold_nis"
   | "reminder_interval_hours"
   | "max_reminders"
+  | "vat_deadline_day"
   | "auto_approve_verified"
 >;
 

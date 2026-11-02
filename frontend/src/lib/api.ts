@@ -151,6 +151,7 @@ export function mediaUrl(path: string | null | undefined): string | null {
 
 export const api = {
   loginUsers: () => request<LoginUser[]>("/api/auth/users"),
+  deadlineDay: () => request<{ vat_deadline_day: number }>("/api/auth/deadline-day"),
   login: (userId: number, password: string) =>
     request<LoginResponse>("/api/auth/login", { method: "POST", ...json({ user_id: userId, password }) }),
   /** Revokes the given session token (defaults to the current one). Never throws. */

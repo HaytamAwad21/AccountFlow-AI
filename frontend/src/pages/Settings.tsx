@@ -2,18 +2,19 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pencil, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
-import { cx, formatNumber, fullDateTime, splitUserName, VAT_DEADLINE_DAY } from "../lib/format";
+import { cx, formatNumber, fullDateTime, splitUserName } from "../lib/format";
 import type { EditableSettings, User } from "../lib/types";
 import { EditWorkerModal } from "../components/EditWorkerModal";
 import { AddWorkerModal } from "../components/AddWorkerModal";
 import { PageHeader } from "../components/PageHeader";
 import { Button, Card, Field, inputClass, RoleBadge, Toggle } from "../components/ui";
 
-type NumericKey = "vat_rate" | "allocation_number_threshold_nis" | "reminder_interval_hours" | "max_reminders";
+type NumericKey = "vat_rate" | "allocation_number_threshold_nis" | "vat_deadline_day" | "reminder_interval_hours" | "max_reminders";
 
 const LIMITS: Record<NumericKey, { min: number; max: number; step: number; label: string }> = {
   vat_rate: { min: 0, max: 50, step: 0.5, label: "שיעור מע״מ" },
   allocation_number_threshold_nis: { min: 0, max: 10_000_000, step: 500, label: "סף מספר הקצאה" },
+  vat_deadline_day: { min: 1, max: 31, step: 1, label: "מועד דיווח מע״מ" },
   reminder_interval_hours: { min: 1, max: 720, step: 1, label: "מרווח תזכורות" },
   max_reminders: { min: 1, max: 10, step: 1, label: "מספר תזכורות מקסימלי" },
 };
@@ -90,6 +91,7 @@ export function Settings() {
       allocation_number_threshold_nis: settings.allocation_number_threshold_nis,
       reminder_interval_hours: settings.reminder_interval_hours,
       max_reminders: settings.max_reminders,
+      vat_deadline_day: settings.vat_deadline_day,
       auto_approve_verified: settings.auto_approve_verified,
     });
   }, [settings]);
@@ -176,6 +178,7 @@ export function Settings() {
                     allocation_number_threshold_nis: settings.allocation_number_threshold_nis,
                     reminder_interval_hours: settings.reminder_interval_hours,
                     max_reminders: settings.max_reminders,
+                    vat_deadline_day: settings.vat_deadline_day,
                     auto_approve_verified: settings.auto_approve_verified,
                   })
                 }
@@ -212,13 +215,15 @@ export function Settings() {
               limits={LIMITS.allocation_number_threshold_nis}
             />
           </Field>
-          <div>
-            <span className="mb-1 block text-xs font-bold text-ink-700">מועד דיווח מע״מ</span>
-            <div className="flex h-[38px] items-center gap-2 bg-ink-100 px-3 text-sm text-ink-700">
-              ה-<Num value={settings.vat_deadline_day ?? VAT_DEADLINE_DAY} /> בכל חודש דיווח
-            </div>
-            <span className="mt-1 block text-xs text-ink-400">קבוע לפי חוק; לקוחות דו חודשיים מדווחים בחודשים האי-זוגיים</span>
-          </div>
+          <Field label="מועד דיווח מע״מ (יום בחודש)" hint="ברירת מחדל: 26. ניתן לשנות כאשר רשות המסים מזיזה את המועד.">
+            <NumberInput
+              value={draft.vat_deadline_day}
+              onChange={(v) => set("vat_deadline_day", v)}
+              disabled={readOnly}
+              suffix="בחודש"
+              limits={LIMITS.vat_deadline_day}
+            />
+          </Field>
         </div>
         <div className="mt-4 bg-ink-100 px-4 py-3 text-sm leading-relaxed text-ink-700">
           <p className="mb-1 font-bold text-ink-900">דוגמה חיה לפי הערכים הנוכחיים</p>

@@ -83,6 +83,11 @@ def _add_missing_columns() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE clients ADD COLUMN last_reengage_at TIMESTAMP"))
             logging.getLogger("accountflow").warning("Added clients.last_reengage_at.")
+    if "system_settings" in inspector.get_table_names():
+        if "vat_deadline_day" not in {c["name"] for c in inspector.get_columns("system_settings")}:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE system_settings ADD COLUMN vat_deadline_day INTEGER NOT NULL DEFAULT 26"))
+            logging.getLogger("accountflow").warning("Added system_settings.vat_deadline_day.")
     if "whatsapp_message_logs" in inspector.get_table_names():
         msg_cols = {c["name"] for c in inspector.get_columns("whatsapp_message_logs")}
         if "is_automated" not in msg_cols:

@@ -304,7 +304,7 @@ Midnight navy, electric blue and cantaloupe orange on a pale grey-blue page, wit
 - **WhatsApp Palette** (the `wa-*` tokens): WhatsApp's own colours for the simulator and message bubbles, with WhatsApp's own dark values.
 
 ### Named Rules
-**The Two Meanings Rule.** Cantaloupe means the 26th or the clerk's next action. That covers the disc, the strip's today marker, the primary button, the review banner, the review state mark and the "requested a call" share of a campaign. The text caret and text selection are the only ambient uses.
+**The Two Meanings Rule.** Cantaloupe means the 26th or the clerk's next action. That covers the disc, the calendar's deadline day, the primary button, the review banner, the review state mark and the "requested a call" share of a campaign. The text caret and text selection are the only ambient uses.
 
 **The One Cantaloupe Button Rule.** A view has at most one cantaloupe button. A disabled primary turns grey, so cantaloupe never sits on something that cannot be pressed.
 
@@ -371,7 +371,7 @@ Circles are the system's second form. They carry the 26 disc at every size, from
 Panel, popup and toast borders are 1px Line Grey. Row hairlines are one step lighter, and field dividers are 1px white at 10%. The phone frame and its contents keep WhatsApp's own radii (6px, 8px, 2.2rem).
 
 ### Named Rules
-**The Square and Disc Rule.** Rectangles are square; a curve is a full circle, and the toggle is the only exception. New round forms hold a number, a person's initials or a state, and a numbered cantaloupe disc always reads 26.
+**The Square and Disc Rule.** Rectangles are square; a curve is a full circle, and the toggle is the only exception. New round forms hold a number, a person's initials or a state, and a numbered cantaloupe disc always reads the day of the next VAT deadline.
 
 ## Components
 
@@ -415,10 +415,10 @@ Page tabs and filters are reversed text: Electric Blue with white text when acti
 - **Mobile:** a slide-in drawer over the Midnight backdrop, opened from a slim field-coloured bar that carries a 28px disc.
 
 ### Month Band
-The signature component. A band in the field colour carries the page title, the countdown figure with its two-line caption, and a month strip of one column per day. Solid white 6px bars show requests opened, today is marked in cantaloupe, and the 26th is a 44px cantaloupe disc hanging 20px over the band's lower edge. Pending user decision: outlined white bars show reminders still scheduled, stacked above the solid bars. Bars run from 4px to 28px, scaled to the month's busiest day, with day numbers at the 1st, every fifth day and today.
+The signature component, rendered once by the app shell as `DeadlineCalendar`. A band in the field colour carries the countdown figure with its two-line caption and every day of the current month, each labelled: one row on wide tabs, a 7-column grid with weekday headers on narrow ones. The deadline day is a cantaloupe disc with "מועד דיווח מע״מ" under it, and no other day uses cantaloupe. Today is an electric blue ring, past days are muted, the days before the deadline carry a light amber tint, and Friday and Saturday are dimmer. The page title and actions sit directly below in the same field colour.
 
 ### Deadline Disc
-The 26 in Secular One on a cantaloupe circle. It is the logo in the rail and the mobile bar, the login mark, the band's end point and the cropped poster shape on the login screen. The login screen is otherwise the field with one white panel.
+The day of the next VAT deadline, 26 by default, in Secular One on a cantaloupe circle. It is the logo in the rail and the mobile bar, the login mark, the band's end point and the cropped poster shape on the login screen. The login screen is otherwise the field with one white panel.
 
 ### State Mark
 A 12px flat shape in a fixed position before its label, so a column scans by form as well as colour: open ring for open, solid blue circle for waiting, half circle for snoozed, amber triangle for correction, cantaloupe disc with a midnight centre for clerk review, red square for escalated, and a tick for resolved. It is never a coloured pill.
@@ -453,6 +453,6 @@ A side panel holding a WhatsApp phone that must keep looking like real WhatsApp,
 - **Don't** use cantaloupe for decoration or for a second button on a view.
 - **Don't** use amber or red for emphasis without a real warning behind it.
 - **Don't** use `wa-*` tokens or WhatsApp radii outside WhatsApp views.
-- **Don't** put any number but 26 in a cantaloupe disc.
+- **Don't** put any number in a cantaloupe disc except the day of the VAT deadline.
 - **Don't** use Secular One for body text, form labels, table rows or buttons.
 - **Don't** render manager-only controls as disabled or hidden elements for workers; leave them out.

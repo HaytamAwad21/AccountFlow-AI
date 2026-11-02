@@ -48,13 +48,13 @@ from schemas import (
     user_out,
 )
 from services.activity import log_activity
-from services.clock import VAT_DEADLINE_DAY, days_until_deadline, fmt_date, local_to_utc, local_today, next_deadline, utcnow
+from services.clock import days_until_deadline, fmt_date, local_to_utc, local_today, next_deadline, utcnow
 from services.events import queue_event
 from services.i18n import NAME_LANGUAGE_ERROR, has_arabic
 from services.no_emoji import strip_buttons, strip_emoji
 from services.scheduler import scheduler_status
 from services.security import hash_password
-from services.system_settings import get_system_settings
+from services.system_settings import deadline_day, get_system_settings
 from services.templating import body_for, localized_buttons, render_text, text_direction
 from services.ticket_engine import ACTIVE_STATUSES, CLIENT_PENDING_STATUSES, auto_variables, missing_variables
 from services.vision_ocr import active_provider
@@ -179,13 +179,14 @@ def _clients_out(db: Session, clients: list[Client]) -> list[ClientOut]:
         m.client_id: m
         for m in db.scalars(select(WhatsAppMessageLog).where(WhatsAppMessageLog.id.in_(list(last_ids.values()) or [0])))
     }
+    day = deadline_day(db)
     out = []
     for c in clients:
         item = ClientOut.model_validate(c)
         item.assigned_worker_name = c.assigned_worker.full_name if c.assigned_worker else None
         item.open_ticket_count = open_counts.get(c.id, 0)
-        item.days_to_deadline = days_until_deadline(c.reporting_frequency)
-        item.next_deadline = fmt_date(next_deadline(c.reporting_frequency))
+        item.days_to_deadline = days_until_deadline(day, c.reporting_frequency)
+        item.next_deadline = fmt_date(next_deadline(day, c.reporting_frequency))
         last = last_msgs.get(c.id)
         if last:
             item.last_message_at = last.created_at
@@ -397,7 +398,7 @@ def _settings_out(db: Session) -> SettingsOut:
         allocation_number_threshold_nis=row.allocation_number_threshold_nis,
         reminder_interval_hours=row.reminder_interval_hours,
         max_reminders=row.max_reminders,
-        vat_deadline_day=VAT_DEADLINE_DAY,
+        vat_deadline_day=row.vat_deadline_day,
         auto_approve_verified=row.auto_approve_verified,
         updated_at=row.updated_at,
         updated_by_user_id=row.updated_by_user_id,
@@ -428,7 +429,8 @@ def update_settings(body: SettingsUpdate, request: Request, db: Session = Depend
         setattr(row, key, value)
     if changes:
         labels = {"firm_name": "שם המשרד", "vat_rate": "שיעור מע״מ", "allocation_number_threshold_nis": "סף מספר הקצאה",
-                  "reminder_interval_hours": "מרווח תזכורות", "max_reminders": "מספר תזכורות", "auto_approve_verified": "אישור אוטומטי"}
+                  "reminder_interval_hours": "מרווח תזכורות", "max_reminders": "מספר תזכורות", "vat_deadline_day": "יום דיווח מע״מ",
+                  "auto_approve_verified": "אישור אוטומטי"}
         summary = ", ".join(f"{labels.get(k, k)}: {old} ← {new}" for k, (old, new) in changes.items())
         log_activity(db, manager, "SETTINGS_UPDATED", f"עודכנו הגדרות המשרד — {summary}", entity_type="settings", entity_id=row.id,
                      details=changes, ip_address=client_ip(request))

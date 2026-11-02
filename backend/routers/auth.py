@@ -3,7 +3,8 @@
 POST /api/auth/login   {user_id, password} -> {token, expires_at, user}
 POST /api/auth/logout  revokes the presented token
 GET  /api/auth/me      the user behind the token
-GET  /api/auth/users   public list of user cards for the login screen (no e-mails)
+GET  /api/auth/users   public list of active user cards for the login screen (no e-mails)
+GET  /api/auth/deadline-day  public VAT deadline day, for the logo on the login screen
 POST /api/auth/change-password  the logged-in user changes their own password
 
 Wrong passwords are NOT written to the activity log. They are counted in `login_failures`;
@@ -26,14 +27,20 @@ from schemas import ChangePasswordRequest, LoginRequest, LoginResponse, LoginUse
 from services.activity import log_activity
 from services.clock import utcnow
 from services.security import hash_password, new_session_token, password_problem, token_digest, verify_password
+from services.system_settings import deadline_day
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.get("/users", response_model=list[LoginUser])
 def login_users(db: Session = Depends(get_db)):
-    stmt = select(User).order_by((User.role != UserRole.MANAGER), User.id)
+    stmt = select(User).where(User.is_active.is_(True)).order_by((User.role != UserRole.MANAGER), User.id)
     return [LoginUser.model_validate(u) for u in db.scalars(stmt)]
+
+
+@router.get("/deadline-day")
+def public_deadline_day(db: Session = Depends(get_db)):
+    return {"vat_deadline_day": deadline_day(db)}
 
 
 def _recent_failures(db: Session, user_id: int) -> int:

@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
-import { cx, splitUserName } from "./lib/format";
+import { api } from "./lib/api";
+import { cx, DEFAULT_VAT_DEADLINE_DAY, nextDeadlineDate, splitUserName } from "./lib/format";
 import { PhoneSimulator } from "./components/PhoneSimulator";
 import { LoginPanel } from "./components/LoginPanel";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
+import { DeadlineCalendar } from "./components/DeadlineCalendar";
 import { DeadlineDisc } from "./components/PageHeader";
 import { Modal, RoleBadge, Spinner, Toaster } from "./components/ui";
 import { useTheme } from "./lib/theme";
@@ -36,12 +38,22 @@ function readTab(): Tab {
 
 /** Full-page login shown whenever there is no valid session. */
 function LoginScreen() {
+  // No session here, so the logo's day comes from the public endpoint.
+  const [deadlineDay, setDeadlineDay] = useState<number | null>(null);
+  useEffect(() => {
+    api
+      .deadlineDay()
+      .then((r) => setDeadlineDay(r.vat_deadline_day))
+      .catch(() => setDeadlineDay(DEFAULT_VAT_DEADLINE_DAY));
+  }, []);
+  const day = deadlineDay === null ? null : nextDeadlineDate(deadlineDay).getDate();
+
   return (
     <div dir="rtl" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-field p-4 @container lg:justify-start lg:ps-[12vw]">
-      <DeadlineDisc className="pointer-events-none absolute -bottom-[14vh] -end-[8vw] hidden h-[78vh] w-[78vh] text-[34vh] lg:grid" />
+      <DeadlineDisc day={day} className="pointer-events-none absolute -bottom-[14vh] -end-[8vw] hidden h-[78vh] w-[78vh] text-[34vh] lg:grid" />
       <div className="relative w-full max-w-md bg-surface p-7">
         <div className="mb-6 flex items-center gap-3">
-          <DeadlineDisc className="h-11 w-11 text-lg" />
+          <DeadlineDisc day={day} className="h-11 w-11 text-lg" />
           <div>
             <h1 className="font-display text-2xl leading-tight text-ink-900">התחברות למערכת</h1>
             <p className="text-xs text-ink-500" dir="ltr">
@@ -83,7 +95,7 @@ function ProfileSwitcher() {
         </button>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="התחברות למערכת" subtitle="בחרו משתמש/ת והקלידו את הסיסמה">
+      <Modal narrow open={open} onClose={() => setOpen(false)} title="התחברות למערכת" subtitle="בחרו משתמש/ת והקלידו את הסיסמה">
         <div className="p-5">{open && <LoginPanel onDone={() => setOpen(false)} />}</div>
       </Modal>
       <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} />
@@ -116,6 +128,7 @@ export default function App() {
     if (blocked) go("trigger");
   }, [blocked]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const logoDay = settings ? nextDeadlineDate(settings.vat_deadline_day).getDate() : null;
   const openCount = clients.reduce((n, c) => n + (c.is_active ? c.open_ticket_count : 0), 0);
 
   if (!authChecked) {
@@ -138,7 +151,7 @@ export default function App() {
         )}
       >
         <div className="flex items-center gap-2 px-3 pb-5 pt-4">
-          <DeadlineDisc className="h-9 w-9 text-sm" />
+          <DeadlineDisc day={logoDay} className="h-9 w-9 text-sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-end font-display text-base leading-tight text-white" dir="ltr">
               AccountFlow
@@ -191,7 +204,7 @@ export default function App() {
           <button type="button" onClick={() => setNavOpen(true)} aria-label="פתיחת התפריט" className="grid h-9 w-9 place-items-center hover:bg-white/10">
             <Menu className="h-5 w-5" />
           </button>
-          <DeadlineDisc className="h-7 w-7 text-xs" />
+          <DeadlineDisc day={logoDay} className="h-7 w-7 text-xs" />
           <span className="min-w-0 flex-1" />
           <button
             type="button"
@@ -202,13 +215,16 @@ export default function App() {
             <Smartphone className="h-5 w-5" />
           </button>
         </header>
-        <main className="@container/main min-h-0 flex-1 overflow-y-auto">
-          {tab === "trigger" && <QuickDispatch />}
-          {tab === "board" && <ChasingBoard />}
-          {tab === "bulk" && <BulkTax />}
-          {tab === "clients" && <ClientsTemplates />}
-          {tab === "activity" && isManager && <ActivityLog />}
-          {tab === "settings" && <Settings />}
+        <main className="@container/main flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <DeadlineCalendar />
+          <div className="flex-1">
+            {tab === "trigger" && <QuickDispatch />}
+            {tab === "board" && <ChasingBoard />}
+            {tab === "bulk" && <BulkTax />}
+            {tab === "clients" && <ClientsTemplates />}
+            {tab === "activity" && isManager && <ActivityLog />}
+            {tab === "settings" && <Settings />}
+          </div>
         </main>
       </div>
 

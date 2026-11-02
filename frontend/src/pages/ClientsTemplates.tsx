@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Lock, Pencil, Plus, Save, Search, UserX, Users } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
-import { cx, FREQUENCY_LABEL, hasArabic, localizedButtons, NAME_LANGUAGE_ERROR, renderTemplate, splitUserName, templateName, VAT_DEADLINE_DAY } from "../lib/format";
+import { cx, FREQUENCY_LABEL, hasArabic, localizedButtons, NAME_LANGUAGE_ERROR, renderTemplate, splitUserName, templateName, DEFAULT_VAT_DEADLINE_DAY } from "../lib/format";
 import type { Client, ClientInput, ReportingFrequency, Template, TemplateButton } from "../lib/types";
 import { PageHeader } from "../components/PageHeader";
 import { WaBubble } from "../components/WaBubble";
@@ -30,7 +30,7 @@ const SAMPLE_VARS: Record<string, string> = {
 };
 
 function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; onSaved: () => void; onCancel: () => void }) {
-  const { users, toast } = useApp();
+  const { users, toast, settings } = useApp();
   const [form, setForm] = useState<ClientInput>(() =>
     initial
       ? {
@@ -121,7 +121,7 @@ function ClientForm({ initial, onSaved, onCancel }: { initial: Client | null; on
         <Field label="מספר וואטסאפ" hint="05x… או ‎+972… — נשמר בפורמט בינלאומי">
           <input required dir="ltr" value={form.whatsapp_phone} onChange={(e) => set("whatsapp_phone", e.target.value)} className={cx(inputClass, "text-end")} inputMode="tel" />
         </Field>
-        <Field label="תדירות דיווח" hint={`מועד הדיווח: ה-${VAT_DEADLINE_DAY} בחודש${form.reporting_frequency === "BIMONTHLY" ? " (בחודשים אי-זוגיים)" : ""}`}>
+        <Field label="תדירות דיווח" hint={`מועד הדיווח: ה-${settings?.vat_deadline_day ?? DEFAULT_VAT_DEADLINE_DAY} בחודש${form.reporting_frequency === "BIMONTHLY" ? " (בחודשים אי-זוגיים)" : ""}`}>
           <select
             value={form.reporting_frequency}
             onChange={(e) => set("reporting_frequency", e.target.value as ReportingFrequency)}

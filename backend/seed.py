@@ -263,7 +263,7 @@ def seed_demo(db: Session) -> dict:
     _backdate(db, t1, 30)
     t1.next_reminder_at = now + timedelta(hours=18)
 
-    # 2. Mizrahi renovations (HE) — missing ח.פ, 1 reminder sent, overdue (urgent if the 26th is ≤ 3 days away)
+    # 2. Mizrahi renovations (HE) — missing ח.פ, 1 reminder sent, overdue (urgent if the deadline is ≤ 3 days away)
     t2 = send(c[1], "missing_invoice_detail", supplier_name="Ace Building Supplies", invoice_number="88412",
               missing_detail="מספר עוסק מורשה של הספק")
     _add_reminders(db, t2, 1)
@@ -286,7 +286,7 @@ def seed_demo(db: Session) -> dict:
     _upload_demo(db, t5, "clear")
     _backdate(db, t5, 8)
 
-    # 6. Nissim mini-market — 2 reminders, overdue (urgent if the 26th is ≤ 3 days away)
+    # 6. Nissim mini-market — 2 reminders, overdue (urgent if the deadline is ≤ 3 days away)
     t6 = send(c[5], "missing_supplier_invoice", supplier_name="Tnuva Dairy", amount="3,412.75 ₪", invoice_date=d(18))
     _add_reminders(db, t6, 2)
     _backdate(db, t6, 150)

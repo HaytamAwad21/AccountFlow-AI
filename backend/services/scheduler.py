@@ -22,6 +22,7 @@ from services.activity import log_activity
 from services.clock import days_until_deadline, utcnow
 from services.events import queue_event
 from services.i18n import t
+from services.system_settings import deadline_day
 from services.templating import body_for, localized_buttons, render_text
 from services.ticket_engine import (
     DEADLINE_SLUG,
@@ -70,8 +71,9 @@ def _clear_passed_urgency(db: Session, now) -> None:
     """The urgent label belongs to one deadline: once that has passed the ticket is normal again."""
     urgent = db.scalars(select(ChasingTicket).where(
         ChasingTicket.priority == TicketPriority.URGENT_DEADLINE, ChasingTicket.status != TicketStatus.RESOLVED)).all()
+    day = deadline_day(db)
     for ticket in urgent:
-        if days_until_deadline(ticket.client.reporting_frequency, now) > settings.urgent_deadline_days:
+        if days_until_deadline(day, ticket.client.reporting_frequency, now) > settings.urgent_deadline_days:
             ticket.priority = TicketPriority.NORMAL
             touch(db, ticket)
 
@@ -128,7 +130,7 @@ def run_reminder_cycle(db: Session, now=None) -> list[dict]:
             continue
 
         ticket.reminder_count += 1
-        days_left = days_until_deadline(client.reporting_frequency, now)
+        days_left = days_until_deadline(deadline_day(db), client.reporting_frequency, now)
         is_tax = ticket.template.category == TemplateCategory.TAX_READY
 
         if not is_tax and days_left <= settings.urgent_deadline_days:

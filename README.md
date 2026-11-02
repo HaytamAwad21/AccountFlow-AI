@@ -37,7 +37,7 @@ On first start the backend creates `backend/accountflow.db` and seeds it with th
 - 10 SMB clients, each with a 9-digit ח.פ, an assigned worker and a reporting frequency (monthly or bi-monthly).
 - 12 tickets in every state. One of them is a pending allocation-number request.
 
-The VAT deadline is fixed to the 26th of the reporting month. The urgent-deadline escalation therefore fires when the 26th is 3 days away or less. `test_flow.py` pins the date so this path is tested on any day.
+The VAT deadline defaults to the 26th of the reporting month, and managers can change the day in הגדרות. The urgent-deadline escalation fires when the deadline is 3 days away or less. `test_flow.py` pins the date so this path is tested on any day.
 
 A database created by an older release is detected on startup, rebuilt and reseeded automatically.
 
@@ -102,7 +102,7 @@ Each user has three separate fields, plus a status:
 | `full_name` (**שם מלא**) | The name on the profile button, login cards and activity log | יעל לוי |
 | `job_title` (**תפקיד במשרד**) | A small line under the name; optional | פקידת הנה״ח |
 | `role` (**הרשאה**) | A badge: מנהל משרד or עובד משרד; this is what decides permissions | `WORKER` |
-| `is_active` (**סטטוס**) | פעיל / הושעה; a suspended user cannot log in and is signed out at once | `true` |
+| `is_active` (**סטטוס**) | פעיל / הושעה; a suspended user is hidden from the login list, cannot log in and is signed out at once | `true` |
 
 Managers manage users in **הגדרות ▸ עובדי המשרד**:
 
@@ -159,7 +159,7 @@ Each row is written in the same database transaction as the change it describes.
 
 ## Roles and permissions
 
-The profile button at the top of the sidebar shows the logged-in user and their role badge (`מנהל משרד` or `עובד משרד`). Clicking it opens the **התחברות למערכת** modal: pick a user and type their password. Suspended users are listed but cannot log in. The API enforces the rules below from the session token, and the UI mirrors them.
+The profile button at the top of the sidebar shows the logged-in user and their role badge (`מנהל משרד` or `עובד משרד`). Clicking it opens the **התחברות למערכת** modal: pick a user and type their password. Suspended users are hidden from this list and cannot log in. The API enforces the rules below from the session token, and the UI mirrors them.
 
 | Action | Manager (מנהל משרד) | Worker (עובד משרד) |
 | --- | --- | --- |
@@ -211,19 +211,20 @@ Settings live in a single `system_settings` row. `GET /api/settings` returns it,
 | `allocation_number_threshold_nis` | 10,000 | Amount before VAT from which an allocation number is mandatory |
 | `reminder_interval_hours` | 48 | Reminder cadence for new reminders |
 | `max_reminders` | 3 | Reminders before escalation; also applied to open tickets |
+| `vat_deadline_day` | 26 | Day of the month VAT reports are due (1 to 31): next deadlines, days left, the urgent escalation window and the dashboard countdown |
 | `firm_name` | כהן ושות׳ - רואי חשבון | WhatsApp sender name and simulator header |
 | `auto_approve_verified` | false | Resolve fully verified invoices without worker review |
 
 The row also records `updated_at` and `updated_by_user_id`. The values in `.env` are only the initial defaults.
 
-The VAT deadline is not a setting. It is always the **26th** of the reporting month (`VAT_DEADLINE_DAY` in `services/clock.py`), and the API returns it read-only as `vat_deadline_day`.
+If a month is shorter than `vat_deadline_day`, the deadline falls on that month's last day. For example, day 31 means the 30th in November and the 28th in February. Messages and campaigns already sent keep the date they were sent with; open tickets follow a new day on the next reminder cycle.
 
 ### Reporting frequency
 
 Each client has a `reporting_frequency`:
 
-- `MONTHLY` (דיווח חד חודשי): the deadline is the 26th of every month.
-- `BIMONTHLY` (דיווח דו חודשי): periods are Jan–Feb, Mar–Apr and so on. Each period is reported on the 26th of the following odd month (Jan, Mar, May, Jul, Sep, Nov).
+- `MONTHLY` (דיווח חד חודשי): the deadline is the office deadline day (default the 26th) of every month.
+- `BIMONTHLY` (דיווח דו חודשי): periods are Jan–Feb, Mar–Apr and so on. Each period is reported on the office deadline day of the following odd month (Jan, Mar, May, Jul, Sep, Nov).
 
 Managers set the frequency in the client form. The clients table shows it next to the next deadline. Bulk tax sheets may include an optional `reporting_frequency` column for new clients.
 

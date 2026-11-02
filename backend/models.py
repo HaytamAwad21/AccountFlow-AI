@@ -139,7 +139,7 @@ class Client(Base):
     last_reengage_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Legacy column kept for existing databases; WhatsApp contact is Hebrew-only, so it is always "he".
     preferred_language: Mapped[Language] = mapped_column(_enum(Language), default=Language.HE)
-    # VAT deadline is always the 26th; frequency decides which months have one.
+    # The office setting vat_deadline_day sets the day; frequency decides which months have one.
     reporting_frequency: Mapped[ReportingFrequency] = mapped_column(_enum(ReportingFrequency), default=ReportingFrequency.MONTHLY)
     assigned_worker_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     notes: Mapped[str] = mapped_column(Text, default="")
@@ -161,6 +161,7 @@ class SystemSettings(Base):
     allocation_number_threshold_nis: Mapped[int] = mapped_column(Integer, default=10000)
     reminder_interval_hours: Mapped[int] = mapped_column(Integer, default=48)
     max_reminders: Mapped[int] = mapped_column(Integer, default=3)
+    vat_deadline_day: Mapped[int] = mapped_column(Integer, default=26)  # 1-31, clamped to short months
     auto_approve_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

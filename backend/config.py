@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     reminder_interval_hours: int = 48
     urgent_reminder_interval_hours: int = 24
     urgent_deadline_days: int = 3
+    vat_deadline_day: int = 26
     default_max_reminders: int = 3
     snooze_hour: int = 20
 

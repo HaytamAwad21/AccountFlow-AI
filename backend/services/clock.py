@@ -37,10 +37,6 @@ def next_local_hour(hour: int, now_utc: datetime | None = None) -> datetime:
     return local_to_utc(target)
 
 
-# Israeli VAT reports and payments are due on the 26th of the reporting month (not configurable).
-VAT_DEADLINE_DAY = 26
-
-
 def _frequency(value) -> str:
     return str(getattr(value, "value", value) or "MONTHLY").upper()
 
@@ -51,19 +47,20 @@ def is_reporting_month(month: int, frequency="MONTHLY") -> bool:
     return _frequency(frequency) != "BIMONTHLY" or month % 2 == 1
 
 
-def next_deadline(frequency="MONTHLY", now_utc: datetime | None = None) -> date:
-    """Next 26th-of-the-month VAT deadline for a client with the given reporting frequency."""
+def next_deadline(deadline_day: int, frequency="MONTHLY", now_utc: datetime | None = None) -> date:
+    """Next VAT deadline for a client with the given reporting frequency. `deadline_day` is the office
+    setting (services/system_settings.py); a month shorter than it uses its last day."""
     today = local_today(now_utc)
     year, month = today.year, today.month
-    if today.day > VAT_DEADLINE_DAY:
+    if today.day > deadline_day:
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
     while not is_reporting_month(month, frequency):
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
-    return date(year, month, min(VAT_DEADLINE_DAY, calendar.monthrange(year, month)[1]))
+    return date(year, month, min(deadline_day, calendar.monthrange(year, month)[1]))
 
 
-def days_until_deadline(frequency="MONTHLY", now_utc: datetime | None = None) -> int:
-    return (next_deadline(frequency, now_utc) - local_today(now_utc)).days
+def days_until_deadline(deadline_day: int, frequency="MONTHLY", now_utc: datetime | None = None) -> int:
+    return (next_deadline(deadline_day, frequency, now_utc) - local_today(now_utc)).days
 
 
 def fmt_date(d: date | datetime) -> str:

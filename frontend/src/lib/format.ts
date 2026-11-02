@@ -1,7 +1,18 @@
 import type { Client, RenderedButton, ReportingFrequency, Template, TicketPriority, TicketStatus, UserRole } from "./types";
 
 /** Israeli VAT reports and payments are due on the 26th of the reporting month. */
-export const VAT_DEADLINE_DAY = 26;
+export const DEFAULT_VAT_DEADLINE_DAY = 26;
+
+/** The deadline in a month: the office day, or the month's last day when the month is shorter. */
+function deadlineInMonth(year: number, month: number, day: number): Date {
+  return new Date(year, month, Math.min(day, new Date(year, month + 1, 0).getDate()));
+}
+
+/** The next monthly VAT deadline for the office deadline day. */
+export function nextDeadlineDate(day: number, now: Date = new Date()): Date {
+  const thisMonth = deadlineInMonth(now.getFullYear(), now.getMonth(), day);
+  return now.getDate() <= thisMonth.getDate() ? thisMonth : deadlineInMonth(now.getFullYear(), now.getMonth() + 1, day);
+}
 
 export const FREQUENCY_LABEL: Record<ReportingFrequency, string> = {
   MONTHLY: "דיווח חד חודשי",
@@ -120,9 +131,10 @@ export function isoMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** The period a VAT report due on the next 26th covers: the month before it, as "YYYY-MM". */
-export function defaultTaxPeriod(now: Date = new Date()): string {
-  return isoMonth(new Date(now.getFullYear(), now.getMonth() + (now.getDate() <= VAT_DEADLINE_DAY ? -1 : 0), 1));
+/** The period a VAT report due on the next deadline covers: the month before it, as "YYYY-MM". */
+export function defaultTaxPeriod(day: number, now: Date = new Date()): string {
+  const due = nextDeadlineDate(day, now);
+  return isoMonth(new Date(due.getFullYear(), due.getMonth() - 1, 1));
 }
 
 /** "2026-09" -> "09/2026"; null when invalid. */

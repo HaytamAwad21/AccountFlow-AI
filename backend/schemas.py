@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from models import (
@@ -158,7 +158,7 @@ class ClientOut(ORMModel):
     created_at: UTCDateTime
     open_ticket_count: int = 0
     days_to_deadline: int = 0
-    next_deadline: str = ""  # dd/mm/yyyy — always the 26th of a reporting month
+    next_deadline: str = ""  # dd/mm/yyyy — the office deadline day of a reporting month
     last_message_at: UTCDateTime | None = None
     last_message_preview: str | None = None
 
@@ -357,7 +357,7 @@ class SettingsOut(BaseModel):
     allocation_number_threshold_nis: int
     reminder_interval_hours: int
     max_reminders: int
-    vat_deadline_day: int  # read-only: fixed by law to the 26th
+    vat_deadline_day: int
     auto_approve_verified: bool
     updated_at: UTCDateTime
     updated_by_user_id: int | None
@@ -376,7 +376,15 @@ class SettingsUpdate(BaseModel):
     allocation_number_threshold_nis: int | None = Field(None, ge=0, le=10_000_000)
     reminder_interval_hours: int | None = Field(None, ge=1, le=720)
     max_reminders: int | None = Field(None, ge=1, le=10)
+    vat_deadline_day: int | None = None
     auto_approve_verified: bool | None = None
+
+    @field_validator("vat_deadline_day", mode="before")
+    @classmethod
+    def _deadline_day_in_month(cls, value):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 31):
+            raise PydanticCustomError("vat_deadline_day", "יום הדיווח חייב להיות מספר שלם מ-1 עד 31")
+        return value
 
 
 class KpiOut(BaseModel):

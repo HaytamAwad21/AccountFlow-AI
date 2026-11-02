@@ -1,4 +1,5 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode, type Ref } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Briefcase, CheckCircle2, Crown, Eye, EyeOff, Info, Loader2, X, XCircle } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { PRIORITY_META, ROLE_LABEL, STATUS_META, cx } from "../lib/format";
@@ -153,6 +154,8 @@ export function Empty({ icon, title, hint }: { icon: ReactNode; title: string; h
   );
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   open,
   onClose,
@@ -160,6 +163,7 @@ export function Modal({
   subtitle,
   children,
   wide = false,
+  narrow = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -167,34 +171,73 @@ export function Modal({
   subtitle?: ReactNode;
   children: ReactNode;
   wide?: boolean;
+  /** A small centred dialog whose body scrolls inside it. */
+  narrow?: boolean;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  // Focus moves into the dialog and returns to whatever opened it.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    if (!panelRef.current?.contains(opener)) panelRef.current?.focus();
+    return () => opener?.focus();
+  }, [open]);
+
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0d1533]/70 p-4 sm:p-8" onMouseDown={onClose}>
+
+  const trapTab = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab") return;
+    const items = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
+    if (!items?.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey ? active === first || active === panelRef.current : active === last) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    }
+  };
+
+  // Portalled to <body>: the sidebar's transform would otherwise trap `fixed` inside its width.
+  return createPortal(
+    <div
+      dir="rtl"
+      className={cx("fixed inset-0 z-50 flex justify-center overflow-y-auto bg-[#0d1533]/70 p-4", narrow ? "items-center" : "items-start sm:p-8")}
+      onMouseDown={onClose}
+    >
       <div
-        className={cx("w-full animate-slide-in border border-ink-300 bg-surface", wide ? "max-w-6xl" : "max-w-xl")}
+        ref={panelRef}
+        tabIndex={-1}
+        className={cx(
+          "animate-slide-in border border-ink-300 bg-surface outline-none",
+          narrow ? "flex max-h-[80vh] w-[440px] max-w-[calc(100vw-32px)] flex-col" : cx("w-full", wide ? "max-w-6xl" : "max-w-xl"),
+        )}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={trapTab}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-ink-300 px-6 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink-300 px-6 py-4">
           <div className="min-w-0">
-            <div className="font-display text-xl leading-tight text-ink-900">{title}</div>
+            <div className={cx("font-display text-xl leading-tight text-ink-900", narrow && "whitespace-nowrap")}>{title}</div>
             {subtitle && <div className="mt-1 text-sm text-ink-500">{subtitle}</div>}
           </div>
           <button onClick={onClose} className="p-1.5 text-ink-500 hover:bg-ink-100 hover:text-ink-900" aria-label="סגירה">
             <X className="h-5 w-5" />
           </button>
         </div>
-        {children}
+        {narrow ? <div className="min-h-0 overflow-y-auto">{children}</div> : children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

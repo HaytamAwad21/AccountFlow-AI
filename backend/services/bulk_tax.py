@@ -14,6 +14,7 @@ from services.clock import fmt_date, next_deadline
 from services.demo_invoices import parse_amount
 from services.money import format_money
 from services.i18n import NAME_LANGUAGE_ERROR, has_arabic
+from services.system_settings import deadline_day
 from services.ticket_engine import EngineError, create_and_send_ticket, recount_campaign, template_by_slug, TAX_SLUG
 from services.whatsapp import normalize_phone
 
@@ -255,15 +256,15 @@ def run_bulk_campaign(db: Session, rows: list[dict], title: str | None = None, w
     return {"campaign": campaign, "errors": errors, "created_clients": created_clients, "sent": sent}
 
 
-def default_period_and_due() -> tuple[str, str]:
-    """The next 26th-of-the-month VAT deadline and the (monthly) period it reports: the month before."""
-    due = next_deadline()
+def default_period_and_due(db: Session) -> tuple[str, str]:
+    """The next VAT deadline and the (monthly) period it reports: the month before."""
+    due = next_deadline(deadline_day(db))
     period_month = due.replace(day=1) - timedelta(days=1)
     return f"{period_month.month:02d}/{period_month.year}", fmt_date(due)
 
 
-def sample_rows() -> list[dict]:
-    period, due = default_period_and_due()
+def sample_rows(db: Session) -> list[dict]:
+    period, due = default_period_and_due(db)
     return [
         {"client_tax_id": "514782301", "client_phone": "+972521234501", "client_name": "משה גבאי", "tax_period": period,
          "vat_amount": "4820.00", "tax_advance_amount": "2150.00", "due_date": due, "national_insurance": "640.00"},
@@ -274,8 +275,8 @@ def sample_rows() -> list[dict]:
     ]
 
 
-def sample_sheet(fmt: str = "csv") -> tuple[bytes, str, str]:
-    df = pd.DataFrame(sample_rows(), columns=REQUIRED_COLUMNS + ["national_insurance"])
+def sample_sheet(db: Session, fmt: str = "csv") -> tuple[bytes, str, str]:
+    df = pd.DataFrame(sample_rows(db), columns=REQUIRED_COLUMNS + ["national_insurance"])
     if fmt == "xlsx":
         buf = io.BytesIO()
         df.to_excel(buf, index=False, sheet_name="Monthly Tax")
@@ -288,7 +289,7 @@ def demo_batch_rows(db: Session, limit: int = 8) -> list[dict]:
     clients = db.scalars(select(Client).where(Client.is_active.is_(True)).order_by(Client.id).limit(limit)).all()
     if not clients:
         raise EngineError("אין לקוחות פעילים לשליחת הדגמה")
-    period, due = default_period_and_due()
+    period, due = default_period_and_due(db)
     rows = []
     for i, c in enumerate(clients):
         vat = 1850 + (i * 1373) % 9200

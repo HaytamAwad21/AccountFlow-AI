@@ -3,8 +3,7 @@
 The row is created on first access from the env defaults in `config.py`; afterwards
 managers edit it from the Settings tab and every engine reads the live values:
 VAT rate (Vision AI math check + demo invoices), allocation-number threshold,
-reminder cadence, max reminders and the firm name shown on WhatsApp. The VAT deadline is
-not a setting: it is always the 26th (services/clock.py).
+reminder cadence, max reminders, the firm name shown on WhatsApp and the VAT deadline day.
 """
 from __future__ import annotations
 
@@ -24,11 +23,17 @@ def get_system_settings(db: Session) -> SystemSettings:
             allocation_number_threshold_nis=env.allocation_number_threshold_nis,
             reminder_interval_hours=env.reminder_interval_hours,
             max_reminders=env.default_max_reminders,
+            vat_deadline_day=env.vat_deadline_day,
             auto_approve_verified=env.auto_approve_verified,
         )
         db.add(row)
         db.flush()
     return row
+
+
+def deadline_day(db: Session) -> int:
+    """Day of the month VAT reports are due; services/clock.py clamps it to short months."""
+    return get_system_settings(db).vat_deadline_day
 
 
 def vat_fraction(db: Session) -> float:

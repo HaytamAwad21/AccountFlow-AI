@@ -39,7 +39,7 @@ from services.clock import days_until_deadline, next_local_hour, utcnow
 from services.events import queue_event
 from services.i18n import classify_missing_detail, t
 from services.no_emoji import strip_buttons, strip_emoji
-from services.system_settings import auto_approve_enabled, firm_name, get_system_settings
+from services.system_settings import auto_approve_enabled, deadline_day, firm_name, get_system_settings
 from services.templating import (
     AUTO_VARIABLES,
     body_for,
@@ -139,7 +139,7 @@ def auto_variables(db: Session, client: Client) -> dict:
         "client_name": client.full_name,
         "company_name": client.company_name,
         "open_items_count": str(open_items_count(db, client.id)),
-        "days_left": str(days_until_deadline(client.reporting_frequency)),
+        "days_left": str(days_until_deadline(deadline_day(db), client.reporting_frequency)),
     }
 
 

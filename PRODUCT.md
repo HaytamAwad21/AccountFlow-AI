@@ -23,7 +23,7 @@ The firm's clients do not install or learn anything: everything happens in Whats
 ## Operating Context
 
 - Locally hosted on the firm's own computer, used in the office. It is not a public website.
-- The working rhythm follows the VAT deadline, fixed to the 26th of the reporting month, for monthly and bi-monthly clients.
+- The working rhythm follows the VAT deadline, by default the 26th of the reporting month and editable in the office settings, for monthly and bi-monthly clients.
 - A clerk's typical pass: send a request, watch the live board, open a ticket, read the WhatsApp timeline and the receipt, approve or reject.
 - A built-in phone simulator shows exactly what the client sees in WhatsApp.
 
