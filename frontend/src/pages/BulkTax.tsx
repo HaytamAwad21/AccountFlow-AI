@@ -54,7 +54,8 @@ function ProgressBar({ c }: { c: Campaign }) {
 }
 
 export function BulkTax() {
-  const { tick, toast, selectClient } = useApp();
+  const { tick, toast, selectClient, settings } = useApp();
+  const demoMode = settings?.demo_mode ?? false;
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selected, setSelected] = useState<CampaignDetail | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -170,9 +171,12 @@ export function BulkTax() {
                 XLSX
               </Button>
             </div>
-            <Button variant="secondary" className="mt-3 w-full" icon={<Sparkles className="h-4 w-4" />} loading={busy === "demo"} onClick={demo}>
-              טעינת קבוצת הדגמה מיידית (8 לקוחות)
-            </Button>
+            {/* made-up amounts: a demo install only, never real clients */}
+            {demoMode && (
+              <Button variant="secondary" className="mt-3 w-full" icon={<Sparkles className="h-4 w-4" />} loading={busy === "demo"} onClick={demo}>
+                טעינת קבוצת הדגמה מיידית (8 לקוחות)
+              </Button>
+            )}
             {errors.length > 0 && (
               <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
                 <p className="mb-1 font-semibold">שורות שדולגו</p>
@@ -188,7 +192,11 @@ export function BulkTax() {
           <Card className="p-4">
             <h3 className="mb-2 font-display text-lg leading-tight text-ink-900">קמפיינים</h3>
             {campaigns.length === 0 ? (
-              <Empty icon={<Megaphone className="h-8 w-8" />} title="עדיין לא נשלחו תפוצות" hint="העלו גיליון או טענו את קבוצת ההדגמה." />
+              <Empty
+                icon={<Megaphone className="h-8 w-8" />}
+                title="עדיין לא נשלחו תפוצות"
+                hint={demoMode ? "העלו גיליון או טענו את קבוצת ההדגמה." : "העלו גיליון כדי לשלוח את הדיווח ללקוחות."}
+              />
             ) : (
               campaigns.map((c) => (
                 <button

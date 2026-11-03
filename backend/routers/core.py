@@ -428,6 +428,7 @@ def _settings_out(db: Session) -> SettingsOut:
         updated_by_name=row.updated_by.full_name if row.updated_by else None,
         vision_provider=active_provider(),
         whatsapp_live=settings.whatsapp_live,
+        demo_mode=settings.demo_mode,
         timezone=settings.timezone,
         urgent_deadline_days=settings.urgent_deadline_days,
         scheduler=scheduler_status(),

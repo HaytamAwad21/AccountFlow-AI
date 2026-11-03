@@ -11,12 +11,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import SessionLocal, init_db
-from routers import activity, auth, campaigns, core, scheduler as scheduler_router, tickets, webhook, whatsapp
-from seed import ensure_passwords, seed_if_empty, upgrade_templates
+from routers import activity, auth, campaigns, core, files, scheduler as scheduler_router, tickets, webhook, whatsapp
+from seed import ensure_passwords, install_office_defaults, seed_if_empty, upgrade_templates
 from services.events import broker
 from services.activity import cleanup_legacy_activity
 from services.history import hebrewize_message_history
@@ -35,6 +34,8 @@ async def lifespan(_app: FastAPI):
         result = seed_if_empty()
         if result.get("seeded"):
             log.info("Seeded demo data: %s", result)
+    elif install_office_defaults():
+        log.info("New office: message templates installed; create the first manager on the setup screen.")
     with SessionLocal() as db:
         hebrewize_message_history(db)  # WhatsApp chat is Hebrew-only, also for older history
         purge_emojis_from_db(db)  # strict no-emoji policy, also for templates and history from older releases
@@ -77,7 +78,5 @@ async def engine_error_handler(_request: Request, exc: EngineError):
 
 
 for r in (auth.router, core.router, tickets.router, webhook.router, whatsapp.router, scheduler_router.router, campaigns.router,
-          activity.router):
+          activity.router, files.router):
     app.include_router(r)
-
-app.mount("/uploads", StaticFiles(directory=str(settings.upload_dir)), name="uploads")

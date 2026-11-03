@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, StringConstraints, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 from models import (
@@ -95,6 +95,16 @@ class LoginResponse(BaseModel):
     token: str
     expires_at: UTCDateTime
     user: UserOut
+
+
+class FirstSetupRequest(BaseModel):
+    """The setup screen of a new office: its name and the first manager."""
+    setup_code: str = Field("", max_length=200)
+    firm_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
+    full_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
+    job_title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = ""
+    email: str = Field(min_length=5, max_length=180, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=6, max_length=128)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -383,6 +393,7 @@ class SettingsOut(BaseModel):
     # read-only runtime info
     vision_provider: str
     whatsapp_live: bool
+    demo_mode: bool
     timezone: str
     urgent_deadline_days: int
     scheduler: dict

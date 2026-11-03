@@ -259,7 +259,7 @@ export interface AppSettings {
   allocation_number_threshold_nis: number;
   reminder_interval_hours: number;
   max_reminders: number;
-  /** Fixed by law: VAT reports are due on the 26th (read-only) */
+  /** Day of the month VAT reports are due (default the 26th); managers change it in Settings */
   vat_deadline_day: number;
   auto_approve_verified: boolean;
   updated_at: string;
@@ -267,6 +267,8 @@ export interface AppSettings {
   updated_by_name: string | null;
   vision_provider: string;
   whatsapp_live: boolean;
+  /** Demo install: the phone simulator can act as the client and the demo tools work */
+  demo_mode: boolean;
   timezone: string;
   urgent_deadline_days: number;
   scheduler: { enabled: boolean; running: boolean; interval_seconds: number; next_run_at: string | null };
@@ -347,6 +349,16 @@ export interface LoginResponse {
   token: string;
   expires_at: string;
   user: User;
+}
+
+/** First-run setup of a new office (POST /api/auth/setup). */
+export interface OfficeSetup {
+  setup_code: string;
+  firm_name: string;
+  full_name: string;
+  job_title: string;
+  email: string;
+  password: string;
 }
 
 export interface ActivityEntry {

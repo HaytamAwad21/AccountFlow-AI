@@ -5,6 +5,7 @@ import { api } from "./lib/api";
 import { cx, DEFAULT_VAT_DEADLINE_DAY, nextDeadlineDate, splitUserName } from "./lib/format";
 import { PhoneSimulator } from "./components/PhoneSimulator";
 import { LoginPanel } from "./components/LoginPanel";
+import { SetupPanel } from "./components/SetupPanel";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { DeadlineCalendar } from "./components/DeadlineCalendar";
 import { DeadlineDisc } from "./components/PageHeader";
@@ -38,32 +39,37 @@ function readTab(): Tab {
   return TABS.some((t) => t.key === h) ? h : "trigger";
 }
 
-/** Full-page login shown whenever there is no valid session. */
+/** Full-page login shown whenever there is no valid session; a new office with no users gets the setup form. */
 function LoginScreen() {
   // No session here, so the logo's day comes from the public endpoint.
   const [deadlineDay, setDeadlineDay] = useState<number | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   useEffect(() => {
     api
       .deadlineDay()
       .then((r) => setDeadlineDay(r.vat_deadline_day))
       .catch(() => setDeadlineDay(DEFAULT_VAT_DEADLINE_DAY));
+    api
+      .setupStatus()
+      .then((r) => setNeedsSetup(r.needed))
+      .catch(() => undefined);
   }, []);
   const day = deadlineDay === null ? null : nextDeadlineDate(deadlineDay).getDate();
 
   return (
     <div dir="rtl" className="relative flex min-h-screen items-center justify-center overflow-hidden bg-field p-4 @container lg:justify-start lg:ps-[12vw]">
       <DeadlineDisc day={day} className="pointer-events-none absolute -bottom-[14vh] -end-[8vw] hidden h-[78vh] w-[78vh] text-[34vh] lg:grid" />
-      <div className="relative w-full max-w-md bg-surface p-7">
+      <div className={cx("relative w-full bg-surface p-7", needsSetup ? "max-w-lg" : "max-w-md")}>
         <div className="mb-6 flex items-center gap-3">
           <DeadlineDisc day={day} className="h-11 w-11 text-lg" />
           <div>
-            <h1 className="font-display text-2xl leading-tight text-ink-900">התחברות למערכת</h1>
+            <h1 className="font-display text-2xl leading-tight text-ink-900">{needsSetup ? "הקמת המשרד במערכת" : "התחברות למערכת"}</h1>
             <p className="text-xs text-ink-500" dir="ltr">
               AccountFlow AI
             </p>
           </div>
         </div>
-        <LoginPanel />
+        {needsSetup ? <SetupPanel /> : <LoginPanel />}
       </div>
       <Toaster />
     </div>

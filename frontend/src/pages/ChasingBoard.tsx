@@ -164,9 +164,12 @@ export function ChasingBoard() {
         hint="כל בקשה פתוחה, מצבה בוואטסאפ ומה הבוט יעשה בהמשך."
         actions={
           <>
-            <Button variant="fieldGhost" size="sm" icon={<FastForward className="h-3.5 w-3.5 -scale-x-100" />} loading={jumping} onClick={timeJump}>
-              הדמיית +{interval} שעות (הפעלת לולאת התזכורות)
-            </Button>
+            {/* sends reminders early: a demo install only */}
+            {settings?.demo_mode && (
+              <Button variant="fieldGhost" size="sm" icon={<FastForward className="h-3.5 w-3.5 -scale-x-100" />} loading={jumping} onClick={timeJump}>
+                הדמיית +{interval} שעות (הפעלת לולאת התזכורות)
+              </Button>
+            )}
             <Button variant="fieldGhost" size="sm" icon={<RefreshCw className="h-3.5 w-3.5" />} loading={checking} onClick={runCheck} title="הרצת מחזור התזכורות לפי השעון האמיתי">
               בדיקה עכשיו
             </Button>

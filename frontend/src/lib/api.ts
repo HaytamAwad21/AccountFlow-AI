@@ -11,6 +11,7 @@ import type {
   InboundResult,
   Kpis,
   LoginResponse,
+  OfficeSetup,
   LoginUser,
   Message,
   QuickSendResponse,
@@ -165,6 +166,8 @@ export const api = {
     }
   },
   me: () => request<User>("/api/auth/me"),
+  setupStatus: () => request<{ needed: boolean }>("/api/auth/setup"),
+  setup: (body: OfficeSetup) => request<LoginResponse>("/api/auth/setup", { method: "POST", ...json(body) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ ok: boolean }>("/api/auth/change-password", {
       method: "POST",

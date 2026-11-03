@@ -25,7 +25,11 @@ class Settings(BaseSettings):
 
     # SQLite by default; set DATABASE_URL=postgresql+psycopg://user:pass@host/db for production.
     database_url: str = f"sqlite:///{(BASE_DIR / 'accountflow.db').as_posix()}"
+    # Demo mode: fill an empty database with demo users, clients and requests. A real office sets false:
+    # it starts with the message templates only and creates its first manager on the setup screen.
     seed_on_startup: bool = True
+    # Secret code the first manager types on the setup screen of an empty, non-demo install. Empty: setup is closed.
+    setup_code: str = ""
 
     timezone: str = "Asia/Jerusalem"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -75,6 +79,8 @@ class Settings(BaseSettings):
 
     # Login & sessions
     session_hours: int = 12
+    # The session cookie lets <img> tags and the live-update stream prove the login; true sends it over HTTPS only.
+    cookie_secure: bool = False
     login_max_failures: int = 5
     login_lockout_minutes: int = 15
     # Given to existing users that have no password yet (e.g. after upgrading an older database).
@@ -83,6 +89,12 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def demo_mode(self) -> bool:
+        """A demo install (SEED_ON_STARTUP=true): the phone simulator can act as a client, and the demo tools
+        (time jump, demo tax batch, demo invoices) work. A real office has neither: they would message real clients."""
+        return self.seed_on_startup
 
     @property
     def whatsapp_live(self) -> bool:

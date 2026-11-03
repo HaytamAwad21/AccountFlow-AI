@@ -262,6 +262,29 @@ def _upload_demo(db: Session, ticket: ChasingTicket, scenario: str) -> None:
     handle_media(db, ticket.client, path, f"/uploads/{path.name}", "image/png", ticket.id, "")
 
 
+def _add_templates(db: Session) -> dict[str, MessageTemplate]:
+    templates: dict[str, MessageTemplate] = {}
+    for data in TEMPLATES:
+        tpl = MessageTemplate(**{"is_system": False, **data})
+        db.add(tpl)
+        templates[data["slug"]] = tpl
+    db.flush()
+    return templates
+
+
+def install_office_defaults() -> bool:
+    """What every install needs, demo or real: the office-settings row and the 6 message templates.
+    Does nothing once templates exist. Returns True when it installed them."""
+    with SessionLocal() as db:
+        get_system_settings(db)
+        if db.scalar(select(MessageTemplate.id).limit(1)):
+            db.commit()
+            return False
+        _add_templates(db)
+        db.commit()
+        return True
+
+
 def seed_demo(db: Session) -> dict:
     from services.ticket_engine import approve_ticket, create_and_send_ticket, handle_button
 
@@ -273,12 +296,7 @@ def seed_demo(db: Session) -> dict:
     db.add_all(users)
     db.flush()
 
-    templates: dict[str, MessageTemplate] = {}
-    for data in TEMPLATES:
-        tpl = MessageTemplate(**{"is_system": False, **data})
-        db.add(tpl)
-        templates[data["slug"]] = tpl
-    db.flush()
+    templates = _add_templates(db)
 
     clients: list[Client] = []
     for data in _clients():

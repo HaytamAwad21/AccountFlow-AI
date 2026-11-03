@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import BulkTaxCampaign, User
-from routers.deps import client_ip, require_user
+from routers.deps import client_ip, require_demo_mode, require_user
 from services.activity import log_activity
 from schemas import BulkUploadResult, CampaignDetail, CampaignOut, campaign_out
 from services.bulk_tax import campaign_stats, demo_batch_rows, read_sheet, run_bulk_campaign, sample_sheet
@@ -69,7 +69,7 @@ async def bulk_tax_upload(
     return _finish(db, result, user, client_ip(request), f"קובץ {file.filename}")
 
 
-@router.post("/demo-batch", response_model=BulkUploadResult, status_code=201)
+@router.post("/demo-batch", response_model=BulkUploadResult, status_code=201, dependencies=[Depends(require_demo_mode)])
 def demo_batch(request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
     rows = demo_batch_rows(db, limit=8)
     result = run_bulk_campaign(db, rows, worker_id=user.id)

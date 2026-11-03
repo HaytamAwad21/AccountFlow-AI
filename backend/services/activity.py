@@ -32,6 +32,7 @@ ACTION_LABELS: dict[str, str] = {
     "CLIENT_DEACTIVATED": "השבתת לקוח",
     "TEMPLATE_UPDATED": "עדכון תבנית הודעה",
     "SETTINGS_UPDATED": "עדכון הגדרות המשרד",
+    "OFFICE_SETUP": "הקמת המשרד במערכת",
     "USER_CREATED": "הוספת עובד",
     "USER_UPDATED": "עדכון עובד",
     "PASSWORD_RESET": "איפוס סיסמה",

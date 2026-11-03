@@ -114,6 +114,13 @@ def init_db() -> None:
 
     _add_missing_columns()
     if _schema_outdated():
+        if not settings.seed_on_startup:
+            # A real office's data is never dropped automatically: stop and let the operator decide.
+            raise RuntimeError(
+                "The database was created by an older AccountFlow release that cannot be upgraded in place. "
+                "Nothing was changed. Restore a backup made by this release, or (demo installs only) set "
+                "SEED_ON_STARTUP=true to rebuild it with demo data."
+            )
         logging.getLogger("accountflow").warning("Outdated database schema detected: rebuilding tables and reseeding demo data.")
         legacy = MetaData()
         legacy.reflect(bind=engine)

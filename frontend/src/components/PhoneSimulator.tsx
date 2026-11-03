@@ -45,7 +45,9 @@ export function PhoneSimulator() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const asWorker = composeAs === "worker";
+  // A real office only writes as itself: acting as the client would answer real clients on WhatsApp.
+  const demoMode = settings?.demo_mode ?? false;
+  const asWorker = !demoMode || composeAs === "worker";
 
   const load = useCallback(async () => {
     if (!client) return;
@@ -215,10 +217,10 @@ export function PhoneSimulator() {
       <button
         onClick={() => setPhoneOpen(true)}
         className="fixed end-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 bg-field px-2 py-4 text-white transition-colors hover:bg-brand-500"
-        title="פתיחת סימולטור הוואטסאפ של הלקוח"
+        title={demoMode ? "פתיחת סימולטור הוואטסאפ של הלקוח" : "פתיחת שיחת הוואטסאפ עם הלקוח"}
       >
         <Smartphone className="h-5 w-5" />
-        <span className="text-[11px] font-semibold [writing-mode:vertical-rl]">הטלפון של הלקוח</span>
+        <span className="text-[11px] font-semibold [writing-mode:vertical-rl]">{demoMode ? "הטלפון של הלקוח" : "שיחת הלקוח"}</span>
       </button>
     );
   }
@@ -236,7 +238,7 @@ export function PhoneSimulator() {
     <aside className="fixed inset-y-0 end-0 z-30 flex w-[400px] max-w-full flex-col border-s border-ink-300 bg-ink-100 xl:static xl:z-auto xl:w-[340px] 2xl:w-[400px]">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-ink-900">סימולטור וואטסאפ חי של הלקוח</p>
+          <p className="text-sm font-bold text-ink-900">{demoMode ? "סימולטור וואטסאפ חי של הלקוח" : "שיחת הוואטסאפ עם הלקוח"}</p>
           <p className="flex items-center gap-1 text-[11px] text-ink-500">
             {live ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
             {live ? "מחובר בזמן אמת" : "מתחבר מחדש (רענון תקופתי)"}
@@ -246,6 +248,12 @@ export function PhoneSimulator() {
           <ChevronLeft className="h-4 w-4 rotate-180" />
         </button>
       </div>
+
+      {!demoMode && settings && !settings.whatsapp_live && (
+        <p className="mx-3 mb-2 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900">
+          וואטסאפ עדיין לא מחובר: ההודעות נשמרות כאן ולא מגיעות ללקוחות.
+        </p>
+      )}
 
       <div className="px-3">
         <select value={client?.id ?? ""} onChange={(e) => selectClient(Number(e.target.value))} className={cx(inputClass, "py-1.5 pe-8 ps-2")}>
@@ -326,7 +334,7 @@ export function PhoneSimulator() {
                     type={m.message_type}
                     automated={m.is_automated}
                     senderName={m.sender_name}
-                    buttonsDisabled={!liveButtonMessageIds.has(m.id) || busy !== null}
+                    buttonsDisabled={!demoMode || !liveButtonMessageIds.has(m.id) || busy !== null}
                     onButton={onButton(m)}
                   />
                 ))}
@@ -389,10 +397,12 @@ export function PhoneSimulator() {
             </div>
           )}
 
-          {/* composer mode switch */}
-          <div className="bg-wa-bar px-2 pt-2">
-            <ComposerSwitch value={composeAs} onChange={switchComposer} disabled={!client || busy !== null} />
-          </div>
+          {/* composer mode switch: a demo install only */}
+          {demoMode && (
+            <div className="bg-wa-bar px-2 pt-2">
+              <ComposerSwitch value={composeAs} onChange={switchComposer} disabled={!client || busy !== null} />
+            </div>
+          )}
 
           {/* pending worker attachment (sent together with the text) */}
           {asWorker && workerFile && (

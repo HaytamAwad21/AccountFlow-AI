@@ -13,6 +13,8 @@ Automated client-chasing, missing-invoice collection and monthly tax notificatio
   - **Israel Tax Authority (רשות המסים) rules:** a 9-digit supplier ח.פ / ע.מ, and a 9-digit **מספר הקצאה** (allocation number) on invoices at or above the allocation threshold.
 - **Manager / worker roles.** Managers administer clients, templates, office settings and staff. Workers send messages, work the chasing board and approve invoices.
 
+**Installing it for a real accounting firm:** follow [DEPLOY.md](DEPLOY.md). It covers the server, HTTPS, the first manager, WhatsApp, OpenAI and backups. The quick start below runs the demo.
+
 ## Quick start
 
 ```bash
@@ -39,7 +41,19 @@ On first start the backend creates `backend/accountflow.db` and seeds it with th
 
 The VAT deadline defaults to the 26th of the reporting month, and managers can change the day in הגדרות. The urgent-deadline escalation fires when the deadline is 3 days away or less. `test_flow.py` pins the date so this path is tested on any day.
 
-A database created by an older release is detected on startup, rebuilt and reseeded automatically.
+A database created by an older release is detected on startup, rebuilt and reseeded automatically. That happens on a demo install only: with `SEED_ON_STARTUP=false` the API refuses to start instead and changes nothing.
+
+### Demo install and real office
+
+`SEED_ON_STARTUP` decides which kind of install this is:
+
+| | Demo (`true`, the default) | Real office (`false`, set by `docker-compose.prod.yml`) |
+| --- | --- | --- |
+| Empty database | Demo users, clients and requests | The office settings and the 6 templates only |
+| First manager | The demo users below | Created on the setup screen (**הקמת המשרד במערכת**) with `SETUP_CODE` from `.env` |
+| Phone panel | Simulator: reply as the client, demo invoices, blue ticks on open | The office's chat with the client: send as the office only; read receipts come from Meta |
+| Demo tools | "+48 hours" time jump, demo tax batch | Hidden, and refused by the API with 403: they would message real clients |
+| Outdated database | Rebuilt with demo data | Start-up stops; nothing is deleted |
 
 Options:
 
@@ -125,6 +139,7 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
 - **Password storage:** passwords are stored as salted PBKDF2-SHA256 hashes (`services/security.py`) and are never returned by the API.
 - **Sessions:**
   - `POST /api/auth/login` returns a random session token. The browser sends it as `Authorization: Bearer <token>`.
+  - Login also sets the same token as an `HttpOnly`, `SameSite=Strict` cookie, because `<img>` tags and the live-update stream cannot send a header. Only those two read-only GETs accept the cookie; every API call still needs the header. `COOKIE_SECURE=true` (set in production) sends the cookie over HTTPS only.
   - Only the token's SHA-256 digest is stored, in `user_sessions`.
   - Sessions expire after `SESSION_HOURS` (default 12).
   - Logout, a password reset or suspending a user revokes that user's sessions immediately.
@@ -134,8 +149,9 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
 - **Protected endpoints:** every data endpoint requires a valid session, and `X-User-Id` headers are no longer trusted. These stay public:
   - The WhatsApp webhook, for Meta only: every Cloud API post must carry a valid `X-Hub-Signature-256` (see [WhatsApp](#whatsapp)). Simulator messages and uploads on the same path need a login.
   - The login-screen user list, which has no e-mails.
+  - Whether a new office still needs its setup screen (`GET /api/auth/setup`).
   - `/api/health`.
-  - The real-time event stream, which carries only change notifications.
+- **Uploaded documents** (`/uploads/<file>`) and the real-time event stream need a login too, through the header or the session cookie. A link to a client's invoice is useless without a session.
 
 ### Activity log (יומן פעילות)
 
@@ -246,7 +262,7 @@ Databases from earlier releases keep working: on startup the request template is
 
 ### Documents page (מסמכים מלקוחות)
 
-The tab under לוח מעקב חי lists every photo or PDF a selected client sent on WhatsApp, newest first: its type, date, the request it answered and that request's status and check result. Documents sent without any open request are listed too. Filters narrow the list by type and by month; a click opens the file full size, and the request link opens the ticket. When a client sent a document again for the same request, the earlier copy is marked as replaced. The data comes from `GET /api/clients/{id}/documents` (any logged-in user).
+The tab under לוח מעקב חי lists every photo or PDF a selected client sent on WhatsApp, newest first: its type, date, the request it answered and that request's status and check result. Documents sent without any open request are listed too. Tabs narrow the list by type. A bank-style **טווח זמן** dropdown narrows it by period: כל התקופה, the current or previous month, the last 2, 3, 6 or 12 months, מתחילת השנה, or **טווח תאריכים** with a start and end date (typed or picked on the calendar). A two-digit year means 20yy: `03/04/27` becomes `03/04/2027` once the field is left, in every date field of the app. A date that is unfinished, does not exist, or starts after the end date shows an error instead of being ignored. Each period shows how many documents it holds, and the chosen period stays when another client is selected. A click opens the file full size, and the request link opens the ticket. When a client sent a document again for the same request, the earlier copy is marked as replaced. The data comes from `GET /api/clients/{id}/documents` (any logged-in user).
 
 ## 5-minute demo script
 
@@ -370,6 +386,8 @@ This applies only when the Cloud API is configured. In simulator-only mode every
 | --- | --- | --- | --- |
 | GET / POST / PUT | `/api/users`, `/api/users/{id}` | read: logged-in · write: manager | Office staff: `full_name`, `job_title`, `role`, `is_active`, password |
 | GET / POST | `/api/auth/users`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/change-password` | login list: public · rest: session | Password login and sessions |
+| GET / POST | `/api/auth/setup` | public; POST needs `SETUP_CODE` and an office with no users | First-run setup: the firm name and the first manager |
+| GET | `/uploads/{file}` | session (header or cookie) | Client documents and office attachments |
 | GET | `/api/activity` | manager | Activity log (יומן פעילות) |
 | GET / PUT | `/api/settings` | read: all · write: manager | Office configuration |
 | POST / PUT / DELETE | `/api/clients…` | manager | Client management (soft delete) |
@@ -377,19 +395,22 @@ This applies only when the Cloud API is configured. In simulator-only mode every
 | POST | `/api/whatsapp/manual-send` | any user | Worker's manual message (multipart: `client_id`, `content_text`, `image_file` / `image_base64` / `media_url`); not automated, logged as **שליחת הודעה ידנית ללקוח** |
 | POST | `/api/tickets/{id}/approve` | any user | Approve a verified invoice |
 | POST | `/api/tickets/{id}/reject` | any user | Reject the invoice `{reason}`: the client gets the Hebrew re-prompt with the reason, and the ticket returns to NEEDS_CORRECTION |
-| POST | `/api/webhook/whatsapp-inbound` | Meta: signed (`X-Hub-Signature-256`) · simulator: any user | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
-| POST | `/api/simulator/demo-receipt` | public | `clear`, `blurry`, `missing_number`, `wrong_supplier`, `bad_math`, `missing_allocation`, `invalid_tax_id` |
-| POST | `/api/scheduler/simulate-time-jump?hours=48` | public | Move pending reminders back, run the cycle (demo) |
-| POST | `/api/campaigns/bulk-tax-upload`, `/api/campaigns/demo-batch` | any user | Bulk "tax is ready" broadcast |
-| GET | `/api/events/stream` | public | Server-Sent Events for real-time UI updates |
+| POST | `/api/webhook/whatsapp-inbound` | Meta: signed (`X-Hub-Signature-256`) · simulator: any user, demo install only | Simulator JSON, Meta envelope or multipart upload; 9-digit validation |
+| POST | `/api/simulator/demo-receipt` | any user, demo install only | `clear`, `blurry`, `missing_number`, `wrong_supplier`, `bad_math`, `missing_allocation`, `invalid_tax_id` |
+| POST | `/api/scheduler/simulate-time-jump?hours=48` | any user, demo install only | Move pending reminders back, run the cycle (demo) |
+| POST | `/api/campaigns/bulk-tax-upload` | any user | Bulk "tax is ready" broadcast |
+| POST | `/api/campaigns/demo-batch` | any user, demo install only | The same broadcast with made-up amounts for the first 8 clients |
+| GET | `/api/events/stream` | session (header or cookie) | Server-Sent Events for real-time UI updates |
 
 Full interactive docs are at `/docs`.
 
 ## Tests
 
 ```bash
-cd backend && python test_flow.py && python test_regressions.py
+cd backend && python test_flow.py && python test_regressions.py && python test_production.py
 ```
+
+`test_production.py` runs a real-office install (`SEED_ON_STARTUP=false`): no demo data, the setup screen and its code, documents and the event stream behind a login, the session cookie, demo tools refused, and an outdated database left untouched.
 
 The test runs against a temporary database through the real HTTP API. It covers the following:
 

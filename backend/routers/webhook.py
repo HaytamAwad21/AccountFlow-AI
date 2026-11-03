@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import SessionLocal, get_db
 from models import ChasingTicket, Client, DeliveryStatus, MessageDirection, MessageType, User, WhatsAppMessageLog
-from routers.deps import current_user, get_client_or_404, require_user
+from routers.deps import (NOT_LOGGED_IN, current_user, get_client_or_404, request_session, require_demo_mode,
+                          require_user)
 from schemas import DemoReceiptRequest, InboundMessage, InboundResult, ticket_out
 from services.demo_invoices import generate_invoice_image, parse_amount
 from services.events import broker, queue_event
@@ -186,13 +187,15 @@ async def whatsapp_inbound(request: Request, user: User | None = Depends(current
     * JSON {object: "whatsapp_business_account", entry: [...]}  – Meta Cloud API webhook; must be
       signed with WHATSAPP_APP_SECRET (X-Hub-Signature-256), a session does not replace the signature
     * multipart/form-data  – simulator file upload (fields: file, client_id | from_phone, ticket_id?,
-      caption?); needs a logged-in office user
-    * JSON InboundMessage  – the in-app simulator (button taps & text); needs a logged-in office user
+      caption?); needs a logged-in office user on a demo install
+    * JSON InboundMessage  – the in-app simulator (button taps & text); needs a logged-in office user on a
+      demo install
     """
     content_type = request.headers.get("content-type", "")
     try:
         if content_type.startswith("multipart/form-data"):
             require_user(user)
+            require_demo_mode()
             form = await request.form()
             upload = form.get("file")
             if upload is None or not hasattr(upload, "read"):
@@ -220,6 +223,7 @@ async def whatsapp_inbound(request: Request, user: User | None = Depends(current
                 raise HTTPException(403, "חתימת ה-webhook חסרה או שגויה")
             return await run_in_threadpool(_process_meta, body)
         require_user(user)
+        require_demo_mode()
         payload = InboundMessage.model_validate(body)
         result = await run_in_threadpool(_process_simple, payload)
         return result.model_dump(mode="json")
@@ -255,7 +259,7 @@ def _demo_receipt(body: DemoReceiptRequest) -> InboundResult:
         return _result(out, started)
 
 
-@router.post("/simulator/demo-receipt", response_model=InboundResult)
+@router.post("/simulator/demo-receipt", response_model=InboundResult, dependencies=[Depends(require_demo_mode)])
 async def simulator_demo_receipt(body: DemoReceiptRequest, _user: User = Depends(require_user)):
     try:
         return await run_in_threadpool(_demo_receipt, body)
@@ -265,8 +269,11 @@ async def simulator_demo_receipt(body: DemoReceiptRequest, _user: User = Depends
 
 @router.post("/simulator/{client_id}/read")
 def simulator_mark_read(client_id: int, db: Session = Depends(get_db), _user: User = Depends(require_user)):
-    """The simulated phone opened the chat: mark outbound messages as READ (blue ticks)."""
+    """The simulated phone opened the chat: mark outbound messages as READ (blue ticks). A real office gets
+    read receipts from Meta only, so the office opening the chat changes nothing there."""
     get_client_or_404(db, client_id)
+    if not settings.demo_mode:
+        return {"ok": True, "updated": 0}
     result = db.execute(
         update(WhatsAppMessageLog)
         .where(
@@ -291,8 +298,16 @@ def simulator_active_ticket(client_id: int, db: Session = Depends(get_db), _user
 
 # ── real-time stream ─────────────────────────────────────────────────────────
 
+def _logged_in(request: Request) -> bool:
+    # A short session of its own: the stream stays open for hours and must not hold a database connection.
+    with SessionLocal() as db:
+        return request_session(db, request) is not None
+
+
 @router.get("/events/stream")
 async def event_stream(request: Request):
+    if not await run_in_threadpool(_logged_in, request):
+        raise HTTPException(401, NOT_LOGGED_IN)
     queue = broker.subscribe()
 
     async def gen():

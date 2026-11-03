@@ -1,1 +1,6 @@
 .githooks/* text eol=lf
+# Run on Linux servers and inside containers: Windows line endings would break them.
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+*.yml text eol=lf
+.env*.example text eol=lf

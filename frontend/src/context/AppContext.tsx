@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { API_BASE, api, getToken, setToken, setUnauthorizedHandler } from "../lib/api";
-import type { AppSettings, Client, ServerEvent, Template, User } from "../lib/types";
+import type { AppSettings, Client, OfficeSetup, ServerEvent, Template, User } from "../lib/types";
 
 export type ToastTone = "info" | "success" | "warning" | "error";
 export interface Toast {
@@ -30,6 +30,8 @@ interface AppState {
   setPhoneOpen: (open: boolean) => void;
   /** Password login. Replaces (and revokes) any current session. Throws ApiError on failure. */
   login: (userId: number, password: string) => Promise<User>;
+  /** Creates a new office's first manager and logs them in. */
+  setupOffice: (body: OfficeSetup) => Promise<User>;
   logout: () => Promise<void>;
   refreshClients: () => Promise<void>;
   refreshTemplates: () => Promise<void>;
@@ -126,6 +128,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         title: `ברוך/ה הבא/ה, ${res.user.full_name.split(" - ")[0]}`,
         body: res.user.role === "MANAGER" ? "מחובר/ת כמנהל/ת משרד" : "מחובר/ת כעובד/ת משרד",
       });
+      return res.user;
+    },
+    [toast],
+  );
+
+  const setupOffice = useCallback(
+    async (body: OfficeSetup) => {
+      const res = await api.setup(body);
+      setToken(res.token);
+      setSessionUser(res.user);
+      toast({ tone: "success", title: "המשרד הוקם במערכת", body: "אפשר להוסיף עובדים בהגדרות ולקלוט לקוחות." });
       return res.user;
     },
     [toast],
@@ -265,6 +278,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     selectClient,
     setPhoneOpen,
     login,
+    setupOffice,
     logout,
     refreshClients,
     refreshTemplates,

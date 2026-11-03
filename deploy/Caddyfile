@@ -1,0 +1,17 @@
+# Public entry point: gets and renews the HTTPS certificate for DOMAIN automatically (Let's Encrypt)
+# and passes every request to the dashboard container, which forwards /api and /uploads to the API.
+{$DOMAIN} {
+	# Compress pages and API answers, but not the live-update stream (it must reach the browser at once).
+	@compressible not path /api/events/stream
+	encode @compressible gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	reverse_proxy frontend:80
+}
