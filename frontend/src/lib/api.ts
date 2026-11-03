@@ -5,6 +5,7 @@ import type {
   Campaign,
   CampaignDetail,
   Client,
+  ClientDocument,
   ClientInput,
   EditableSettings,
   InboundResult,
@@ -180,7 +181,7 @@ export const api = {
   users: () => request<User[]>("/api/users"),
   createUser: (body: { full_name: string; job_title: string; email: string; role: UserRole; is_active: boolean; password: string }) =>
     request<User>("/api/users", { method: "POST", ...json(body) }),
-  updateUser: (id: number, body: Partial<Pick<User, "full_name" | "job_title" | "role" | "is_active">> & { password?: string }) =>
+  updateUser: (id: number, body: Partial<Pick<User, "full_name" | "job_title" | "email" | "role" | "is_active">> & { password?: string }) =>
     request<User>(`/api/users/${id}`, { method: "PUT", ...json(body) }),
 
   settings: () => request<AppSettings>("/api/settings"),
@@ -193,6 +194,7 @@ export const api = {
   updateClient: (id: number, body: Partial<ClientInput>) => request<Client>(`/api/clients/${id}`, { method: "PUT", ...json(body) }),
   deactivateClient: (id: number) => request<Client>(`/api/clients/${id}`, { method: "DELETE" }),
   messages: (clientId: number) => request<Message[]>(`/api/clients/${clientId}/messages`),
+  documents: (clientId: number) => request<ClientDocument[]>(`/api/clients/${clientId}/documents`),
 
   templates: () => request<Template[]>("/api/templates"),
   updateTemplate: (id: number, body: Partial<Omit<Template, "buttons_json">> & { buttons_json?: TemplateButton[] }) =>

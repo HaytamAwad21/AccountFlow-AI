@@ -101,6 +101,23 @@ export interface Message {
   created_at: string;
 }
 
+/** A photo or PDF the client sent on WhatsApp, with the request it answered (if any). */
+export interface ClientDocument {
+  message_id: number;
+  created_at: string;
+  media_url: string;
+  file_kind: "image" | "pdf";
+  caption: string;
+  ticket_id: number | null;
+  ticket_ref: string | null;
+  request_name: string | null;
+  document_type: string | null;
+  ticket_status: TicketStatus | null;
+  /** the copy the request was checked against; an earlier upload for the same request was replaced */
+  is_latest: boolean;
+  check_status: "PASSED" | "FAILED" | "MANUAL_REVIEW" | null;
+}
+
 export interface OcrChecks {
   clarity: boolean | null;
   document_type: boolean | null;
@@ -146,6 +163,8 @@ export interface OcrResult {
   simulated: boolean;
   provider_note: string;
   clerk_edited?: boolean;
+  /** false for a plain receipt or a check: only the readability (clarity) check ran */
+  tax_checks?: boolean;
   approved?: boolean;
   approved_by?: string | null;
 }

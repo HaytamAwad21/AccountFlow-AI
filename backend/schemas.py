@@ -24,7 +24,7 @@ from models import (
     UserRole,
     WhatsAppMessageLog,
 )
-from services.money import Currency, normalize_variables
+from services.money import DEFAULT_DOCUMENT_TYPE, Currency, normalize_variables
 from services.templating import required_variables, template_variables
 
 
@@ -69,6 +69,7 @@ class UserIn(BaseModel):
 class UserUpdate(BaseModel):
     full_name: str | None = Field(None, min_length=2, max_length=120)
     job_title: str | None = Field(None, max_length=120)
+    email: str | None = Field(None, min_length=5, max_length=180, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     role: UserRole | None = None
     is_active: bool | None = None
     password: str | None = Field(None, min_length=6, max_length=128, description="manager-set new password (resets the user's sessions)")
@@ -255,6 +256,23 @@ class TicketOut(BaseModel):
 
 class TicketDetail(TicketOut):
     messages: list[MessageOut] = []
+
+
+class DocumentOut(BaseModel):
+    """A photo or PDF the client sent on WhatsApp, with the request it answered (if any)."""
+    message_id: int
+    created_at: UTCDateTime
+    media_url: str
+    file_kind: Literal["image", "pdf"]
+    caption: str
+    ticket_id: int | None
+    ticket_ref: str | None
+    request_name: str | None
+    document_type: str | None
+    ticket_status: TicketStatus | None
+    # The copy the request was checked against; an earlier upload for the same request was replaced.
+    is_latest: bool
+    check_status: Literal["PASSED", "FAILED", "MANUAL_REVIEW"] | None
 
 
 class QuickSendRequest(BaseModel):
@@ -496,6 +514,31 @@ def ticket_out(t: ChasingTicket) -> TicketOut:
 def ticket_detail(t: ChasingTicket) -> TicketDetail:
     base = ticket_out(t).model_dump()
     return TicketDetail(**base, messages=[message_out(m) for m in t.messages])
+
+
+# Requests that asked for an invoice before document types existed.
+INVOICE_REQUEST_CATEGORIES = (TemplateCategory.MISSING_INVOICE, TemplateCategory.MISSING_DETAIL)
+
+
+def document_out(msg: WhatsAppMessageLog) -> DocumentOut:
+    tk = msg.ticket
+    ctx = (tk.context_variables_json if tk else None) or {}
+    document_type = ctx.get("document_type") or (DEFAULT_DOCUMENT_TYPE if tk and tk.template.category in INVOICE_REQUEST_CATEGORIES else None)
+    is_latest = tk is not None and tk.media_file_path == msg.media_url
+    return DocumentOut(
+        message_id=msg.id,
+        created_at=msg.created_at,
+        media_url=msg.media_url or "",
+        file_kind="pdf" if (msg.media_url or "").lower().endswith(".pdf") else "image",
+        caption=msg.content_text or "",
+        ticket_id=tk.id if tk else None,
+        ticket_ref=tk.ticket_ref if tk else None,
+        request_name=tk.template.name_he if tk else None,
+        document_type=document_type,
+        ticket_status=tk.status if tk else None,
+        is_latest=is_latest,
+        check_status=(tk.ocr_validation_json or {}).get("status") if is_latest else None,
+    )
 
 
 def recipient_out(r: BulkTaxRecipient) -> RecipientOut:

@@ -21,6 +21,7 @@ import { api, ApiError } from "../lib/api";
 import {
   AMOUNT_VARS,
   DATE_VARS,
+  DOCUMENT_TYPES,
   DEFAULT_CURRENCY,
   INTEGER_VARS,
   MISSING_DETAIL_CHIPS,
@@ -60,7 +61,7 @@ import { WaBubble } from "../components/WaBubble";
 import { Button, Card, Empty, Field, inputClass, Ltr, SectionTitle } from "../components/ui";
 
 const CARD_META: Record<string, { title: string; icon: ReactNode }> = {
-  missing_supplier_invoice: { title: "חשבונית חסרה", icon: <FileQuestion className="h-4 w-4" /> },
+  missing_supplier_invoice: { title: "מסמך חסר", icon: <FileQuestion className="h-4 w-4" /> },
   missing_invoice_detail: { title: "פרט חסר", icon: <FileSearch className="h-4 w-4" /> },
   unidentified_bank_charge: { title: "חיוב לא מזוהה", icon: <CreditCard className="h-4 w-4" /> },
   tax_ready_to_pay: { title: "דיווח מס מוכן", icon: <Landmark className="h-4 w-4" /> },
@@ -111,6 +112,7 @@ export function QuickDispatch() {
   const [lastSent, setLastSent] = useState<{ ref: string; ms: number; client: string } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const docTypeRef = useRef<HTMLSelectElement>(null);
 
   const vatRate = settings?.vat_rate ?? 18;
   const allocationThreshold = settings?.allocation_number_threshold_nis ?? 10000;
@@ -159,6 +161,7 @@ export function QuickDispatch() {
       }
       const deadlineDay = settings?.vat_deadline_day ?? DEFAULT_VAT_DEADLINE_DAY;
       if ("tax_period" in next && !next.tax_period) next.tax_period = defaultTaxPeriod(deadlineDay);
+      if ("document_type" in next && !next.document_type) next.document_type = DOCUMENT_TYPES[0];
       if ("due_date" in next && !next.due_date) next.due_date = isoDate(nextDeadlineDate(deadlineDay));
       return next;
     });
@@ -167,7 +170,8 @@ export function QuickDispatch() {
   const inputVars = template
     ? template.slug === "monthly_folder_deadline_warning"
       ? ["days_left", "open_items_count"]
-      : template.required_variables
+      : // the document type is chosen first: it decides what the rest of the request is about
+        [...template.required_variables].sort((a, b) => Number(b === "document_type") - Number(a === "document_type"))
     : [];
 
   const previewVars = useMemo(() => {
@@ -192,7 +196,7 @@ export function QuickDispatch() {
   const unfilled = inputVars.filter((v) => !String(vars[v] ?? "").trim());
 
   const focusComposer = (which: "template" | "manual") =>
-    window.setTimeout(() => (which === "manual" ? manualTextRef.current : firstInputRef.current)?.focus(), 30);
+    window.setTimeout(() => (which === "manual" ? manualTextRef.current : docTypeRef.current ?? firstInputRef.current)?.focus(), 30);
 
   const pickClient = (c: Client) => {
     selectClient(c.id, true);
@@ -241,7 +245,7 @@ export function QuickDispatch() {
         body: `מעקב אוטומטי הופעל: תזכורת כל ${settings?.reminder_interval_hours ?? 48} שעות. צפו בטלפון של הלקוח בצד ←`,
       });
       const keep: Record<string, string> = {};
-      for (const k of ["tax_period", "due_date"]) if (vars[k]) keep[k] = vars[k];
+      for (const k of ["tax_period", "due_date", "document_type"]) if (vars[k]) keep[k] = vars[k];
       setVars(keep);
       setCurrencies({}); // every new request starts in shekels
       refreshClients().catch(() => undefined);
@@ -522,7 +526,15 @@ export function QuickDispatch() {
                       const ref = idx === 0 ? firstInputRef : undefined;
                       return (
                         <Field key={v} label={meta.label}>
-                          {AMOUNT_VARS.has(v) ? (
+                          {v === "document_type" ? (
+                            <select ref={docTypeRef} value={vars[v] ?? ""} onChange={(e) => setVar(v, e.target.value)} className={cx(inputClass, ringClass)}>
+                              {DOCUMENT_TYPES.map((d) => (
+                                <option key={d} value={d}>
+                                  {d}
+                                </option>
+                              ))}
+                            </select>
+                          ) : AMOUNT_VARS.has(v) ? (
                             <AmountInput
                               ref={ref}
                               value={vars[v] ?? ""}

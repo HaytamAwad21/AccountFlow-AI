@@ -108,12 +108,13 @@ Managers manage users in **הגדרות ▸ עובדי המשרד**:
 
 - **הוספת עובד/ת** opens a popup with these fields:
   - Full name.
-  - Job title, with suggestions such as פקיד/ת הנה״ח or פקיד/ת שכר.
+  - Job title: a dropdown in the app's own colours with suggestions such as פקיד/ת הנה״ח or פקיד/ת שכר. Any other title can still be typed.
   - E-mail.
   - Permission: two cards, one for manager and one for worker.
   - An initial password and its confirmation, at least 6 characters.
   - Status.
-- **עריכה** on each row opens the edit popup. It changes the same fields and can set a new password. Leave the password empty to keep the current one. A reset signs the user out of every open session.
+- **עריכה** on each row opens the edit popup. It changes every field: name, job title, e-mail, permission and status. It can also set a new password. Leave the password empty to keep the current one. A reset signs the user out of every open session.
+  - The e-mail is stored in lowercase. An e-mail that another user already has is refused with HTTP 409 (`כתובת האימייל כבר רשומה במערכת`).
 - Workers never see these buttons: manager-only controls are not rendered at all for them. The API refuses them with HTTP 403 as well.
 - The last active manager cannot be demoted or suspended.
 
@@ -143,7 +144,7 @@ The `activity_log` table records real operational events only: who did what, whe
 | Group | Events (label in the tab) |
 | --- | --- |
 | Session | **התחברות למערכת** and **התנתקות מהמערכת** |
-| Sending | **שליחת בקשה ללקוח** from שליחת בקשה, with the request type and the client's name, e.g. `נשלחה בקשה מסוג ”חשבונית ספק חסרה“ ללקוח …` |
+| Sending | **שליחת בקשה ללקוח** from שליחת בקשה, with the request type and the client's name, e.g. `נשלחה בקשה מסוג ”מסמך חסר מספק“ ללקוח …` |
 | | **שליחת תזכורות**: manual reminder runs (by the worker) and automatic 48h cycles (shown as **מערכת**), with a count per reminder type |
 | | **שליחת דיווח מס בתפוצה** for bulk "הדיווח מוכן" broadcasts |
 | Invoices and tickets | **אישור חשבונית**, **דחיית חשבונית** (with the reason), **סגירת פנייה**, **פתיחת פנייה מחדש**, **תיקון שדות חשבונית** |
@@ -168,7 +169,7 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 | Add, edit or deactivate clients (buttons and the actions column) | Yes | hidden |
 | Edit message templates | Yes | hidden; workers see the Hebrew text only |
 | **הגדרות** tab: VAT rate, allocation threshold, reminder interval, max reminders, firm name, auto-approve | Yes, edit | Read-only: inputs disabled, no שמירת הגדרות / ביטול שינויים buttons |
-| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (same fields + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | Yes | hidden: the whole **עובדי המשרד** section is not rendered |
+| **הוספת עובד/ת** (name, job title, e-mail, permission, initial password, status) and **עריכה** (every field, e-mail included, + password reset) via `POST /api/users` and `PUT /api/users/{user_id}` | Yes | hidden: the whole **עובדי המשרד** section is not rendered |
 | Read the activity log (`GET /api/activity`, **יומן פעילות** tab) | Yes | tab hidden |
 | Auto-approve switch on the chasing board | Yes | hidden |
 
@@ -176,7 +177,7 @@ The profile button at the top of the sidebar shows the logged-in user and their 
 
 ### Sidebar and dark mode
 
-- **Navigation order:** שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות. הגדרות is always last and visible to everyone.
+- **Navigation order:** שליחת בקשה, לוח מעקב חי, מסמכים מלקוחות, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות. הגדרות is always last and visible to everyone.
 - **Profile card:** the logged-in user's avatar, name, role badge, **שינוי סיסמה** and **התנתקות** sit at the bottom of the sidebar, under the phone-simulator button.
 - **Dark mode:** click the moon / sun button next to the logo to switch between light and dark mode. Hovering it shows the tooltip "מעבר למצב כהה / בהיר".
   - The choice is saved in `localStorage` as `accountflow.theme`. Without a saved choice, the app follows the system setting.
@@ -228,11 +229,30 @@ Each client has a `reporting_frequency`:
 
 Managers set the frequency in the client form. The clients table shows it next to the next deadline. Bulk tax sheets may include an optional `reporting_frequency` column for new clients.
 
+## Missing documents (מסמך חסר)
+
+The **מסמך חסר** request asks a client for a document the office is missing. In step 3 of שליחת בקשה the worker picks its type, and the WhatsApp message names it:
+
+| Type | What Vision AI checks |
+| --- | --- |
+| חשבונית מס | Every invoice and Tax Authority check (header and number, supplier, VAT math, 9-digit ח.פ, allocation number) |
+| חשבונית מס-קבלה | The same full checks |
+| קבלה | Readability (blur) only, then always to clerk review |
+| צ׳ק | Readability (blur) only, then always to clerk review |
+
+A receipt or a check has no tax fields, so it is never approved automatically: a readable copy goes to **ממתין לבדיקת פקיד**, and a blurry one is sent back with a request for a clearer photo that names the document. Reminders name the document too. A request sent without a type (the API, older integrations) asks for a חשבונית מס.
+
+Databases from earlier releases keep working: on startup the request template is renamed and reworded only if it still has its old default text, so a template a manager edited is left alone.
+
+### Documents page (מסמכים מלקוחות)
+
+The tab under לוח מעקב חי lists every photo or PDF a selected client sent on WhatsApp, newest first: its type, date, the request it answered and that request's status and check result. Documents sent without any open request are listed too. Filters narrow the list by type and by month; a click opens the file full size, and the request link opens the ticket. When a client sent a document again for the same request, the earlier copy is marked as replaced. The data comes from `GET /api/clients/{id}/documents` (any logged-in user).
+
 ## 5-minute demo script
 
 1. **שליחת בקשה.**
    1. Search for a client and press Enter.
-   2. Choose **חשבונית חסרה** and type a supplier and an amount. `1240` becomes `₪1,240.00`, and the VAT breakdown at the live rate appears under the field.
+   2. Choose **מסמך חסר**, pick the document type (חשבונית מס by default) and type a supplier and an amount. `1240` becomes `₪1,240.00`, and the VAT breakdown at the live rate appears under the field.
    3. Press **Enter**. The message appears on the client's phone, with buttons.
 2. **Phone simulator.**
    1. Tap **קבלה מטושטשת**. Vision AI rejects the photo, and the bot answers within a second.
@@ -261,7 +281,8 @@ backend/
                           BulkTaxCampaign, BulkTaxRecipient
   schemas.py              Pydantic v2 request/response models + serializers
   seed.py                 settings, users, Hebrew templates, Hebrew / English-named clients, tickets in every state
-  test_flow.py            end-to-end verification (257 checks)
+  test_flow.py            end-to-end verification
+  test_regressions.py     checks for logic bugs found by review (does not stop at the first failure)
   services/
     system_settings.py    live office configuration accessors
     ticket_engine.py      quick-send, button/text/media state machine, 9-digit Tax Authority validation
@@ -277,7 +298,7 @@ backend/
 frontend/src/             Hebrew, RTL (dir="rtl", logical Tailwind classes)
   App.tsx                 sidebar shell, profile switcher, 5 tabs, phone simulator
   context/AppContext.tsx  shared state, signed-in user, SSE stream with polling fallback, toasts
-  pages/                  QuickDispatch, ChasingBoard, BulkTax, ClientsTemplates, Settings
+  pages/                  QuickDispatch, ChasingBoard, Documents, BulkTax, ClientsTemplates, Settings
   components/             PhoneSimulator, WaBubble, TicketModal, ui kit (LockBadge, RoleBadge…)
 ```
 

@@ -22,6 +22,7 @@ from services.activity import log_activity
 from services.clock import days_until_deadline, utcnow
 from services.events import queue_event
 from services.i18n import t
+from services.money import DEFAULT_DOCUMENT_TYPE, TAX_DOCUMENT_TYPES
 from services.system_settings import deadline_day
 from services.templating import body_for, localized_buttons, render_text
 from services.ticket_engine import (
@@ -43,10 +44,15 @@ _scheduler: BackgroundScheduler | None = None
 
 def _reminder_text(ticket: ChasingTicket, lang: str) -> str:
     ctx = ticket.context_variables_json or {}
-    kwargs = {**ctx, "n": ticket.reminder_count, "max": ticket.max_reminders, "ticket_ref": ticket.ticket_ref}
+    document_type = ctx.get("document_type") or DEFAULT_DOCUMENT_TYPE
+    kwargs = {**ctx, "document_type": document_type, "n": ticket.reminder_count, "max": ticket.max_reminders,
+              "ticket_ref": ticket.ticket_ref}
     if ticket.status == TicketStatus.NEEDS_CORRECTION:
-        typed = ctx.get("awaiting_text") and not ctx.get("awaiting_media")
-        return t("reminder_correction_typed" if typed else "reminder_correction", lang, **kwargs)
+        if ctx.get("awaiting_text") and not ctx.get("awaiting_media"):
+            return t("reminder_correction_typed", lang, **kwargs)
+        if document_type not in TAX_DOCUMENT_TYPES:
+            return t("reminder_correction_document", lang, **kwargs)
+        return t("reminder_correction", lang, **kwargs)
     category = ticket.template.category
     if ticket.template.slug == DEADLINE_SLUG:
         category = TemplateCategory.MONTHLY_FOLDER

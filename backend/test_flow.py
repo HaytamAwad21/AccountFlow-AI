@@ -231,6 +231,13 @@ def main() -> None:
         r = c.put(f"/api/users/{intern['id']}", json={"full_name": "יוסף לוי", "job_title": "פקיד הנה״ח", "is_active": False}, headers=M).json()
         check(r["full_name"] == "יוסף לוי" and r["job_title"] == "פקיד הנה״ח" and r["avatar_initials"] == "יל" and r["is_active"] is False,
               "manager renames and suspends a worker (initials recomputed)")
+        r = c.put(f"/api/users/{intern['id']}", json={"email": "Yossef.Levi@Cohen-CPA.co.il"}, headers=M)
+        check(r.status_code == 200 and r.json()["email"] == "yossef.levi@cohen-cpa.co.il", "manager changes a worker's e-mail (stored lower-case)", r.text[:160])
+        check(c.put(f"/api/users/{intern['id']}", json={"email": "MAYA@cohen-cpa.co.il"}, headers=M).status_code == 409,
+              "an e-mail another user already has is refused")
+        check(c.put(f"/api/users/{intern['id']}", json={"email": "not-an-email"}, headers=M).status_code == 422, "an invalid e-mail is refused")
+        check(c.put(f"/api/users/{intern['id']}", json={"email": "yossef.levi@cohen-cpa.co.il"}, headers=M).status_code == 200,
+              "saving the same e-mail again is fine")
         check(c.get("/api/auth/me", headers=INTERN).status_code == 401, "suspended user's session is rejected by the API")
         check(c.post("/api/auth/login", json={"user_id": intern["id"], "password": "yossi123"}, headers=ANON).status_code == 403,
               "suspended user cannot log in")
@@ -524,7 +531,7 @@ def main() -> None:
             check(hebrewize_message_history(db) >= 3, "legacy messages rewritten on startup")
             converted = [db.get(WhatsAppMessageLog, i) for i in ids]
             check(all(HE.search(m.content_text) and not AR.search(m.content_text) for m in converted), "English and Arabic history is now Hebrew")
-            check(converted[0].content_text.startswith("שלום Olivia Grant") and converted[0].buttons_json[0]["title"] == "העלאת צילום חשבונית",
+            check(converted[0].content_text.startswith("שלום Olivia Grant") and converted[0].buttons_json[0]["title"] == "העלאת צילום המסמך",
                   "template message and its buttons re-rendered from the Hebrew template")
             check("(2/3)" in converted[1].content_text and "תזכורת ידידותית" in converted[1].content_text, "reminder keeps its counter")
             check(hebrewize_message_history(db) == 0, "conversion is idempotent")
@@ -725,6 +732,104 @@ def main() -> None:
                   "no legacy action codes left")
         check(describe_reminder_actions([{"kind": "FRIENDLY_REMINDER"}, {"kind": "FRIENDLY_REMINDER"}, {"kind": "ESCALATED"}])
               == "2 תזכורות ידידותיות, 1 פניות שהוסלמו לשיחה", "reminder summary in Hebrew")
+
+        section("Missing document types (מסמך חסר) and the documents page")
+        from database import SessionLocal as DocSession
+        from models import ChasingTicket as DocTicket
+        from seed import TEMPLATES, upgrade_templates
+        from services.scheduler import _reminder_text
+
+        doc_tpl = next(t for t in c.get("/api/templates").json() if t["slug"] == "missing_supplier_invoice")
+        check(doc_tpl["name_he"] == "מסמך חסר מספק" and "document_type" in doc_tpl["required_variables"],
+              "the missing-invoice request is now a missing-document request with a document type", doc_tpl["name_he"])
+        docs_client = c.post("/api/clients", headers=M, json={"full_name": "צביקה מסמכים", "company_name": "מסמכים בע\"מ", "tax_id": "517011950",
+                                                              "whatsapp_phone": "0521119050", "assigned_worker_id": worker["id"]}).json()
+        quiet_client = c.post("/api/clients", headers=M, json={"full_name": "רינה שקטה", "company_name": "שקטה מסמכים", "tax_id": "517011951",
+                                                               "whatsapp_phone": "0521119051", "assigned_worker_id": worker["id"]}).json()
+
+        def doc_send(document_type: str | None):
+            variables = {"supplier_name": "Check Supplier", "amount": "700", "invoice_date": "2026-10-03"}
+            if document_type is not None:
+                variables["document_type"] = document_type
+            return c.post("/api/tickets/quick-send", json={"client_id": docs_client["id"], "template_slug": "missing_supplier_invoice",
+                                                           "context_variables": variables})
+
+        def demo(ticket: dict, scenario: str) -> dict:
+            return c.post("/api/simulator/demo-receipt", json={"client_id": docs_client["id"], "ticket_id": ticket["id"], "scenario": scenario}).json()
+
+        r = doc_send("צ׳ק")
+        check(r.status_code == 201 and r.json()["ticket"]["context_variables_json"].get("document_type") == "צ׳ק" and "צ׳ק" in r.json()["rendered_text"],
+              "a missing check is requested by name", r.text[:200])
+        check_ticket = r.json()["ticket"] if r.status_code == 201 else {}
+        typed = doc_send("צ'ק")
+        check(typed.status_code == 201 and typed.json()["ticket"]["context_variables_json"].get("document_type") == "צ׳ק",
+              "an apostrophe is stored as a geresh (צ׳ק)", typed.text[:160])
+        check(doc_send("תעודת זהות").status_code == 422, "an unknown document type is rejected")
+        r = doc_send(None)
+        check(r.status_code == 201 and r.json()["ticket"]["context_variables_json"].get("document_type") == "חשבונית מס",
+              "a request without a type asks for a tax invoice", r.text[:160])
+
+        with DocSession() as db:
+            text = _reminder_text(db.get(DocTicket, typed.json()["ticket"]["id"]), "he")
+        check("צ׳ק" in text and "חשבונית" not in text, "the reminder names the missing document", text)
+        r = demo(check_ticket, "blurry")
+        check(r["ticket"]["status"] == "NEEDS_CORRECTION" and r["ocr"]["rejection_codes"] == ["blurry"] and "מטושטש" in r["reply"]
+              and "צ׳ק" in r["reply"] and "חשבונית" not in r["reply"], "a blurry check is sent back without invoice wording", r.get("reply"))
+        with DocSession() as db:
+            text = _reminder_text(db.get(DocTicket, check_ticket["id"]), "he")
+        check("צ׳ק" in text and "חשבונית" not in text, "the correction reminder names the check", text)
+        r = demo(check_ticket, "clear")
+        ocr = r["ocr"]
+        check(r["ticket"]["status"] == "NEEDS_CLERK_REVIEW" and ocr["is_valid"] is None and ocr.get("tax_checks") is False
+              and ocr["checks"]["clarity"] is True and all(v is None for k, v in ocr["checks"].items() if k != "clarity"),
+              "a readable check skips the tax checks and goes to the clerk", ocr.get("checks"))
+        receipt = doc_send("קבלה").json()["ticket"]
+        check(demo(receipt, "missing_number")["ticket"]["status"] == "NEEDS_CLERK_REVIEW", "a plain receipt skips the tax checks too")
+        tax_receipt = doc_send("חשבונית מס-קבלה").json()["ticket"]
+        r = demo(tax_receipt, "missing_number")
+        check("missing_number" in r["ocr"]["rejection_codes"] and r["ocr"].get("tax_checks") is not False,
+              "a tax invoice-receipt still gets the full invoice checks")
+
+        own = io.BytesIO()
+        Image.new("RGB", (400, 400), "white").save(own, "PNG")
+        c.post("/api/whatsapp/manual-send", data={"client_id": str(docs_client["id"]), "content_text": "המסמך שלנו"},
+               files={"image_file": ("ours.png", own.getvalue(), "image/png")})
+        c.post("/api/webhook/whatsapp-inbound", json={"client_id": docs_client["id"], "type": "text", "text": "שלחתי"})
+        c.post("/api/simulator/demo-receipt", json={"client_id": quiet_client["id"], "scenario": "clear"})
+        check(c.get(f"/api/clients/{docs_client['id']}/documents", headers=ANON).status_code == 401, "the documents list needs a login")
+        r = c.get(f"/api/clients/{docs_client['id']}/documents")
+        docs = r.json() if r.status_code == 200 else []
+        check([(d["document_type"], d["ticket_id"], d["check_status"], d["is_latest"]) for d in docs] == [
+            ("חשבונית מס-קבלה", tax_receipt["id"], "FAILED", True), ("קבלה", receipt["id"], "MANUAL_REVIEW", True),
+            ("צ׳ק", check_ticket["id"], "MANUAL_REVIEW", True), ("צ׳ק", check_ticket["id"], None, False)],
+              "every document the client sent, newest first, with its request, type and check (older copy marked)", docs)
+        check(all(d["file_kind"] == "image" and d["media_url"].startswith("/uploads/") and d["ticket_ref"] for d in docs),
+              "documents link to their file and request; the office's own picture and text messages are not listed")
+        quiet_docs = c.get(f"/api/clients/{quiet_client['id']}/documents").json()
+        check(len(quiet_docs) == 1 and quiet_docs[0]["ticket_id"] is None and quiet_docs[0]["document_type"] is None,
+              "a document sent without any request is listed too", quiet_docs)
+
+        old = next(t for t in TEMPLATES if t["slug"] == "missing_supplier_invoice")
+        with DocSession() as db:
+            row = db.scalar(select(MessageTemplate).where(MessageTemplate.slug == "missing_supplier_invoice"))
+            current = (row.name_he, row.body_he, row.buttons_json)
+            row.name_he, row.body_he = "חשבונית ספק חסרה", (
+                "שלום {{client_name}}\n"
+                "במסגרת בדיקת הנהלת החשבונות החודשית ראינו תשלום בסך {{amount}} לספק '{{supplier_name}}' "
+                "בתאריך {{invoice_date}}, אך חשבונית המס חסרה בתיק שלך.\n"
+                "נא להשיב עם צילום ברור או קובץ PDF של החשבונית כדי שנוכל לקזז עבורך את המע\"מ.")
+            row.buttons_json = [{**b, "he": {"upload_photo": "העלאת צילום חשבונית", "no_document": "אין לי אותה"}.get(b["id"], b["he"])}
+                                for b in row.buttons_json]
+            db.commit()
+            check(upgrade_templates(db) == 1, "an unedited old template is upgraded on startup")
+            db.refresh(row)
+            check((row.name_he, row.body_he, row.buttons_json) == current == (old["name_he"], old["body_he"], current[2])
+                  and current[2][0]["he"] == "העלאת צילום המסמך", "it becomes the current missing-document template")
+            row.body_he = "נוסח שהמנהלת כתבה בעצמה {{supplier_name}}"
+            db.commit()
+            check(upgrade_templates(db) == 0, "a template a manager edited is left alone")
+            row.body_he = current[1]
+            db.commit()
 
         section("Deactivate client (manager) + Meta webhook + dashboard")
         r = c.delete(f"/api/clients/{new_clients['en']['id']}", headers=M).json()

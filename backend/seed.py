@@ -37,17 +37,17 @@ TEMPLATES: list[dict] = [
         "slug": "missing_supplier_invoice",
         "category": TemplateCategory.MISSING_INVOICE,
         "requires_media_reply": True,
-        "name_he": "חשבונית ספק חסרה",
+        "name_he": "מסמך חסר מספק",
         "body_he": (
             "שלום {{client_name}}\n"
             "במסגרת בדיקת הנהלת החשבונות החודשית ראינו תשלום בסך {{amount}} לספק '{{supplier_name}}' "
-            "בתאריך {{invoice_date}}, אך חשבונית המס חסרה בתיק שלך.\n"
-            "נא להשיב עם צילום ברור או קובץ PDF של החשבונית כדי שנוכל לקזז עבורך את המע\"מ."
+            "בתאריך {{invoice_date}}, אך חסר בתיק שלך מסמך: {{document_type}}.\n"
+            "נא להשיב עם צילום ברור או קובץ PDF של המסמך כדי שנוכל לרשום אותו כראוי."
         ),
         "buttons_json": [
-            {"id": "upload_photo", "action": "REQUEST_MEDIA", "he": "העלאת צילום חשבונית"},
+            {"id": "upload_photo", "action": "REQUEST_MEDIA", "he": "העלאת צילום המסמך"},
             {"id": "remind_8pm", "action": "SNOOZE_TONIGHT", "he": "תזכירו לי ב-20:00"},
-            {"id": "no_document", "action": "NO_DOCUMENT", "he": "אין לי אותה"},
+            {"id": "no_document", "action": "NO_DOCUMENT", "he": "אין לי את המסמך"},
         ],
     },
     {
@@ -134,6 +134,48 @@ TEMPLATES: list[dict] = [
         ],
     },
 ]
+
+# Texts of earlier releases that the startup upgrade replaces. A field a manager has edited no longer
+# matches its old default, so it is left alone.
+LEGACY_TEMPLATE_DEFAULTS: dict[str, dict] = {
+    "missing_supplier_invoice": {
+        "name_he": "חשבונית ספק חסרה",
+        "body_he": (
+            "שלום {{client_name}}\n"
+            "במסגרת בדיקת הנהלת החשבונות החודשית ראינו תשלום בסך {{amount}} לספק '{{supplier_name}}' "
+            "בתאריך {{invoice_date}}, אך חשבונית המס חסרה בתיק שלך.\n"
+            "נא להשיב עם צילום ברור או קובץ PDF של החשבונית כדי שנוכל לקזז עבורך את המע\"מ."
+        ),
+        "buttons": {"upload_photo": "העלאת צילום חשבונית", "no_document": "אין לי אותה"},
+    },
+}
+
+
+def upgrade_templates(db: Session) -> int:
+    """Bring template texts still at an earlier release's default up to date. Returns how many templates changed."""
+    current = {t["slug"]: t for t in TEMPLATES}
+    changed = 0
+    for slug, legacy in LEGACY_TEMPLATE_DEFAULTS.items():
+        row = db.scalar(select(MessageTemplate).where(MessageTemplate.slug == slug))
+        if row is None:
+            continue
+        new = current[slug]
+        touched = False
+        for field in ("name_he", "body_he"):
+            if getattr(row, field) == legacy[field]:
+                setattr(row, field, new[field])
+                touched = True
+        titles = {b["id"]: b["he"] for b in new["buttons_json"]}
+        buttons = [{**b, "he": titles[b["id"]]} if legacy["buttons"].get(b.get("id")) == b.get("he") else b
+                   for b in row.buttons_json or []]
+        if buttons != row.buttons_json:
+            row.buttons_json = buttons
+            touched = True
+        changed += int(touched)
+    if changed:
+        db.commit()
+    return changed
+
 
 # Demo login passwords (documented in README.md). Change them from Settings ▸ עריכה after the first login.
 SEED_PASSWORDS = {

@@ -2,17 +2,10 @@ import { useEffect, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
-import { cx, ROLE_LABEL } from "../lib/format";
+import { cx } from "../lib/format";
 import type { UserRole } from "../lib/types";
-import { Button, Field, inputClass, Modal, PasswordInput, RoleBadge, Toggle } from "./ui";
-
-const JOB_TITLE_SUGGESTIONS = ["מנהל/ת משרד", "רואה/ת חשבון", "מנהל/ת חשבונות", "פקיד/ת הנה״ח", "פקיד/ת שכר", "מתמחה", "מזכיר/ה"];
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-const ROLE_HELP: Record<UserRole, string> = {
-  MANAGER: "ניהול לקוחות, תבניות, הגדרות המשרד, עובדים ויומן הפעילות",
-  WORKER: "שליחת הודעות, לוח מעקב, אישור חשבוניות וסימולטור",
-};
+import { Button, Field, inputClass, Modal, PasswordInput, Toggle } from "./ui";
+import { EMAIL_RE, JobTitleInput, RolePicker } from "./WorkerFields";
 
 /** Manager-only "add worker" form: name and job title are separate fields. */
 export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -93,19 +86,7 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
             />
           </Field>
           <Field label="תפקיד במשרד" hint="מוצג מתחת לשם (רשות)">
-            <input
-              dir="auto"
-              list="job-title-suggestions"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="לדוגמה: פקידת הנה״ח"
-              className={inputClass}
-            />
-            <datalist id="job-title-suggestions">
-              {JOB_TITLE_SUGGESTIONS.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
+            <JobTitleInput value={jobTitle} onChange={setJobTitle} />
           </Field>
           <div className="sm:col-span-2">
             <Field label="אימייל" hint={show("email", email) ?? undefined}>
@@ -124,22 +105,7 @@ export function AddWorkerModal({ open, onClose }: { open: boolean; onClose: () =
 
         <section>
           <span className="mb-1.5 block text-xs font-medium text-ink-600">הרשאה</span>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={cx(
-                  "rounded-xl border p-3 text-start transition",
-                  role === r ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500" : "border-ink-200 hover:bg-ink-50",
-                )}
-              >
-                <RoleBadge role={r} />
-                <span className="mt-1.5 block text-xs leading-snug text-ink-500">{ROLE_HELP[r]}</span>
-              </button>
-            ))}
-          </div>
+          <RolePicker value={role} onChange={setRole} />
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2">

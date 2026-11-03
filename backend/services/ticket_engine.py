@@ -38,6 +38,7 @@ from models import (
 from services.clock import days_until_deadline, next_local_hour, utcnow
 from services.events import queue_event
 from services.i18n import classify_missing_detail, t
+from services.money import DEFAULT_DOCUMENT_TYPE, TAX_DOCUMENT_TYPES
 from services.no_emoji import strip_buttons, strip_emoji
 from services.system_settings import auto_approve_enabled, deadline_day, firm_name, get_system_settings
 from services.templating import (
@@ -47,7 +48,7 @@ from services.templating import (
     render_text,
     required_variables,
 )
-from services.vision_ocr import is_nine_digits, normalize_id, verify_invoice_image
+from services.vision_ocr import is_nine_digits, normalize_id, verify_clarity_only, verify_invoice_image
 from services.whatsapp import REENGAGE_BUTTON_ID, REENGAGE_BUTTON_TITLE, dispatch, release_held_messages
 
 log = logging.getLogger("accountflow.engine")
@@ -287,6 +288,8 @@ def create_and_send_ticket(
     lang = lang_of(client)
     provided = {k: str(v).strip() for k, v in (variables or {}).items() if v is not None and str(v).strip() != ""}
     merged = {**auto_variables(db, client), **provided}
+    if "document_type" in required_variables(template) and not merged.get("document_type"):
+        merged["document_type"] = DEFAULT_DOCUMENT_TYPE  # callers that predate document types asked for an invoice
     missing = missing_variables(template, merged)
     if missing:
         raise MissingVariablesError(missing)
@@ -586,6 +589,24 @@ def media_path(media_url: str | None) -> Path | None:
     return settings.upload_dir / Path(media_url).name
 
 
+def is_tax_document(ticket: ChasingTicket) -> bool:
+    """False for a request for a plain receipt or a check; every other request expects a tax invoice."""
+    return (ticket.context_variables_json or {}).get("document_type", DEFAULT_DOCUMENT_TYPE) in TAX_DOCUMENT_TYPES
+
+
+def _reprompt(db: Session, ticket: ChasingTicket, client: Client, reason: str, lang: str = "he") -> tuple[str, list[dict]]:
+    """The request for a clearer copy: the editable invoice template, or a short text naming the receipt or check."""
+    ctx = ticket.context_variables_json or {}
+    reprompt = template_by_slug(db, REPROMPT_SLUG)
+    supplier = ctx.get("supplier_name") or (ticket.ocr_validation_json or {}).get("supplier_name") or t("supplier_fallback", lang)
+    if is_tax_document(ticket):
+        text = render_text(body_for(reprompt, lang), {"client_name": client.full_name, "rejection_reason": reason, "supplier_name": supplier})
+    else:
+        text = t("document_reprompt", lang, client_name=client.full_name, document_type=ctx["document_type"],
+                 supplier_name=supplier, rejection_reason=reason)
+    return text, localized_buttons(reprompt, lang)
+
+
 def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: str,
                  ticket_id: int | None = None, caption: str = "", external_id: str | None = None) -> dict:
     lang = lang_of(client)
@@ -608,9 +629,12 @@ def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: 
         return {"ticket": ticket, "ocr": None, "reply": reply}
 
     office = get_system_settings(db)
-    result = verify_invoice_image(path, ctx.get("supplier_name"), ctx.get("invoice_number"), lang, mime,
-                                  vat_rate=office.vat_rate / 100.0,
-                                  allocation_threshold=office.allocation_number_threshold_nis)
+    if not is_tax_document(ticket):
+        result = verify_clarity_only(path, mime, lang)
+    else:
+        result = verify_invoice_image(path, ctx.get("supplier_name"), ctx.get("invoice_number"), lang, mime,
+                                      vat_rate=office.vat_rate / 100.0,
+                                      allocation_threshold=office.allocation_number_threshold_nis)
     ticket.ocr_validation_json = result
 
     if result["is_valid"] is True:
@@ -631,14 +655,8 @@ def handle_media(db: Session, client: Client, path: Path, media_url: str, mime: 
     else:
         ticket.status = TicketStatus.NEEDS_CORRECTION
         ticket.next_reminder_at = now + reminder_interval(db)
-        reprompt = template_by_slug(db, REPROMPT_SLUG)
-        variables = {
-            "client_name": client.full_name,
-            "rejection_reason": result["rejection_reason"],
-            "supplier_name": ctx.get("supplier_name") or result.get("supplier_name") or t("supplier_fallback", lang),
-        }
-        reply = render_text(body_for(reprompt, lang), variables)
-        send_outbound(db, client, ticket, reply, localized_buttons(reprompt, lang), MessageType.OCR_FEEDBACK)
+        reply, buttons = _reprompt(db, ticket, client, result["rejection_reason"], lang)
+        send_outbound(db, client, ticket, reply, buttons, MessageType.OCR_FEEDBACK)
 
     touch(db, ticket)
     return {"ticket": ticket, "ocr": result, "reply": reply}
@@ -671,17 +689,12 @@ def reject_invoice(db: Session, ticket: ChasingTicket, user: User | None, reason
         ocr.update(approved=False, rejected_at=now.isoformat(), rejected_by=user.full_name if user else None,
                    clerk_rejection_reason=reason)
         ticket.ocr_validation_json = ocr
-    ctx = _set_ctx(ticket, awaiting_media=True, clerk_rejection_reason=reason)
+    _set_ctx(ticket, awaiting_media=True, clerk_rejection_reason=reason)
     ticket.status = TicketStatus.NEEDS_CORRECTION
     ticket.resolved_at = None
     ticket.next_reminder_at = now + reminder_interval(db)
-    reprompt = template_by_slug(db, REPROMPT_SLUG)
-    text = render_text(body_for(reprompt), {
-        "client_name": client.full_name,
-        "rejection_reason": reason,
-        "supplier_name": ctx.get("supplier_name") or ocr.get("supplier_name") or t("supplier_fallback"),
-    })
-    send_outbound(db, client, ticket, text, localized_buttons(reprompt, "he"), MessageType.OCR_FEEDBACK)
+    text, buttons = _reprompt(db, ticket, client, reason)
+    send_outbound(db, client, ticket, text, buttons, MessageType.OCR_FEEDBACK)
     touch(db, ticket)
     return ticket
 

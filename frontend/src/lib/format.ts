@@ -204,6 +204,14 @@ export const PRIORITY_META: Record<TicketPriority, { label: string; className: s
   URGENT_DEADLINE: { label: "דחוף · מועד דיווח", className: "text-red-600 font-semibold" },
 };
 
+/** What a "missing document" request can ask for; same list and order as the backend (services/money.py). */
+export const DOCUMENT_TYPES = ["חשבונית מס", "חשבונית מס-קבלה", "קבלה", "צ׳ק"] as const;
+
+/** Tax invoices get the full Vision AI and Tax Authority checks; a plain receipt or a check only the readability check. */
+export function isTaxDocument(documentType: string | null | undefined): boolean {
+  return documentType !== "קבלה" && documentType !== "צ׳ק";
+}
+
 export const VARIABLE_LABELS: Record<string, { label: string; placeholder: string }> = {
   supplier_name: { label: "שם הספק", placeholder: "לדוגמה: דלק תחנת דלק" },
   amount: { label: "סכום ששולם", placeholder: "לדוגמה: 1240.50" },
@@ -220,6 +228,7 @@ export const VARIABLE_LABELS: Record<string, { label: string; placeholder: strin
   days_left: { label: "ימים שנותרו (אוטומטי)", placeholder: "" },
   open_items_count: { label: "פריטים פתוחים (אוטומטי)", placeholder: "" },
   rejection_reason: { label: "סיבת הדחייה", placeholder: "" },
+  document_type: { label: "סוג המסמך", placeholder: "" },
 };
 
 /** Quick picks for the "missing detail" field. The first two trigger the 9-digit Tax Authority validation. */

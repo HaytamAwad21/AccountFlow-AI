@@ -30,7 +30,7 @@ The firm's clients do not install or learn anything: everything happens in Whats
 ## Capabilities and Constraints
 
 - The UI is entirely Hebrew and right to left. Numbers, phone numbers and IDs stay left to right inside Hebrew text.
-- Tabs: שליחת בקשה, לוח מעקב חי, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות (always last).
+- Tabs: שליחת בקשה, לוח מעקב חי, מסמכים מלקוחות, הדיווח מוכן, לקוחות ותבניות, יומן פעילות (managers only), הגדרות (always last).
 - Manager-only controls are not rendered for workers at all.
 - Light and dark themes are both required.
 - The phone simulator stays, and keeps looking like real WhatsApp.

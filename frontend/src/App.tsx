@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ClipboardList, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
+import { ClipboardList, FolderOpen, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { api } from "./lib/api";
 import { cx, DEFAULT_VAT_DEADLINE_DAY, nextDeadlineDate, splitUserName } from "./lib/format";
@@ -16,13 +16,15 @@ import { BulkTax } from "./pages/BulkTax";
 import { ClientsTemplates } from "./pages/ClientsTemplates";
 import { Settings } from "./pages/Settings";
 import { ActivityLog } from "./pages/ActivityLog";
+import { Documents } from "./pages/Documents";
 
-type Tab = "trigger" | "board" | "bulk" | "clients" | "settings" | "activity";
+type Tab = "trigger" | "board" | "documents" | "bulk" | "clients" | "settings" | "activity";
 
 /** Sidebar order — "הגדרות" always last. Manager-only tabs are not rendered at all for workers. */
 const TABS: { key: Tab; label: string; icon: ReactNode; managerOnly?: boolean }[] = [
   { key: "trigger", label: "שליחת בקשה", icon: <Zap className="h-4 w-4" /> },
   { key: "board", label: "לוח מעקב חי", icon: <ClipboardList className="h-4 w-4" /> },
+  { key: "documents", label: "מסמכים מלקוחות", icon: <FolderOpen className="h-4 w-4" /> },
   { key: "bulk", label: "הדיווח מוכן", icon: <Megaphone className="h-4 w-4" /> },
   { key: "clients", label: "לקוחות ותבניות", icon: <Users className="h-4 w-4" /> },
   { key: "activity", label: "יומן פעילות", icon: <History className="h-4 w-4" />, managerOnly: true },
@@ -220,6 +222,7 @@ export default function App() {
           <div className="flex-1">
             {tab === "trigger" && <QuickDispatch />}
             {tab === "board" && <ChasingBoard />}
+            {tab === "documents" && <Documents />}
             {tab === "bulk" && <BulkTax />}
             {tab === "clients" && <ClientsTemplates />}
             {tab === "activity" && isManager && <ActivityLog />}

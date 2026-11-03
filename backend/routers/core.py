@@ -32,6 +32,7 @@ from schemas import (
     ClientIn,
     ClientOut,
     ClientUpdate,
+    DocumentOut,
     KpiOut,
     MessageOut,
     PreviewOut,
@@ -43,6 +44,7 @@ from schemas import (
     UserIn,
     UserOut,
     UserUpdate,
+    document_out,
     message_out,
     template_out,
     user_out,
@@ -132,6 +134,12 @@ def update_user(user_id: int, body: UserUpdate, request: Request, db: Session = 
     if "job_title" in data and data["job_title"] is not None and data["job_title"].strip() != user.job_title:
         changes["job_title"] = [user.job_title, data["job_title"].strip()]
         user.job_title = data["job_title"].strip()
+    if data.get("email") and data["email"].strip().lower() != user.email:
+        email = data["email"].strip().lower()
+        if db.scalar(select(User).where(func.lower(User.email) == email, User.id != user.id)):
+            raise HTTPException(409, "כתובת האימייל כבר רשומה במערכת")
+        changes["email"] = [user.email, email]
+        user.email = email
     if "role" in data and data["role"] is not None and data["role"] != user.role:
         changes["role"] = [user.role.value, data["role"].value]
         user.role = data["role"]
@@ -143,7 +151,7 @@ def update_user(user_id: int, body: UserUpdate, request: Request, db: Session = 
         # suspended: sign the user out everywhere
         db.execute(update(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None)).values(revoked_at=utcnow()))
     if changes:
-        labels = {"full_name": "שם", "job_title": "תפקיד במשרד", "role": "הרשאה", "is_active": "סטטוס"}
+        labels = {"full_name": "שם", "job_title": "תפקיד במשרד", "email": "אימייל", "role": "הרשאה", "is_active": "סטטוס"}
         log_activity(db, manager, "USER_UPDATED", f"עודכנו פרטי {user.full_name}: {', '.join(labels[k] for k in changes)}",
                      entity_type="user", entity_id=user.id, details=changes, ip_address=ip)
     if data.get("password"):
@@ -315,6 +323,21 @@ def client_messages(client_id: int, limit: int = Query(300, le=1000), db: Sessio
         .limit(limit)
     ).all()
     return [message_out(m) for m in reversed(rows)]
+
+
+@router.get("/clients/{client_id}/documents", response_model=list[DocumentOut])
+def client_documents(client_id: int, limit: int = Query(500, le=2000), db: Session = Depends(get_db),
+                     _user: User = Depends(require_user)):
+    """Every photo or PDF the client sent, newest first, with the request it answered."""
+    get_client_or_404(db, client_id)
+    rows = db.scalars(
+        select(WhatsAppMessageLog)
+        .where(WhatsAppMessageLog.client_id == client_id, WhatsAppMessageLog.direction == MessageDirection.INBOUND,
+               WhatsAppMessageLog.media_url.is_not(None))
+        .order_by(WhatsAppMessageLog.created_at.desc(), WhatsAppMessageLog.id.desc())
+        .limit(limit)
+    ).all()
+    return [document_out(m) for m in rows]
 
 
 # ── templates ────────────────────────────────────────────────────────────────

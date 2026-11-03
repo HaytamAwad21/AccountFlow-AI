@@ -26,6 +26,13 @@ AMOUNT_VARIABLES = frozenset({"amount", "charge_amount", "vat_amount", "tax_adva
 DATE_VARIABLES = frozenset({"invoice_date", "charge_date", "due_date"})
 MONTH_VARIABLES = frozenset({"tax_period"})
 INTEGER_VARIABLES = frozenset({"days_left", "open_items_count"})
+DOCUMENT_TYPE_VARIABLES = frozenset({"document_type"})
+
+# What a "missing document" request can ask for. Tax invoices get the full Vision AI and Tax
+# Authority checks; a plain receipt or a check has no such fields, so only its readability is checked.
+DOCUMENT_TYPES: tuple[str, ...] = ("חשבונית מס", "חשבונית מס-קבלה", "קבלה", "צ׳ק")
+TAX_DOCUMENT_TYPES = frozenset({"חשבונית מס", "חשבונית מס-קבלה"})
+DEFAULT_DOCUMENT_TYPE = "חשבונית מס"
 
 # Hebrew field names used in validation messages (same labels as the dashboard form).
 VARIABLE_LABELS_HE: dict[str, str] = {
@@ -40,6 +47,7 @@ VARIABLE_LABELS_HE: dict[str, str] = {
     "tax_period": "תקופת דיווח",
     "days_left": "ימים שנותרו",
     "open_items_count": "פריטים פתוחים",
+    "document_type": "סוג המסמך",
 }
 
 MAX_AMOUNT = Decimal("100000000")
@@ -139,6 +147,14 @@ def parse_count(raw: object, name: str) -> int:
     return int(text)
 
 
+def parse_document_type(raw: object, name: str = "document_type") -> str:
+    """One of DOCUMENT_TYPES. An apostrophe typed for the geresh (צ'ק) is accepted."""
+    text = str(raw if raw is not None else "").strip().replace("'", "׳")
+    if text not in DOCUMENT_TYPES:
+        raise VariableError(f"{label(name)}: יש לבחור סוג מסמך מהרשימה")
+    return text
+
+
 def normalize_variables(variables: dict, currencies: dict[str, str] | None = None) -> tuple[dict, list[str]]:
     """Validate and format every typed variable. Returns (normalized variables, Hebrew errors).
 
@@ -164,6 +180,8 @@ def normalize_variables(variables: dict, currencies: dict[str, str] | None = Non
                 out[name] = f"{month:02d}/{year}"
             elif name in INTEGER_VARIABLES:
                 out[name] = str(parse_count(raw, name))
+            elif name in DOCUMENT_TYPE_VARIABLES:
+                out[name] = parse_document_type(raw, name)
         except VariableError as exc:
             errors.append(str(exc))
     for name in currencies:

@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from config import settings
 from database import SessionLocal, init_db
 from routers import activity, auth, campaigns, core, scheduler as scheduler_router, tickets, webhook, whatsapp
-from seed import ensure_passwords, seed_if_empty
+from seed import ensure_passwords, seed_if_empty, upgrade_templates
 from services.events import broker
 from services.activity import cleanup_legacy_activity
 from services.history import hebrewize_message_history
@@ -38,6 +38,7 @@ async def lifespan(_app: FastAPI):
     with SessionLocal() as db:
         hebrewize_message_history(db)  # WhatsApp chat is Hebrew-only, also for older history
         purge_emojis_from_db(db)  # strict no-emoji policy, also for templates and history from older releases
+        upgrade_templates(db)  # after the purge: an old default with emojis matches only once they are gone
         cleaned = cleanup_legacy_activity(db)  # failed logins / simulator demos are not activity
         if cleaned:
             log.warning("Activity log cleanup: %d legacy rows removed or renamed", cleaned)

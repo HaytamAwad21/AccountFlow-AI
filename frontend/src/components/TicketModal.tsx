@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, mediaUrl } from "../lib/api";
-import { cx, fullDateTime, ils, relativeTime } from "../lib/format";
+import { cx, fullDateTime, ils, isTaxDocument, relativeTime } from "../lib/format";
 import type { OcrResult, TemplateCategory, TicketDetail } from "../lib/types";
 import { Button, inputClass, Ltr, Modal, PriorityLabel, Spinner, StatusBadge } from "./ui";
 import { maskDate } from "../lib/date";
@@ -60,6 +60,7 @@ const CONTEXT_LABELS: Record<string, string> = {
   detail_kind: "סוג הפרט",
   allocation_number: "מספר הקצאה שהוזן",
   tax_id: "ח.פ שהוזן",
+  document_type: "סוג המסמך",
   client_reply_text: "תשובת הלקוח",
   last_invalid_value: "ערך שגוי אחרון",
   invalid_attempts: "ניסיונות שגויים",
@@ -132,6 +133,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
   }, [ticketId, tick]);
 
   const ocr = ticket?.ocr_validation_json ?? null;
+  // A plain receipt or a check is only checked for readability: no tax fields to show or correct.
+  const taxChecks = ocr ? ocr.tax_checks !== false : isTaxDocument(String(ticket?.context_variables_json.document_type ?? ""));
   const kind = ticket ? ticketKind(ticket) : "document";
   const callRequestedAt = ticket?.context_variables_json.call_requested_at;
 
@@ -179,7 +182,8 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
 
   const reject = async () => {
     if (!ticket || rejectReason.trim().length < 3) return;
-    const t = await act("reject", () => api.rejectTicket(ticket.id, rejectReason.trim()), "החשבונית נדחתה — הלקוח התבקש לשלוח צילום חדש");
+    const done = taxChecks ? "החשבונית נדחתה — הלקוח התבקש לשלוח צילום חדש" : "המסמך נדחה — הלקוח התבקש לשלוח צילום חדש";
+    const t = await act("reject", () => api.rejectTicket(ticket.id, rejectReason.trim()), done);
     if (t) {
       setRejecting(false);
       setRejectReason("");
@@ -282,7 +286,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
               )}
               {ticket.status !== "RESOLVED" && kind === "document" && ocr && (
                 <Button variant="secondary" icon={<ThumbsDown className="h-4 w-4" />} onClick={() => setRejecting((v) => !v)}>
-                  דחיית החשבונית
+                  {taxChecks ? "דחיית החשבונית" : "דחיית המסמך"}
                 </Button>
               )}
               {ticket.status === "RESOLVED" ? (
@@ -384,7 +388,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
             {kind === "document" && (
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-xs font-bold text-ink-900">אימות Vision AI ורשות המסים</h4>
+                <h4 className="text-xs font-bold text-ink-900">{taxChecks ? "אימות Vision AI ורשות המסים" : "בדיקת קריאות המסמך"}</h4>
                 {ocr && (
                   <span
                     className={cx(
@@ -401,7 +405,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
               ) : (
                 <div className="space-y-3">
                   <ul className="divide-y divide-ink-100 rounded-lg border border-ink-200">
-                    {CHECKS.map((c) => (
+                    {CHECKS.filter((c) => taxChecks || c.key === "clarity").map((c) => (
                       <li key={c.key} className="flex items-center gap-2.5 px-3 py-2" title={c.hint}>
                         <CheckIcon value={ocr.checks?.[c.key] ?? null} />
                         <span className="text-sm text-ink-800">{c.label}</span>
@@ -426,7 +430,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                     <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{ocr.rejection_reason_he}</p>
                   )}
 
-                  {editing ? (
+                  {!taxChecks ? null : editing ? (
                     <div className="grid grid-cols-2 gap-2">
                       {EDIT_FIELDS.map((f) => (
                         <label key={f.key} className={cx("block", f.key === "supplier_name" && "col-span-2")}>
@@ -476,7 +480,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                       </tbody>
                     </table>
                   )}
-                  {!editing && (
+                  {!editing && taxChecks && (
                     <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={startEdit}>
                       תיקון שדות ידני
                     </Button>
@@ -487,7 +491,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   </p>
                 </div>
               )}
-              {!ocr && ticket.media_file_path && (
+              {!ocr && taxChecks && ticket.media_file_path && (
                 <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={startEdit}>
                   הזנת שדות החשבונית ידנית
                 </Button>

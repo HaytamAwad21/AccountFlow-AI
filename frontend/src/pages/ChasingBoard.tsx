@@ -36,7 +36,7 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
 /** Supplier, numbers and amount of a request, for the details column. */
 function ticketDetail(t: Ticket): string {
   const c = t.context_variables_json;
-  return [c.supplier_name, c.invoice_number && `#${c.invoice_number}`, c.missing_detail, c.amount ?? c.charge_amount ?? c.vat_amount].filter(Boolean).join(" · ");
+  return [c.document_type, c.supplier_name, c.invoice_number && `#${c.invoice_number}`, c.missing_detail, c.amount ?? c.charge_amount ?? c.vat_amount].filter(Boolean).join(" · ");
 }
 
 export function ChasingBoard() {

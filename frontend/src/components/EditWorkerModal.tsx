@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
-import { cx, ROLE_LABEL } from "../lib/format";
+import { cx } from "../lib/format";
 import type { User, UserRole } from "../lib/types";
 import { Button, Field, inputClass, Modal, PasswordInput, RoleBadge, Toggle } from "./ui";
+import { EMAIL_RE, JobTitleInput, RolePicker } from "./WorkerFields";
 
-/** Manager-only editor for an office worker: name, job title, role, active / suspended status and password reset
- *  (PUT /api/users/{id}). */
+/** Manager-only editor for an office worker: every field (name, job title, e-mail, role, active / suspended
+ *  status) and a password reset (PUT /api/users/{id}). */
 export function EditWorkerModal({ worker, onClose }: { worker: User | null; onClose: () => void }) {
   const { refreshUsers, toast, user } = useApp();
   const [fullName, setFullName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("WORKER");
   const [active, setActive] = useState(true);
   const [password, setPassword] = useState("");
@@ -21,29 +23,34 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
     if (!worker) return;
     setFullName(worker.full_name);
     setJobTitle(worker.job_title);
+    setEmail(worker.email);
     setRole(worker.role);
     setActive(worker.is_active);
     setPassword("");
   }, [worker]);
 
   const nameInvalid = fullName.trim().length < 2;
+  const emailInvalid = !EMAIL_RE.test(email.trim());
+  const emailChanged = !!worker && email.trim().toLowerCase() !== worker.email;
   const passwordInvalid = password.length > 0 && password.length < 6;
   const dirty =
     !!worker &&
     (fullName.trim() !== worker.full_name ||
       jobTitle.trim() !== worker.job_title ||
+      emailChanged ||
       role !== worker.role ||
       active !== worker.is_active ||
       password.length > 0);
   const editingSelf = worker?.id === user?.id;
 
   const save = async () => {
-    if (!worker || nameInvalid || passwordInvalid || !dirty) return;
+    if (!worker || nameInvalid || emailInvalid || passwordInvalid || !dirty) return;
     setSaving(true);
     try {
-      const body: Partial<Pick<User, "full_name" | "job_title" | "role" | "is_active">> & { password?: string } = {};
+      const body: Partial<Pick<User, "full_name" | "job_title" | "email" | "role" | "is_active">> & { password?: string } = {};
       if (fullName.trim() !== worker.full_name) body.full_name = fullName.trim();
       if (jobTitle.trim() !== worker.job_title) body.job_title = jobTitle.trim();
+      if (emailChanged) body.email = email.trim().toLowerCase();
       if (role !== worker.role) body.role = role;
       if (active !== worker.is_active) body.is_active = active;
       if (password) body.password = password;
@@ -85,19 +92,27 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
               />
             </Field>
             <Field label="תפקיד במשרד" hint="מוצג מתחת לשם (רשות)">
-              <input dir="auto" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="לדוגמה: פקידת הנה״ח" className={inputClass} />
+              <JobTitleInput value={jobTitle} onChange={setJobTitle} />
             </Field>
+            <div className="sm:col-span-2">
+              <Field label="אימייל" hint={emailInvalid ? "כתובת אימייל לא תקינה" : undefined}>
+                <input
+                  type="email"
+                  dir="ltr"
+                  autoComplete="off"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@firm.co.il"
+                  className={cx(inputClass, "text-left", emailInvalid && "ring-2 ring-red-400")}
+                />
+              </Field>
+            </div>
           </div>
 
-          <Field label="הרשאה">
-            <select value={role} onChange={(e) => setRole(e.target.value as UserRole)} className={inputClass}>
-              {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <div>
+            <span className="mb-1.5 block text-xs font-bold text-ink-700">הרשאה</span>
+            <RolePicker value={role} onChange={setRole} />
+          </div>
 
           <div>
             <span className="mb-1 block text-xs font-medium text-ink-600">סטטוס</span>
@@ -127,7 +142,7 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
               <Button type="button" variant="ghost" onClick={onClose}>
                 ביטול
               </Button>
-              <Button type="submit" variant="accent" loading={saving} disabled={!dirty || nameInvalid || passwordInvalid} icon={<Save className="h-4 w-4" />}>
+              <Button type="submit" variant="accent" loading={saving} disabled={!dirty || nameInvalid || emailInvalid || passwordInvalid} icon={<Save className="h-4 w-4" />}>
                 שמירה
               </Button>
             </span>

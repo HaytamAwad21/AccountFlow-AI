@@ -12,7 +12,7 @@ from collections import defaultdict
 STRINGS: dict[str, dict[str, str]] = {
     # ── 48h friendly reminders ────────────────────────────────────────────
     "reminder_MISSING_INVOICE": {
-        "he": "תזכורת ידידותית ({n}/{max}): אנחנו עדיין ממתינים לחשבונית מהספק '{supplier_name}' ({amount}, {invoice_date}). מספיק צילום ברור אחד.",
+        "he": "תזכורת ידידותית ({n}/{max}): אנחנו עדיין ממתינים ל{document_type} מהספק '{supplier_name}' ({amount}, {invoice_date}). מספיק צילום ברור אחד.",
     },
     "reminder_MISSING_DETAIL": {
         "he": "תזכורת ידידותית ({n}/{max}) לגבי חשבונית מס' {invoice_number} מהספק '{supplier_name}': עדיין חסר בה '{missing_detail}'. נא לשלוח עותק מתוקן או לכתוב כאן את הפרט החסר.",
@@ -28,6 +28,9 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "reminder_correction": {
         "he": "תזכורת ידידותית ({n}/{max}): אנחנו עדיין צריכים צילום ברור אחד של החשבונית מ-'{supplier_name}' — עמוד מלא ומספר החשבונית גלוי.",
+    },
+    "reminder_correction_document": {
+        "he": "תזכורת ידידותית ({n}/{max}): אנחנו עדיין צריכים צילום ברור אחד של ה{document_type} מ-'{supplier_name}', עם המסמך המלא.",
     },
     "reminder_correction_typed": {
         "he": "תזכורת ידידותית ({n}/{max}): עדיין חסר לנו {missing_detail} לחשבונית מהספק '{supplier_name}'. נא לכתוב כאן את המספר המדויק, בדיוק 9 ספרות.",
@@ -90,6 +93,12 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "reason_blurry": {
         "he": "הצילום מטושטש ולא ניתן לקרוא את מספר החשבונית",
+    },
+    "reason_blurry_document": {
+        "he": "הצילום מטושטש ולא ניתן לקרוא אותו",
+    },
+    "document_reprompt": {
+        "he": "תודה {client_name}!\nבדקתי עכשיו את הצילום של ה{document_type} ששלחת עבור '{supplier_name}', אבל {rejection_reason}.\nאפשר לצלם שוב תמונה ברורה אחת של המסמך המלא?",
     },
     "reason_missing_number": {
         "he": "מספר החשבונית לא מופיע במסמך — נא לוודא שמספר החשבונית נראה בצילום",

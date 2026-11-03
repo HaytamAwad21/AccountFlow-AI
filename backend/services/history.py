@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from models import ChasingTicket, MessageDirection, MessageTemplate, MessageType, TemplateCategory, WhatsAppMessageLog
 from services.i18n import t
+from services.money import DEFAULT_DOCUMENT_TYPE
 from services.templating import body_for, render_text
 
 log = logging.getLogger("accountflow.history")
@@ -71,6 +72,7 @@ def _hebrew_for(db: Session, msg: WhatsAppMessageLog, ticket: ChasingTicket | No
     text = msg.content_text or ""
     ctx = dict((ticket.context_variables_json if ticket else None) or {})
     ctx.setdefault("client_name", msg.client.full_name)
+    ctx.setdefault("document_type", DEFAULT_DOCUMENT_TYPE)
     ocr = (ticket.ocr_validation_json if ticket else None) or {}
 
     if msg.message_type == MessageType.TEMPLATE and ticket is not None:

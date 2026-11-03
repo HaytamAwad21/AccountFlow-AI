@@ -476,6 +476,19 @@ def verify_invoice_image(
     return validate_extraction(ex, expected_supplier, expected_invoice_number, lang, vat_rate, allocation_threshold)
 
 
+def verify_clarity_only(file_path: str | Path, mime: str | None = None, lang: str = "he") -> dict:
+    """A plain receipt or a check has no tax-invoice fields to verify, so only its readability is checked,
+    locally and at no API cost. A readable copy always goes to a clerk: it is never auto-approved."""
+    ex = extract_invoice_fields(file_path, mime, force_local=True)
+    ex["manual_review_required"] = True
+    result = validate_extraction(ex, lang=lang)
+    if "blurry" in result["rejection_codes"]:
+        reason = t("reason_blurry_document", lang)
+        result.update(rejection_reason=reason, rejection_reason_he=reason)
+    result["tax_checks"] = False
+    return result
+
+
 EDITABLE_FIELDS = ("invoice_number", "supplier_name", "business_id", "allocation_number", "invoice_date",
                    "net_amount", "vat_amount", "total_amount")
 
