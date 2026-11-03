@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext";
 import { api, mediaUrl } from "../lib/api";
 import { cx, DOCUMENT_TYPES, fullDateTime } from "../lib/format";
 import type { ClientDocument } from "../lib/types";
+import { ALL_TIME, DateRangeFilter, inBounds, rangeBounds, type Bounds, type DateRange } from "../components/DateRangeFilter";
 import { PageHeader } from "../components/PageHeader";
 import { TicketModal } from "../components/TicketModal";
 import { Card, Empty, inputClass, Spinner, StatusBadge, TabButton } from "../components/ui";
@@ -22,31 +23,21 @@ function groupOf(d: ClientDocument): string {
   return d.document_type ?? d.request_name ?? "אחר";
 }
 
-function monthKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("he-IL", { month: "long", year: "numeric" });
-}
-
 /** Every photo or PDF a client sent on WhatsApp, filed by type and month, so the office can find it later. */
 export function Documents() {
   const { clients, selectedClientId, selectClient, tick } = useApp();
   const [query, setQuery] = useState("");
   const [docs, setDocs] = useState<ClientDocument[] | null>(null);
   const [group, setGroup] = useState("all");
-  const [month, setMonth] = useState("all");
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
   const [openTicket, setOpenTicket] = useState<number | null>(null);
   const client = clients.find((c) => c.id === selectedClientId) ?? null;
 
-  // Another client starts unfiltered; server events refresh the current list in place.
+  // Another client starts on every type but keeps the period, so staff can check the same months across
+  // clients; server events refresh the current list in place.
   useEffect(() => {
     setDocs(null);
     setGroup("all");
-    setMonth("all");
   }, [client?.id]);
 
   useEffect(() => {
@@ -73,15 +64,23 @@ export function Documents() {
     );
   }, [clients, query]);
 
+  const inRange = useMemo(() => {
+    const b = rangeBounds(range);
+    return (docs ?? []).filter((d) => inBounds(d.created_at, b));
+  }, [docs, range]);
+
+  // The type tabs count what the chosen period holds.
   const groups = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const d of docs ?? []) counts.set(groupOf(d), (counts.get(groupOf(d)) ?? 0) + 1);
+    for (const d of inRange) counts.set(groupOf(d), (counts.get(groupOf(d)) ?? 0) + 1);
+    if (group !== "all" && !counts.has(group)) counts.set(group, 0); // keep the chosen tab when the period has none
     const order = [...DOCUMENT_TYPES, ...[...counts.keys()].filter((g) => g !== NO_REQUEST && !(DOCUMENT_TYPES as readonly string[]).includes(g)), NO_REQUEST];
     return order.filter((g) => counts.has(g)).map((g) => ({ name: g, count: counts.get(g) ?? 0 }));
-  }, [docs]);
+  }, [inRange, group]);
 
-  const months = useMemo(() => [...new Set((docs ?? []).map((d) => monthKey(d.created_at)))].sort().reverse(), [docs]);
-  const visible = (docs ?? []).filter((d) => (group === "all" || groupOf(d) === group) && (month === "all" || monthKey(d.created_at) === month));
+  const ofGroup = (d: ClientDocument) => group === "all" || groupOf(d) === group;
+  const visible = inRange.filter(ofGroup);
+  const countFor = (b: Bounds) => (docs ?? []).filter((d) => ofGroup(d) && inBounds(d.created_at, b)).length;
 
   return (
     <>
@@ -138,10 +137,10 @@ export function Documents() {
                   {docs && <span className="text-sm text-ink-600">{docs.length} מסמכים</span>}
                 </div>
                 {docs && docs.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <>
                     <div className="flex flex-wrap gap-1">
                       <TabButton active={group === "all"} onClick={() => setGroup("all")}>
-                        הכל <span className="ms-1 font-normal opacity-75">{docs.length}</span>
+                        הכל <span className="ms-1 font-normal opacity-75">{inRange.length}</span>
                       </TabButton>
                       {groups.map((g) => (
                         <TabButton key={g.name} active={group === g.name} onClick={() => setGroup(g.name)}>
@@ -149,15 +148,8 @@ export function Documents() {
                         </TabButton>
                       ))}
                     </div>
-                    <select value={month} onChange={(e) => setMonth(e.target.value)} className={cx(inputClass, "ms-auto w-auto py-1.5")} aria-label="סינון לפי חודש">
-                      <option value="all">כל החודשים</option>
-                      {months.map((m) => (
-                        <option key={m} value={m}>
-                          {monthLabel(m)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    <DateRangeFilter value={range} onChange={setRange} countFor={countFor} />
+                  </>
                 )}
               </div>
 
@@ -168,7 +160,7 @@ export function Documents() {
               ) : docs.length === 0 ? (
                 <Empty icon={<FolderOpen className="h-10 w-10" />} title="הלקוח עדיין לא שלח מסמכים" hint="צילומים וקובצי PDF שהלקוח ישלח בוואטסאפ יישמרו כאן." />
               ) : visible.length === 0 ? (
-                <Empty icon={<FolderOpen className="h-10 w-10" />} title="אין מסמכים שמתאימים לסינון" />
+                <Empty icon={<FolderOpen className="h-10 w-10" />} title="אין מסמכים שמתאימים לסינון" hint="נסו טווח זמן רחב יותר או סוג מסמך אחר." />
               ) : (
                 <div className="grid grid-cols-2 gap-3 p-4 @lg:grid-cols-3 @4xl:grid-cols-4">
                   {visible.map((d) => (

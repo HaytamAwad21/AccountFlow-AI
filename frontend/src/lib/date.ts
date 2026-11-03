@@ -11,6 +11,12 @@ export function parseDdMmYyyy(s: string): Date | null {
   return d.getDate() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 ? d : null;
 }
 
+/** "05/10/26" → "05/10/2026": a two-digit year means 20yy. Any other text is returned unchanged. */
+export function expandYear(s: string): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(s.trim());
+  return m ? `${m[1]}/${m[2]}/20${m[3]}` : s;
+}
+
 /** Typing mask for dd/mm/yyyy: digits only, slashes are inserted automatically.
  *  "5/" pads to "05/", pasted "2026-10-05" or "5.10.2026" are converted. While deleting,
  *  no trailing slash is re-added, so Backspace walks back over the separators. */

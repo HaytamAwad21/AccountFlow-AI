@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type InputHTMLAttributes } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { maskDate, parseDdMmYyyy, toDdMmYyyy } from "../lib/date";
+import { expandYear, maskDate, parseDdMmYyyy, toDdMmYyyy } from "../lib/date";
 import { cx } from "../lib/format";
 import { inputClass } from "./ui";
 
@@ -100,11 +100,17 @@ export const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput(
         placeholder={placeholder ?? "dd/mm/yyyy"}
         value={value}
         onChange={(e) => onChange(maskDate(e.target.value, value))}
+        onBlur={(e) => {
+          // "05/10/26" is written out as "05/10/2026" once the field is left
+          if (expandYear(value) !== value) onChange(expandYear(value));
+          rest.onBlur?.(e);
+        }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && e.altKey) {
             e.preventDefault();
             toggle();
           }
+          if (e.key === "Enter" && expandYear(value) !== value) onChange(expandYear(value));
           rest.onKeyDown?.(e);
         }}
         className={cx(inputClass, "pl-10 text-end tabular-nums", className)}
