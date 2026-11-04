@@ -6,6 +6,7 @@ GET  /api/auth/me      the user behind the token
 GET  /api/auth/users   public list of active user cards for the login screen (no e-mails)
 GET  /api/auth/deadline-day  public VAT deadline day, for the logo on the login screen
 POST /api/auth/change-password  the logged-in user changes their own password
+POST /api/auth/2fa/setup | enable {code} | disable {password}  the logged-in user's two-step login
 GET  /api/auth/setup   public: {"needed": true} while a new office has no user yet
 POST /api/auth/setup   {setup_code, firm_name, full_name, job_title, email, password} creates the first manager
 
@@ -29,10 +30,12 @@ from database import get_db
 from models import LoginFailure, User, UserRole, UserSession
 from routers.deps import (SESSION_COOKIE, bearer_token, clear_session_cookie, client_ip, current_session, require_user,
                           set_session_cookie)
-from schemas import ChangePasswordRequest, FirstSetupRequest, LoginRequest, LoginResponse, LoginUser, UserOut, user_out
+from schemas import (ChangePasswordRequest, FirstSetupRequest, LoginRequest, LoginResponse, LoginUser, PasswordConfirm,
+                     TwoFactorCode, UserOut, user_out)
 from services.activity import log_activity
 from services.clock import utcnow
-from services.security import hash_password, new_session_token, password_problem, token_digest, verify_password
+from services.security import (hash_password, new_session_token, new_totp_secret, otpauth_uri, password_problem, qr_data_uri,
+                               token_digest, verify_password, verify_totp)
 from services.system_settings import deadline_day, get_system_settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -119,6 +122,16 @@ def login(body: LoginRequest, request: Request, response: Response, db: Session 
         db.add(LoginFailure(user_id=user.id, ip_address=ip, created_at=utcnow()))
         db.commit()
         raise HTTPException(401, "הסיסמה שגויה")
+    if user.totp_enabled:
+        # The right password without a code only asks for the code; a wrong code counts towards the lockout.
+        if not (body.code or "").strip():
+            raise HTTPException(401, {"code": "two_factor_required", "message": "יש להזין את הקוד בן 6 הספרות מאפליקציית האימות בטלפון"})
+        step = verify_totp(user.totp_secret, body.code, user.totp_last_step)
+        if step is None:
+            db.add(LoginFailure(user_id=user.id, ip_address=ip, created_at=utcnow()))
+            db.commit()
+            raise HTTPException(401, {"code": "two_factor_invalid", "message": "הקוד שגוי או שכבר נוצל. יש להזין את הקוד שמופיע עכשיו באפליקציה."})
+        user.totp_last_step = step
 
     result = _start_session(db, user, request, response)
     db.execute(delete(LoginFailure).where(LoginFailure.user_id == user.id))
@@ -149,6 +162,44 @@ def me(request: Request, response: Response, user: User = Depends(require_user))
     token = bearer_token(request.headers.get("authorization"))
     if token and request.cookies.get(SESSION_COOKIE) != token:
         set_session_cookie(response, token)
+    return user_out(user)
+
+
+@router.post("/2fa/setup")
+def two_factor_setup(db: Session = Depends(get_db), user: User = Depends(require_user)):
+    """A new authenticator key for the logged-in user. It takes effect only after /2fa/enable with a code."""
+    if user.totp_enabled:
+        raise HTTPException(409, "האימות הדו-שלבי כבר פעיל. כדי להחליף טלפון, יש לכבות אותו ולהפעיל מחדש.")
+    user.totp_secret = new_totp_secret()
+    user.totp_last_step = 0
+    db.commit()
+    uri = otpauth_uri(user.totp_secret, user.email, f"AccountFlow · {get_system_settings(db).firm_name}")
+    return {"secret": user.totp_secret, "otpauth_uri": uri, "qr": qr_data_uri(uri)}
+
+
+@router.post("/2fa/enable", response_model=UserOut)
+def two_factor_enable(body: TwoFactorCode, request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    if user.totp_enabled:
+        raise HTTPException(409, "האימות הדו-שלבי כבר פעיל")
+    step = verify_totp(user.totp_secret, body.code, user.totp_last_step)
+    if step is None:
+        raise HTTPException(400, "הקוד שגוי. יש להזין את הקוד שמופיע עכשיו באפליקציה, אחרי סריקת הקוד.")
+    user.totp_enabled = True
+    user.totp_last_step = step
+    log_activity(db, user, "TWO_FACTOR_ENABLED", f"{user.full_name} הפעיל/ה אימות דו-שלבי", entity_type="user",
+                 entity_id=user.id, ip_address=client_ip(request))
+    db.commit()
+    return user_out(user)
+
+
+@router.post("/2fa/disable", response_model=UserOut)
+def two_factor_disable(body: PasswordConfirm, request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(400, "הסיסמה שגויה")
+    user.totp_enabled, user.totp_secret, user.totp_last_step = False, "", 0
+    log_activity(db, user, "TWO_FACTOR_DISABLED", f"{user.full_name} כיבה/תה את האימות הדו-שלבי", entity_type="user",
+                 entity_id=user.id, ip_address=client_ip(request))
+    db.commit()
     return user_out(user)
 
 

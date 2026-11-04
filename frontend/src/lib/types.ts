@@ -26,6 +26,8 @@ export interface User {
   role: UserRole;
   avatar_initials: string;
   is_active: boolean;
+  /** Logs in with the password and a 6-digit code from a phone app */
+  two_factor_enabled: boolean;
   created_at: string;
 }
 

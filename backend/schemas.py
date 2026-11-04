@@ -54,6 +54,7 @@ class UserOut(ORMModel):
     role: UserRole
     avatar_initials: str
     is_active: bool
+    two_factor_enabled: bool = False
     created_at: UTCDateTime
 
 
@@ -88,6 +89,15 @@ class LoginUser(ORMModel):
 
 class LoginRequest(BaseModel):
     user_id: int
+    password: str = Field(min_length=1, max_length=128)
+    code: str | None = Field(None, max_length=12)  # the 6-digit code, for a user with two-step login
+
+
+class TwoFactorCode(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+class PasswordConfirm(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 

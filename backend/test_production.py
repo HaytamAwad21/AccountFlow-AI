@@ -5,11 +5,16 @@ that need a login. Runs on a throw-away database with SEED_ON_STARTUP=false and 
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
 import os
 import shutil
+import struct
 import sys
 import tempfile
+import time
 import traceback
 from pathlib import Path
 
@@ -190,7 +195,74 @@ def demo_tools_are_off(c: TestClient, state: dict) -> None:
     check(r.status_code == 200 and r.json().get("updated") == 0, "opening the chat does not fake read receipts", r.text)
 
 
+def totp(secret: str, offset: int = 0) -> str:
+    """RFC 6238 code (30 s steps, 6 digits, SHA-1), written independently of the app's own code."""
+    key = base64.b32decode(secret + "=" * (-len(secret) % 8))
+    step = int(time.time()) // 30 + offset
+    digest = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()
+    start = digest[-1] & 0x0F
+    return f"{(struct.unpack('>I', digest[start:start + 4])[0] & 0x7FFFFFFF) % 1_000_000:06d}"
+
+
+def two_step_login(c: TestClient, state: dict) -> None:
+    M = bearer(state["token"])
+    me = c.get("/api/auth/me", headers=M).json()
+    check(me.get("two_factor_enabled") is False, "two-step login starts off", me)
+    r = c.post("/api/auth/2fa/setup", headers=M)
+    body = r.json() if r.status_code == 200 else {}
+    secret = body.get("secret", "")
+    check(r.status_code == 200 and len(secret) >= 32 and body.get("otpauth_uri", "").startswith("otpauth://totp/")
+          and body.get("qr", "").startswith("data:image/png;base64,"), "setup gives a key and a QR code for the phone app", r.text[:200])
+    check(c.get("/api/auth/me", headers=M).json().get("two_factor_enabled") is False, "a started setup is not on yet")
+    check(c.post("/api/auth/2fa/enable", headers=M, json={"code": "000000"}).status_code == 400, "a wrong code does not turn it on")
+    r = c.post("/api/auth/2fa/enable", headers=M, json={"code": totp(secret)})
+    check(r.status_code == 200 and c.get("/api/auth/me", headers=M).json()["two_factor_enabled"] is True,
+          "the code from the phone turns it on", r.text)
+    acts = {a["action"] for a in c.get("/api/activity", headers=M).json()["items"]}
+    check("TWO_FACTOR_ENABLED" in acts, "the activity log records it")
+
+    me = c.get("/api/auth/me", headers=M).json()
+    login = {"user_id": me["id"], "password": OWNER["password"]}
+    for _ in range(6):  # a correct password without the code only asks for the code; it never locks the account
+        r = c.post("/api/auth/login", json=login, headers=ANON)
+    check(r.status_code == 401 and r.json()["detail"].get("code") == "two_factor_required",
+          "the password alone is not enough: the code is asked for", r.text)
+    r = c.post("/api/auth/login", json={**login, "code": "123456"}, headers=ANON)
+    check(r.status_code == 401 and r.json()["detail"].get("code") == "two_factor_invalid", "a wrong code is refused", r.text)
+    r = c.post("/api/auth/login", json={"user_id": me["id"], "password": "wrong-password", "code": totp(secret, 1)}, headers=ANON)
+    check(r.status_code == 401, "a right code with a wrong password is refused")
+    good = totp(secret, 1)
+    r = c.post("/api/auth/login", json={**login, "code": good}, headers=ANON)
+    check(r.status_code == 200, "password and code log in", r.text)
+    state["token"] = r.json().get("token", state["token"])
+    r = c.post("/api/auth/login", json={**login, "code": good}, headers=ANON)
+    check(r.status_code == 401, "a code cannot be used twice (someone who saw it cannot replay it)", r.status_code)
+
+    M = bearer(state["token"])
+    r = c.post("/api/users", headers=M, json={"full_name": "עובדת בדיקה", "email": "w2fa@levi-cpa.test", "password": "worker-pass-1", "role": "WORKER"})
+    worker_id = r.json()["id"]
+    W = bearer(c.post("/api/auth/login", json={"user_id": worker_id, "password": "worker-pass-1"}, headers=ANON).json()["token"])
+    w_secret = c.post("/api/auth/2fa/setup", headers=W).json()["secret"]
+    c.post("/api/auth/2fa/enable", headers=W, json={"code": totp(w_secret)})
+    staff = {u["id"]: u for u in c.get("/api/users", headers=M).json()}
+    check(staff[worker_id].get("two_factor_enabled") is True, "the staff list shows who uses two-step login")
+    check(c.post(f"/api/users/{me['id']}/reset-two-factor", headers=W).status_code == 403, "a worker cannot switch it off for others")
+    r = c.post(f"/api/users/{worker_id}/reset-two-factor", headers=M)
+    check(r.status_code == 200 and r.json().get("two_factor_enabled") is False, "a manager switches it off for a worker who lost the phone", r.text)
+    check(c.post("/api/auth/login", json={"user_id": worker_id, "password": "worker-pass-1"}, headers=ANON).status_code == 200,
+          "that worker logs in with the password again")
+    check(c.get("/api/auth/me", headers=W).status_code == 401, "the reset signs out that worker's open sessions")
+
+    check(c.post("/api/auth/2fa/disable", headers=M, json={"password": "wrong-password"}).status_code == 400,
+          "switching it off needs the password")
+    r = c.post("/api/auth/2fa/disable", headers=M, json={"password": OWNER["password"]})
+    check(r.status_code == 200 and c.post("/api/auth/login", json=login, headers=ANON).status_code == 200,
+          "with the password it switches off, and the password alone logs in again", r.text)
+
+
 def old_schema_is_never_wiped(c: TestClient, state: dict) -> None:
+    with database.SessionLocal() as db:
+        before = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
     with database.engine.begin() as conn:
         conn.execute(text("CREATE TABLE clerk_users (id INTEGER PRIMARY KEY)"))
     try:
@@ -203,13 +275,13 @@ def old_schema_is_never_wiped(c: TestClient, state: dict) -> None:
             conn.execute(text("DROP TABLE IF EXISTS clerk_users"))
     with database.SessionLocal() as db:
         users = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
-    check(users == 1, "the office's users are still there", users)
+    check(users == before > 0, "the office's users are still there", (before, users))
 
 
 CASES = [
     fresh_install_has_no_demo_data, setup_refuses_bad_input, setup_creates_the_first_manager, uploaded_files_need_a_login,
     live_updates_need_a_login, logout_clears_only_its_own_cookie, secure_cookie_when_configured, demo_tools_are_off,
-    old_schema_is_never_wiped,
+    two_step_login, old_schema_is_never_wiped,
 ]
 
 

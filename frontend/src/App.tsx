@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ClipboardList, FolderOpen, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, Smartphone, Sun, Users, X, Zap } from "lucide-react";
+import { ClipboardList, FolderOpen, History, KeyRound, LogIn, LogOut, Megaphone, Menu, Moon, Settings as SettingsIcon, ShieldCheck, Smartphone, Sun, Users, X, Zap } from "lucide-react";
 import { useApp } from "./context/AppContext";
 import { api } from "./lib/api";
 import { cx, DEFAULT_VAT_DEADLINE_DAY, nextDeadlineDate, splitUserName } from "./lib/format";
@@ -7,6 +7,7 @@ import { PhoneSimulator } from "./components/PhoneSimulator";
 import { LoginPanel } from "./components/LoginPanel";
 import { SetupPanel } from "./components/SetupPanel";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
+import { TwoFactorModal } from "./components/TwoFactorModal";
 import { DeadlineCalendar } from "./components/DeadlineCalendar";
 import { DeadlineDisc } from "./components/PageHeader";
 import { Modal, RoleBadge, Spinner, Toaster } from "./components/ui";
@@ -81,6 +82,7 @@ function ProfileSwitcher() {
   const { user, logout } = useApp();
   const [open, setOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [twoFactor, setTwoFactor] = useState(false);
 
   if (!user) return null;
   const { name } = splitUserName(user.full_name);
@@ -102,11 +104,19 @@ function ProfileSwitcher() {
           <LogOut className="h-3.5 w-3.5 -scale-x-100" /> התנתקות
         </button>
       </div>
+      <button
+        onClick={() => setTwoFactor(true)}
+        className="flex w-full items-center justify-center gap-1 py-1 text-xs text-field-muted transition-colors hover:bg-white/10 hover:text-white"
+      >
+        <ShieldCheck className={cx("h-3.5 w-3.5", user.two_factor_enabled && "text-emerald-300")} />
+        אימות דו-שלבי: {user.two_factor_enabled ? "פעיל" : "כבוי"}
+      </button>
 
       <Modal narrow open={open} onClose={() => setOpen(false)} title="התחברות למערכת" subtitle="בחרו משתמש/ת והקלידו את הסיסמה">
         <div className="p-5">{open && <LoginPanel onDone={() => setOpen(false)} />}</div>
       </Modal>
       <ChangePasswordModal open={changingPassword} onClose={() => setChangingPassword(false)} />
+      <TwoFactorModal open={twoFactor} onClose={() => setTwoFactor(false)} />
     </div>
   );
 }

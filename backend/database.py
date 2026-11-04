@@ -78,6 +78,12 @@ def _add_missing_columns() -> None:
                         conn.execute(text("UPDATE users SET full_name = :n, job_title = :t WHERE id = :i"),
                                      {"n": name.strip(), "t": title.strip(), "i": user_id})
             logging.getLogger("accountflow").warning("Added users.job_title and split existing 'name - title' values.")
+        if "totp_enabled" not in user_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_secret VARCHAR(64) NOT NULL DEFAULT ''"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0"))
+            logging.getLogger("accountflow").warning("Added two-step login columns to users.")
     if "clients" in inspector.get_table_names():
         if "last_reengage_at" not in {c["name"] for c in inspector.get_columns("clients")}:
             with engine.begin() as conn:

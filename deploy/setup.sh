@@ -30,6 +30,7 @@ read -r -p "OpenAI API key (starts with sk-; Enter to add it later): " openai_ke
 db_password="$(random_hex 24)"
 setup_code="$(random_hex 4)-$(random_hex 4)-$(random_hex 4)"
 verify_token="$(random_hex 16)"
+backup_passphrase="$(random_hex 4)-$(random_hex 4)-$(random_hex 4)-$(random_hex 4)-$(random_hex 4)-$(random_hex 4)"
 
 sed \
 	-e "s|^DOMAIN=.*|DOMAIN=$domain|" \
@@ -37,6 +38,7 @@ sed \
 	-e "s|^SETUP_CODE=.*|SETUP_CODE=$setup_code|" \
 	-e "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$openai_key|" \
 	-e "s|^WHATSAPP_VERIFY_TOKEN=.*|WHATSAPP_VERIFY_TOKEN=$verify_token|" \
+	-e "s|^BACKUP_PASSPHRASE=.*|BACKUP_PASSPHRASE=$backup_passphrase|" \
 	.env.production.example > .env
 chmod 600 .env
 mkdir -p backups
@@ -46,6 +48,10 @@ cat <<EOF
 .env is ready (only you can read it).
 
   Setup code for the first manager:  $setup_code
+
+  Backup passphrase:                 $backup_passphrase
+  Save it NOW outside this server (a password manager, or printed and locked away).
+  Every backup is encrypted with it: if the server is lost and this is lost too, no backup can be opened.
 
 Next:
   1. Start the app:   docker compose -f docker-compose.prod.yml up -d --build

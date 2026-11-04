@@ -32,11 +32,14 @@ export const API_BASE: string = (import.meta.env.VITE_API_URL as string | undefi
 export class ApiError extends Error {
   status: number;
   missing: string[];
+  /** Machine-readable reason when the server gives one, e.g. "two_factor_required" */
+  code?: string;
 
-  constructor(status: number, message: string, missing: string[] = []) {
+  constructor(status: number, message: string, missing: string[] = [], code?: string) {
     super(message);
     this.status = status;
     this.missing = missing;
+    this.code = code;
   }
 }
 
@@ -75,6 +78,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 
 function detailMessage(detail: unknown): string {
   if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) return String((detail as { message: unknown }).message);
   if (Array.isArray(detail)) {
     return detail
       .map((d) => {
@@ -108,15 +112,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
     let missing: string[] = [];
+    let code: string | undefined;
     try {
       const body = await res.json();
       message = detailMessage(body.detail) || message;
       missing = body.missing ?? [];
+      code = typeof body.detail === "object" && body.detail ? body.detail.code : undefined;
     } catch {
       /* non-JSON error body */
     }
     if (res.status === 401 && !path.startsWith("/api/auth/login") && onUnauthorized) onUnauthorized();
-    throw new ApiError(res.status, message, missing);
+    throw new ApiError(res.status, message, missing, code);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -154,8 +160,13 @@ export function mediaUrl(path: string | null | undefined): string | null {
 export const api = {
   loginUsers: () => request<LoginUser[]>("/api/auth/users"),
   deadlineDay: () => request<{ vat_deadline_day: number }>("/api/auth/deadline-day"),
-  login: (userId: number, password: string) =>
-    request<LoginResponse>("/api/auth/login", { method: "POST", ...json({ user_id: userId, password }) }),
+  login: (userId: number, password: string, code?: string) =>
+    request<LoginResponse>("/api/auth/login", { method: "POST", ...json({ user_id: userId, password, code }) }),
+  /** Two-step login of the logged-in user: a new key and its QR code, then enable with a code, or disable. */
+  twoFactorSetup: () => request<{ secret: string; otpauth_uri: string; qr: string }>("/api/auth/2fa/setup", { method: "POST" }),
+  twoFactorEnable: (code: string) => request<User>("/api/auth/2fa/enable", { method: "POST", ...json({ code }) }),
+  twoFactorDisable: (password: string) => request<User>("/api/auth/2fa/disable", { method: "POST", ...json({ password }) }),
+  resetTwoFactor: (userId: number) => request<User>(`/api/users/${userId}/reset-two-factor`, { method: "POST" }),
   /** Revokes the given session token (defaults to the current one). Never throws. */
   logout: async (token: string | null = authToken) => {
     if (!token) return;

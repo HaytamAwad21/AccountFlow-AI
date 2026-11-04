@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, ShieldCheck } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
@@ -42,6 +42,23 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
       active !== worker.is_active ||
       password.length > 0);
   const editingSelf = worker?.id === user?.id;
+  const [resetting, setResetting] = useState(false);
+
+  // The worker lost the phone with the authenticator app: switch two-step login off and sign them out.
+  const resetTwoFactor = async () => {
+    if (!worker) return;
+    setResetting(true);
+    try {
+      await api.resetTwoFactor(worker.id);
+      await refreshUsers();
+      toast({ tone: "success", title: "האימות הדו-שלבי אופס", body: `${worker.full_name} נכנס/ת עכשיו עם הסיסמה בלבד ויכול/ה להפעיל אותו מחדש` });
+      onClose();
+    } catch (e) {
+      toast({ tone: "error", title: "האיפוס נכשל", body: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const save = async () => {
     if (!worker || nameInvalid || emailInvalid || passwordInvalid || !dirty) return;
@@ -127,6 +144,17 @@ export function EditWorkerModal({ worker, onClose }: { worker: User | null; onCl
           <Field label="סיסמה חדשה (אופציונלי)" hint={passwordInvalid ? "לפחות 6 תווים" : "השאירו ריק כדי לא לשנות. איפוס סיסמה מנתק את העובד/ת מכל החיבורים."}>
             <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" placeholder="" invalid={passwordInvalid} />
           </Field>
+
+          {worker.two_factor_enabled && !editingSelf && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border border-ink-300 px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs text-ink-700">
+                <ShieldCheck className="h-4 w-4 text-emerald-700" /> אימות דו-שלבי פעיל
+              </span>
+              <Button type="button" size="sm" variant="secondary" loading={resetting} onClick={resetTwoFactor} title="למשל כשהטלפון אבד: העובד/ת ינותק/תנותק ויוכל/תוכל להפעיל מחדש">
+                איפוס (הטלפון אבד)
+              </Button>
+            </div>
+          )}
 
           {editingSelf && (role !== "MANAGER" || !active) && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">

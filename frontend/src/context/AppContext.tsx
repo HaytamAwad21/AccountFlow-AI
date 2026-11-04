@@ -29,7 +29,7 @@ interface AppState {
   selectClient: (id: number | null, openPhone?: boolean) => void;
   setPhoneOpen: (open: boolean) => void;
   /** Password login. Replaces (and revokes) any current session. Throws ApiError on failure. */
-  login: (userId: number, password: string) => Promise<User>;
+  login: (userId: number, password: string, code?: string) => Promise<User>;
   /** Creates a new office's first manager and logs them in. */
   setupOffice: (body: OfficeSetup) => Promise<User>;
   logout: () => Promise<void>;
@@ -117,9 +117,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const login = useCallback(
-    async (userId: number, password: string) => {
+    async (userId: number, password: string, code?: string) => {
       const previous = getToken();
-      const res = await api.login(userId, password);
+      const res = await api.login(userId, password, code);
       setToken(res.token);
       if (previous && previous !== res.token) api.logout(previous); // revoke the replaced session
       setSessionUser(res.user);

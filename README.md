@@ -13,7 +13,7 @@ Automated client-chasing, missing-invoice collection and monthly tax notificatio
   - **Israel Tax Authority (רשות המסים) rules:** a 9-digit supplier ח.פ / ע.מ, and a 9-digit **מספר הקצאה** (allocation number) on invoices at or above the allocation threshold.
 - **Manager / worker roles.** Managers administer clients, templates, office settings and staff. Workers send messages, work the chasing board and approve invoices.
 
-**Installing it for a real accounting firm:** follow [DEPLOY.md](DEPLOY.md). It covers the server, HTTPS, the first manager, WhatsApp, OpenAI and backups. The quick start below runs the demo.
+**Installing it for a real accounting firm:** follow [DEPLOY.md](DEPLOY.md). It covers the server and its lock-down, HTTPS, the first manager, two-step login, WhatsApp, OpenAI, and encrypted off-site backups. The quick start below runs the demo.
 
 ## Quick start
 
@@ -143,6 +143,11 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
   - Only the token's SHA-256 digest is stored, in `user_sessions`.
   - Sessions expire after `SESSION_HOURS` (default 12).
   - Logout, a password reset or suspending a user revokes that user's sessions immediately.
+- **Two-step login (optional, per user):** a user turns it on under **אימות דו-שלבי** in the sidebar by scanning a QR code with an authenticator app (TOTP: 6 digits, 30 seconds, as in Google Authenticator).
+  - After that, a login needs the password and the current code. The right password without a code is answered `401` with `detail.code = "two_factor_required"`, and the dashboard asks for the code.
+  - A wrong code counts towards the lockout. A code is accepted once only, so a code someone saw cannot be replayed.
+  - Turning it off needs the password. A manager can reset it for someone who lost their phone (`POST /api/users/{id}/reset-two-factor`), which also signs that person out.
+  - The staff list shows who uses it. Every change is in the activity log.
 - **Lockout:** after `LOGIN_MAX_FAILURES` wrong passwords (default 5) within `LOGIN_LOCKOUT_MINUTES` (default 15), the account is locked temporarily with HTTP 429.
   - Wrong passwords are counted in a separate `login_failures` table. They never appear in the activity log.
   - A successful login clears that user's failures, and expired attempts are purged automatically.
@@ -423,7 +428,7 @@ Full interactive docs are at `/docs`.
 cd backend && python test_flow.py && python test_regressions.py && python test_production.py
 ```
 
-`test_production.py` runs a real-office install (`SEED_ON_STARTUP=false`): no demo data, the setup screen and its code, documents and the event stream behind a login, the session cookie, demo tools refused, and an outdated database left untouched.
+`test_production.py` runs a real-office install (`SEED_ON_STARTUP=false`): no demo data, the setup screen and its code, documents and the event stream behind a login, the session cookie, demo tools refused, two-step login (with codes computed independently of the app), and an outdated database left untouched.
 
 The test runs against a temporary database through the real HTTP API. It covers the following:
 

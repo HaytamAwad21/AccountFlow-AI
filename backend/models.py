@@ -118,6 +118,10 @@ class User(Base):
     # PBKDF2-SHA256 hash (services/security.py); never returned by the API
     password_hash: Mapped[str] = mapped_column(String(256), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Two-step login (services/security.py): the authenticator key, on/off, and the last code step used
+    totp_secret: Mapped[str] = mapped_column(String(64), default="")
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     clients: Mapped[list[Client]] = relationship(back_populates="assigned_worker")
@@ -125,6 +129,10 @@ class User(Base):
     @property
     def is_manager(self) -> bool:
         return self.role == UserRole.MANAGER
+
+    @property
+    def two_factor_enabled(self) -> bool:
+        return bool(self.totp_enabled)
 
 
 class Client(Base):

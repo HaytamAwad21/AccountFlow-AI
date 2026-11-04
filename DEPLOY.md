@@ -10,7 +10,7 @@ What runs on the server, all in Docker:
 | frontend | The dashboard (nginx) | No |
 | backend | The API, the reminder engine and the WhatsApp webhook | No |
 | db | PostgreSQL 16 | No |
-| backup | Nightly copy of the database and the uploaded documents into `backups/` | No |
+| backup | Nightly encrypted copy of the database and the uploaded documents, in `backups/` and off the server | No |
 
 Every command below runs on the server, inside the `AccountFlow-AI` folder.
 
@@ -20,25 +20,46 @@ Every command below runs on the server, inside the `AccountFlow-AI` folder.
 - **A domain name** you control, for example a subdomain of the firm's site.
 - **An OpenAI API key** from platform.openai.com, with pay-as-you-go billing. This is not a ChatGPT subscription. Set a monthly spending limit in the billing settings.
 - **For live WhatsApp** (can come later): a Meta Business account for the firm and a phone number that is not used in the regular WhatsApp app. See step 7.
+- **Storage for off-site backups**: a bucket in any S3-compatible storage (AWS S3 in Tel Aviv, Cloudflare R2, Backblaze B2). See step 8.
+- **An SSH key** on your own computer, to log in to the server without a password. See step 3.
 
 ## 2. Point the domain at the server
 
 In the domain's DNS settings, add an **A record**: the name (for example `app`) points at the server's public IP address. Wait until `ping app.levi-cpa.co.il` answers from that IP; it usually takes a few minutes.
 
-## 3. Prepare the server
+## 3. Prepare and lock down the server
 
-Connect with SSH, then install Docker and turn on the firewall:
+**Your login key.** On your own computer, create a key if you have none, and copy it to the server. Use the user name your cloud provider gave you (often `ubuntu` or `root`):
+
+```bash
+ssh-keygen -t ed25519
+```
+
+```bash
+ssh-copy-id ubuntu@<server address>
+```
+
+Log in with `ssh ubuntu@<server address>`; it no longer asks for the server's password. Then install Docker:
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
-sudo ufw allow OpenSSH
-sudo ufw allow 80,443/tcp
-sudo ufw allow 443/udp
-sudo ufw --force enable
 ```
 
-Log out and back in, so `docker` works without `sudo`.
+Log out and back in, so `docker` works without `sudo`. Get the code (step 4), then lock the server down:
+
+```bash
+sudo bash deploy/harden.sh
+```
+
+`deploy/harden.sh` does four things:
+
+- **SSH with keys only:** password logins and root password logins are switched off, so nobody can guess their way in.
+- **fail2ban:** an address that fails to log in 5 times is blocked for an hour.
+- **Automatic security updates:** Ubuntu installs them every day and restarts at 04:00 when an update needs it. The app's containers start again by themselves.
+- **Firewall:** only SSH (22), HTTP (80) and HTTPS (443) are open.
+
+It refuses to change anything until your login key is installed, so it cannot lock you out. When it finishes, check from a **new** terminal that `ssh ubuntu@<server address>` still works before closing the old one.
 
 ## 4. Get the code and create the settings
 
@@ -50,7 +71,12 @@ bash deploy/setup.sh
 
 If the repository is private, GitHub asks for a username and a personal access token instead of a password.
 
-`deploy/setup.sh` asks for the site address and the OpenAI key. It then writes `.env` with a fresh database password, a WhatsApp verify token and a **setup code**, and prints the setup code. Keep it for step 6. `.env` holds secrets: never commit it, email it or paste it into chats.
+`deploy/setup.sh` asks for the site address and the OpenAI key. It then writes `.env` with a fresh database password, a WhatsApp verify token, a **setup code** and a **backup passphrase**, and prints the last two:
+
+- **Setup code:** keep it for step 6.
+- **Backup passphrase:** save it **now, outside the server**, in a password manager or printed and locked away. Every backup is encrypted with it. If the server is lost and the passphrase is lost too, no backup can be opened, not even by you.
+
+`.env` holds secrets: never commit it, email it or paste it into chats.
 
 ## 5. Start the app
 
@@ -74,6 +100,9 @@ docker compose -f docker-compose.prod.yml ps
    - Check the VAT rate, the VAT deadline day and the reminder rules.
    - Add the workers under **עובדי המשרד**.
 4. In **לקוחות ותבניות**, add the clients. A tax-notice sheet uploaded in **הדיווח מוכן** also adds any client it does not know yet.
+5. **Two-step login for everyone.** Each person clicks **אימות דו-שלבי** under their name in the sidebar and scans the QR code with Google Authenticator or Microsoft Authenticator. From then on a login needs the password and the 6-digit code from the phone, so a stolen password alone is useless. Start with the managers.
+   - **Someone lost their phone:** a manager opens **עריכה** for that person and presses **איפוס (הטלפון אבד)**. They log in with the password and set it up on the new phone.
+   - **The staff list** shows who has turned it on.
 
 There is no demo data on this install: no demo users, clients or requests. The six message templates are installed.
 
@@ -107,38 +136,62 @@ Test with one real phone before the firm starts: send a request to it and answer
 
 ## 8. Backups
 
-The `backup` service copies the database and the uploaded documents into the `backups/` folder when it starts and then every 24 hours. It keeps 14 days (`BACKUP_KEEP_DAYS` in `.env`).
+The `backup` service backs up the database and the uploaded documents when it starts and then every 24 hours:
 
-A copy that stays on the same server is lost with the server, so copy `backups/` somewhere else regularly. For example, from your own computer:
+- **Encrypted:** each backup is encrypted with `BACKUP_PASSPHRASE` (AES-256). The files in `backups/` end in `.enc` and cannot be read without the passphrase.
+- **Off the server:** when `BACKUP_REMOTE` is set, each backup is also copied to your storage bucket. A copy that stays on the server is lost with the server.
+- **Kept 14 days** (`BACKUP_KEEP_DAYS`), on the server and in the bucket.
+
+**Set up the off-site copy** (do this before the firm starts):
+
+1. Create a bucket, for example in AWS S3, region `il-central-1` (Tel Aviv).
+2. Create an access key that can only write to that bucket.
+3. In `.env`, remove the `#` signs in the `BACKUP_REMOTE` and `RCLONE_CONFIG_OFFSITE_*` lines and fill in the bucket name and the key. `.env.production.example` shows examples for AWS, Cloudflare R2 and Backblaze B2.
+4. Restart the backup service and check its log. It should end with `backup done (on this server and in offsite:...)`.
 
 ```bash
-scp -r user@server-ip:AccountFlow-AI/backups ./accountflow-backups
+docker compose -f docker-compose.prod.yml up -d --force-recreate backup
+```
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail 5 backup
 ```
 
 To make a backup right now (for example before an update):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backup sh /backup.sh
+docker compose -f docker-compose.prod.yml exec backup sh /usr/local/bin/backup.sh
 ```
 
 ### Restore a backup
 
-Replace the file names with the ones you want from `backups/`:
+The backup's name is the date and time in its file names, for example `2026-11-04_0200` for `db_2026-11-04_0200.dump.enc`. Stop the API, restore, start it again:
 
 ```bash
 docker compose -f docker-compose.prod.yml stop backend
-docker compose -f docker-compose.prod.yml exec -T db pg_restore --clean --if-exists -U accountflow -d accountflow < backups/db_2026-11-03_0200.dump
-docker compose -f docker-compose.prod.yml run --rm --no-deps -v "$PWD/backups:/backups" backend sh -c "tar -xzf /backups/uploads_2026-11-03_0200.tar.gz -C /app/uploads"
+```
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm --no-deps -v accountflow_uploads:/restore-uploads --entrypoint sh backup /usr/local/bin/restore.sh 2026-11-04_0200
+```
+
+```bash
 docker compose -f docker-compose.prod.yml start backend
 ```
+
+A wrong passphrase stops the restore before anything is changed.
+
+**The server is gone:** set up a new server with steps 2 to 4. Then, before starting the app, put the **saved** backup passphrase and the same `BACKUP_REMOTE` settings into the new `.env`. Start the app, and restore as above: a backup that is not on the server is fetched from the bucket first.
 
 ## 9. Updating to a new version
 
 ```bash
-docker compose -f docker-compose.prod.yml exec backup sh /backup.sh
+docker compose -f docker-compose.prod.yml exec backup sh /usr/local/bin/backup.sh
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+Updating from a version whose backups were not encrypted: run `bash deploy/setup.sh` on a copy, or add a `BACKUP_PASSPHRASE` line to `.env` yourself (letters, digits and dashes, at least 24 characters), and save it outside the server. Then delete the old unencrypted `backups/db_*.dump` and `backups/uploads_*.tar.gz` files.
 
 The data stays in Docker volumes; rebuilding does not touch it. The app upgrades its database tables on start. If a database is too old to upgrade in place, the API stops with a message and changes nothing; it never deletes data on its own.
 
@@ -156,6 +209,8 @@ docker compose -f docker-compose.prod.yml logs --tail 100 backend
 | The setup screen says the code is wrong | Compare with `grep SETUP_CODE .env`. After editing `.env`, run `docker compose -f docker-compose.prod.yml up -d --force-recreate backend`. |
 | Invoices are not read, every photo goes to a clerk | `OPENAI_API_KEY` in `.env`, and credit in the OpenAI billing page. The API log shows `openai failed` when a call fails. |
 | Clients get nothing on WhatsApp | The log line of the send, the token and phone number ID in `.env`, and the 24-hour window (README.md). |
+| The backup log says `NO BACKUP` | `BACKUP_PASSPHRASE` is missing from `.env`. |
+| The backup log shows an rclone error | The bucket name, region and access key in `.env`, and that the key may write to the bucket. |
 
 ## Before the firm starts using it
 
@@ -164,4 +219,6 @@ docker compose -f docker-compose.prod.yml logs --tail 100 backend
 - The WhatsApp Business account and phone number are in the firm's name, and Meta bills the firm.
 - A monthly spending limit is set on the OpenAI account.
 - About 20 real invoices from different suppliers, including blurry ones, were tested.
-- Backups are copied off the server, and one restore was tried.
+- `deploy/harden.sh` ran, and logging in with the key still works.
+- The backup passphrase is saved outside the server. Backups reach the bucket, and one restore was tried.
+- Every manager has turned on two-step login.

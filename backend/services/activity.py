@@ -58,6 +58,9 @@ ACTION_LABELS: dict[str, str] = {
     "USER_UPDATED": "עדכון עובד",
     "PASSWORD_RESET": "איפוס סיסמה",
     "PASSWORD_CHANGED": "שינוי סיסמה אישית",
+    "TWO_FACTOR_ENABLED": "הפעלת אימות דו-שלבי",
+    "TWO_FACTOR_DISABLED": "כיבוי אימות דו-שלבי",
+    "TWO_FACTOR_RESET": "איפוס אימות דו-שלבי לעובד",
 }
 
 # Action codes written by older releases that are no longer activity events.

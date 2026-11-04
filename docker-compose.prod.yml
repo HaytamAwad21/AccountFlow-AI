@@ -66,8 +66,12 @@ services:
       - frontend
 
   backup:
-    image: postgres:16-alpine
+    # Encrypted with BACKUP_PASSPHRASE; also copied to BACKUP_REMOTE when set (deploy/backup.sh)
+    build:
+      context: ./deploy
+      dockerfile: backup.Dockerfile
     restart: unless-stopped
+    env_file: .env
     environment:
       PGHOST: db
       PGUSER: accountflow
@@ -78,8 +82,7 @@ services:
     volumes:
       - uploads:/uploads:ro
       - ./backups:/backups
-      - ./deploy/backup.sh:/backup.sh:ro
-    entrypoint: ["sh", "/backup.sh", "--loop"]
+    entrypoint: ["sh", "/usr/local/bin/backup.sh", "--loop"]
     depends_on:
       db:
         condition: service_healthy

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, KeyRound, LogIn } from "lucide-react";
+import { ArrowRight, Check, KeyRound, LogIn, Smartphone } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import { api, ApiError } from "../lib/api";
 import { cx, ROLE_LABEL, splitUserName } from "../lib/format";
 import type { LoginUser } from "../lib/types";
-import { Button, PasswordInput, RoleBadge, Spinner } from "./ui";
+import { Button, inputClass, PasswordInput, RoleBadge, Spinner } from "./ui";
 
 /**
  * Two-step password login: pick a user card, then type that user's password.
@@ -19,7 +19,11 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Two-step login: after the right password, the server asks for the 6-digit code from the phone app.
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState("");
   const passwordRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,24 +41,37 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
     if (picked) window.setTimeout(() => passwordRef.current?.focus(), 30);
   }, [picked]);
 
-  const pick = (u: LoginUser) => {
+  const pick = (u: LoginUser | null) => {
     setPicked(u);
     setPassword("");
     setError(null);
+    setNeedCode(false);
+    setCode("");
   };
 
   const submit = async () => {
-    if (!picked || !password || submitting) return;
+    if (!picked || !password || submitting || (needCode && code.length !== 6)) return;
     setSubmitting(true);
     setError(null);
     try {
-      await login(picked.id, password);
+      await login(picked.id, password, needCode ? code : undefined);
       setPassword("");
+      setCode("");
       onDone?.();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "ההתחברות נכשלה");
-      setPassword("");
-      passwordRef.current?.focus();
+      const reason = e instanceof ApiError ? e.code : undefined;
+      if (reason === "two_factor_required" || reason === "two_factor_invalid") {
+        // The password was right: keep it and ask for (another) code.
+        setNeedCode(true);
+        setCode("");
+        if (reason === "two_factor_invalid") setError(e instanceof Error ? e.message : null);
+        window.setTimeout(() => codeRef.current?.focus(), 30);
+      } else {
+        setError(e instanceof ApiError ? e.message : "ההתחברות נכשלה");
+        setPassword("");
+        setNeedCode(false);
+        passwordRef.current?.focus();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -82,7 +99,7 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
           submit();
         }}
       >
-        <button type="button" onClick={() => setPicked(null)} className="flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-800">
+        <button type="button" onClick={() => pick(null)} className="flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-800">
           <ArrowRight className="h-3.5 w-3.5" /> בחירת משתמש אחר
         </button>
         <div className="flex items-center gap-3 rounded-xl border border-brand-500 bg-brand-50 px-4 py-3">
@@ -104,11 +121,44 @@ export function LoginPanel({ onDone }: { onDone?: () => void }) {
               setPassword(v);
               setError(null);
             }}
-            invalid={!!error}
+            invalid={!!error && !needCode}
           />
         </label>
+        {needCode && (
+          <label className="block">
+            <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-ink-600">
+              <Smartphone className="h-3.5 w-3.5" /> קוד מאפליקציית האימות
+            </span>
+            <input
+              ref={codeRef}
+              dir="ltr"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                setError(null);
+              }}
+              placeholder="000000"
+              aria-describedby="code-hint"
+              className={cx(inputClass, "text-center text-lg tracking-[0.4em] tabular-nums", error && "ring-2 ring-red-400")}
+            />
+            <span id="code-hint" className="mt-1 block text-xs text-ink-500">
+              פתחו את Google Authenticator או Microsoft Authenticator בטלפון והקלידו את הקוד שמופיע עכשיו.
+            </span>
+          </label>
+        )}
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
-        <Button type="submit" variant="accent" size="lg" className="w-full" loading={submitting} disabled={!password} icon={<LogIn className="h-5 w-5 -scale-x-100" />}>
+        <Button
+          type="submit"
+          variant="accent"
+          size="lg"
+          className="w-full"
+          loading={submitting}
+          disabled={!password || (needCode && code.length !== 6)}
+          icon={<LogIn className="h-5 w-5 -scale-x-100" />}
+        >
           התחברות
         </Button>
       </form>

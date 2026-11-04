@@ -310,7 +310,12 @@ export function Settings() {
                       <RoleBadge role={u.role} />
                     </td>
                     <td className="px-3 py-2">
-                      <span className={cx("font-semibold", u.is_active ? "text-ink-900" : "text-red-600")}>{u.is_active ? "פעיל" : "הושעה"}</span>
+                      <span className={cx("block font-semibold", u.is_active ? "text-ink-900" : "text-red-600")}>{u.is_active ? "פעיל" : "הושעה"}</span>
+                      {u.two_factor_enabled && (
+                        <span className="flex items-center gap-1 whitespace-nowrap text-xs text-emerald-700" title="נכנס/ת עם סיסמה וקוד מהטלפון">
+                          <ShieldCheck className="h-3.5 w-3.5" /> אימות דו-שלבי
+                        </span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2">
                       <Button size="sm" variant="secondary" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditingWorker(u)}>

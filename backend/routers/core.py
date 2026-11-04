@@ -163,6 +163,22 @@ def update_user(user_id: int, body: UserUpdate, request: Request, db: Session = 
     return user_out(user)
 
 
+@router.post("/users/{user_id}/reset-two-factor", response_model=UserOut)
+def reset_two_factor(user_id: int, request: Request, db: Session = Depends(get_db), manager: User = Depends(require_manager)):
+    """A worker lost the phone with the authenticator app: switch two-step login off and sign them out everywhere.
+    They log in with the password and can set it up again on the new phone."""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "העובד/ת לא נמצא/ה")
+    user.totp_enabled, user.totp_secret, user.totp_last_step = False, "", 0
+    db.execute(update(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None)).values(revoked_at=utcnow()))
+    log_activity(db, manager, "TWO_FACTOR_RESET", f"אופס האימות הדו-שלבי של {user.full_name}", entity_type="user",
+                 entity_id=user.id, ip_address=client_ip(request))
+    queue_event(db, {"type": "users"})
+    db.commit()
+    return user_out(user)
+
+
 # ── clients ──────────────────────────────────────────────────────────────────
 
 def _clients_out(db: Session, clients: list[Client]) -> list[ClientOut]:
