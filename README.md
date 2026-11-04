@@ -459,4 +459,3 @@ The test runs against a temporary database through the real HTTP API. It covers 
 ```bash
 git config core.hooksPath .githooks
 ```
-<!-- v3 -->
