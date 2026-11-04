@@ -12,9 +12,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     host: true,
+    // xfwd passes the browser's address on (X-Forwarded-For), so the activity log shows each device, not the proxy.
     proxy: {
-      "/api": { target: API_TARGET, changeOrigin: true },
-      "/uploads": { target: API_TARGET, changeOrigin: true },
+      "/api": { target: API_TARGET, changeOrigin: true, xfwd: true },
+      "/uploads": { target: API_TARGET, changeOrigin: true, xfwd: true },
     },
   },
   preview: { port: 5173 },

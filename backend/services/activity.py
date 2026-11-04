@@ -3,8 +3,13 @@
 Only meaningful operational events are recorded: sessions (login / logout), requests and
 reminders sent to clients, tax broadcasts, invoice / ticket decisions and management changes.
 Failed logins are NOT activity: they are tracked separately (models.LoginFailure) for lockout.
+
+Each row also names the device ("Chrome · Windows"): every computer in an office reaches an internet server
+from the office's one public address, so the address alone cannot tell the office's computers apart.
 """
 from __future__ import annotations
+
+from contextvars import ContextVar
 
 from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
@@ -12,6 +17,22 @@ from sqlalchemy.orm import Session
 from models import ActivityLog, User
 from services.clock import utcnow
 from services.events import queue_event
+
+# The device of the HTTP request being handled (set by a middleware in main.py); empty for the scheduler.
+request_device: ContextVar[str] = ContextVar("request_device", default="")
+
+_BROWSERS = (("Edg/", "Edge"), ("OPR/", "Opera"), ("SamsungBrowser/", "Samsung Internet"), ("Firefox/", "Firefox"),
+             ("FxiOS/", "Firefox"), ("CriOS/", "Chrome"), ("Chrome/", "Chrome"), ("Safari/", "Safari"))
+_SYSTEMS = (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"), ("Windows", "Windows"),
+            ("Mac OS X", "Mac"), ("CrOS", "ChromeOS"), ("Linux", "Linux"))
+
+
+def describe_device(user_agent: str | None) -> str:
+    """'Chrome · Windows' from a browser's User-Agent; empty when it is not a known browser or system."""
+    agent = user_agent or ""
+    browser = next((name for key, name in _BROWSERS if key in agent), "")
+    system = next((name for key, name in _SYSTEMS if key in agent), "")
+    return " · ".join(part for part in (browser, system) if part)
 
 # action code -> Hebrew label shown in the "יומן פעילות" tab
 ACTION_LABELS: dict[str, str] = {
@@ -64,6 +85,7 @@ def log_activity(
         entity_id=entity_id,
         details_json=details or None,
         ip_address=ip_address or "",
+        device=request_device.get(),
         created_at=utcnow(),
     )
     db.add(entry)

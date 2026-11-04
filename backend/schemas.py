@@ -125,6 +125,7 @@ class ActivityOut(BaseModel):
     entity_id: int | None
     details: dict | None
     ip_address: str
+    device: str
 
 
 class ActivityPage(BaseModel):
@@ -328,10 +329,13 @@ class QuickSendResponse(BaseModel):
 
 class TicketNote(BaseModel):
     note: str = ""
+    # The status the person's screen showed: if the request moved on meanwhile, the action is refused (409).
+    expected_status: TicketStatus | None = None
 
 
 class TicketReject(BaseModel):
     reason: str = Field(min_length=3, max_length=300, description="Hebrew reason, sent to the client on WhatsApp")
+    expected_status: TicketStatus | None = None
 
 
 class OcrUpdate(BaseModel):

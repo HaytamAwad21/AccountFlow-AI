@@ -56,6 +56,7 @@ def list_activity(
             entity_id=r.entity_id,
             details=r.details_json,
             ip_address=r.ip_address,
+            device=r.device or "",
         )
         for r in rows
     ]

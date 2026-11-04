@@ -88,6 +88,11 @@ def _add_missing_columns() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE system_settings ADD COLUMN vat_deadline_day INTEGER NOT NULL DEFAULT 26"))
             logging.getLogger("accountflow").warning("Added system_settings.vat_deadline_day.")
+    if "activity_log" in inspector.get_table_names():
+        if "device" not in {c["name"] for c in inspector.get_columns("activity_log")}:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE activity_log ADD COLUMN device VARCHAR(80) NOT NULL DEFAULT ''"))
+            logging.getLogger("accountflow").warning("Added activity_log.device.")
     if "whatsapp_message_logs" in inspector.get_table_names():
         msg_cols = {c["name"] for c in inspector.get_columns("whatsapp_message_logs")}
         if "is_automated" not in msg_cols:

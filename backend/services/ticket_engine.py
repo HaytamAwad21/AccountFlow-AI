@@ -3,7 +3,8 @@
 Engine A  – `create_and_send_ticket` (the 3-second clerk trigger)
 Engine C  – `handle_button` / `handle_text` / `handle_media` (inbound WhatsApp + Vision AI,
             including the Israel Tax Authority 9-digit rules for typed allocation numbers / ח.פ)
-Clerk ops – `approve_ticket`, `resolve_ticket`, `reopen_ticket`
+Clerk ops – `approve_ticket`, `resolve_ticket`, `reopen_ticket`, each after `lock_ticket`, so two people pressing
+            the same button act once; `lock_client_requests` + `recent_identical_request` do the same for sending
 
 Reminder cadence, max reminders, VAT rate, allocation threshold and the firm name come from
 the live `system_settings` row (see services/system_settings.py).
@@ -16,11 +17,12 @@ import uuid
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from config import settings
 from models import (
+    ActivityLog,
     BulkTaxCampaign,
     BulkTaxRecipient,
     ChasingTicket,
@@ -109,6 +111,87 @@ class MissingVariablesError(EngineError):
     def __init__(self, missing: list[str]):
         self.missing = missing
         super().__init__("חסרים שדות חובה: " + ", ".join(missing))
+
+
+class ConflictError(EngineError):
+    """Someone else already acted on the request (another screen, the same moment)."""
+
+    status_code = 409
+
+
+# ── one action per request, even from two screens at once ───────────────────
+
+# The states an office action may start from; a request in any other state was already handled.
+OPEN_STATUSES = tuple(s for s in TicketStatus if s != TicketStatus.RESOLVED)
+REOPENABLE_STATUSES = (TicketStatus.RESOLVED, TicketStatus.NEEDS_CLERK_REVIEW, TicketStatus.ESCALATED)
+STATUS_HE = {
+    TicketStatus.OPEN: "פתוח",
+    TicketStatus.WAITING_FOR_CLIENT: "ממתין ללקוח",
+    TicketStatus.SNOOZED_TONIGHT: "נדחה ל-20:00",
+    TicketStatus.NEEDS_CORRECTION: "דרוש תיקון",
+    TicketStatus.NEEDS_CLERK_REVIEW: "ממתין לבדיקת פקיד",
+    TicketStatus.RESOLVED: "טופל",
+    TicketStatus.ESCALATED: "הוסלם",
+}
+# Sending the very same request to the same client again within this time is taken as a double send.
+DUPLICATE_WINDOW = timedelta(minutes=2)
+
+
+def _conflict_message(db: Session, ticket: ChasingTicket) -> str:
+    db.refresh(ticket)
+    message = f"הפנייה {ticket.ticket_ref} כבר במצב ”{STATUS_HE.get(ticket.status, ticket.status.value)}“"
+    from services.activity import ACTION_LABELS
+
+    last = db.scalar(select(ActivityLog).where(ActivityLog.entity_type == "ticket", ActivityLog.entity_id == ticket.id)
+                     .order_by(ActivityLog.id.desc()).limit(1))
+    # Name the colleague only when their action is what changed the request (not, say, the client's reply).
+    if last and last.user and abs((ticket.updated_at - last.created_at).total_seconds()) < 10:
+        message += f": {last.user.full_name} ביצע/ה ”{ACTION_LABELS.get(last.action, last.action)}“"
+    return message + ". הפעולה שלך לא בוצעה, והמסך עודכן."
+
+
+def lock_ticket(db: Session, ticket: ChasingTicket, allowed: tuple[TicketStatus, ...],
+                expected: TicketStatus | None = None) -> None:
+    """Let an office action go ahead only if the request is still where the person saw it: in `expected` (the status
+    their screen showed) or, without it, the status just loaded, and that status is in `allowed`. The check is a
+    conditional UPDATE, which also holds when two clicks reach the server in the same instant: the database lets
+    one through and the other finds the status already changed. Raises ConflictError otherwise."""
+    seen = expected or ticket.status
+    if seen not in allowed or ticket.status != seen:
+        raise ConflictError(_conflict_message(db, ticket))
+    locked = db.execute(
+        update(ChasingTicket).where(ChasingTicket.id == ticket.id, ChasingTicket.status == seen)
+        .values(status=seen).execution_options(synchronize_session=False)
+    ).rowcount
+    if not locked:
+        raise ConflictError(_conflict_message(db, ticket))
+    db.refresh(ticket)  # the row is ours now: work on its latest saved state
+
+
+def lock_client_requests(db: Session, client: Client) -> None:
+    """Take the client's row lock for the rest of the transaction, so requests to one client are sent one at a time
+    and `recent_identical_request` sees a request another screen sent a moment ago."""
+    db.execute(update(Client).where(Client.id == client.id).values(id=Client.id).execution_options(synchronize_session=False))
+
+
+def recent_identical_request(db: Session, client: Client, template: MessageTemplate, variables: dict | None) -> ChasingTicket | None:
+    """An open request of the same type sent to this client within DUPLICATE_WINDOW whose message has the same details
+    (every variable the template uses, with the default document type filled in like `create_and_send_ticket`)."""
+    provided = {k: str(v).strip() for k, v in (variables or {}).items() if v is not None and str(v).strip() != ""}
+    keys = required_variables(template)
+    if "document_type" in keys:
+        provided.setdefault("document_type", DEFAULT_DOCUMENT_TYPE)
+    recent = db.scalars(
+        select(ChasingTicket).where(
+            ChasingTicket.client_id == client.id, ChasingTicket.template_id == template.id,
+            ChasingTicket.status != TicketStatus.RESOLVED, ChasingTicket.created_at >= utcnow() - DUPLICATE_WINDOW,
+        ).order_by(ChasingTicket.id.desc())
+    )
+    for ticket in recent:
+        ctx = ticket.context_variables_json or {}
+        if all(str(ctx.get(k, "")).strip() == provided.get(k, "") for k in keys):
+            return ticket
+    return None
 
 
 # ── lookups ──────────────────────────────────────────────────────────────────
@@ -561,7 +644,11 @@ def handle_text(db: Session, client: Client, text: str, ticket_id: int | None = 
         ticket.next_reminder_at = None
         reply = t("ack_text_detail", lang, text=text)
     else:
+        # The reply tells the client a person will read it ("paid yesterday", "I'll send it tomorrow"), so the
+        # request goes to the clerk and the reminders stop; the clerk can send it back to waiting (reopen).
         _set_ctx(ticket, last_client_text=text)
+        ticket.status = TicketStatus.NEEDS_CLERK_REVIEW
+        ticket.next_reminder_at = None
         reply = t("ack_text_generic", lang)
     send_outbound(db, client, ticket, reply, None, MessageType.TEXT)
     touch(db, ticket)

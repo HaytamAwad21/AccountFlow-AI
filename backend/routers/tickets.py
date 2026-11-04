@@ -26,9 +26,14 @@ from services.activity import log_activity
 from services.system_settings import get_system_settings
 from services.templating import text_direction
 from services.ticket_engine import (
+    OPEN_STATUSES,
+    REOPENABLE_STATUSES,
     approve_ticket,
     reject_invoice,
     create_and_send_ticket,
+    lock_client_requests,
+    lock_ticket,
+    recent_identical_request,
     reopen_ticket,
     resolve_ticket,
     template_by_slug,
@@ -66,6 +71,15 @@ def quick_send(body: QuickSendRequest, request: Request, db: Session = Depends(g
         template = template_by_slug(db, body.template_slug)
     else:
         raise HTTPException(422, "יש לבחור תבנית")
+
+    # The same request from two screens (or a double send): the client's lock makes the second one wait for the
+    # first and then find it.
+    lock_client_requests(db, client)
+    duplicate = recent_identical_request(db, client, template, body.context_variables)
+    if duplicate:
+        by = f" על ידי {duplicate.worker.full_name}" if duplicate.worker else ""
+        raise HTTPException(409, f"בקשה זהה (”{template.name_he}“) נשלחה ל{client.full_name} לפני רגע{by}: {duplicate.ticket_ref}. "
+                                 "לא נשלחה בקשה נוספת.")
 
     ticket, msg = create_and_send_ticket(
         db, client=client, template=template, variables=body.context_variables,
@@ -114,6 +128,7 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db), _user: User = Depe
 def approve(ticket_id: int, request: Request, body: TicketNote | None = None, db: Session = Depends(get_db),
             user: User = Depends(require_user)):
     ticket = get_ticket_or_404(db, ticket_id)
+    lock_ticket(db, ticket, OPEN_STATUSES, body.expected_status if body else None)
     approve_ticket(db, ticket, user, (body.note if body else ""))
     log_activity(db, user, "TICKET_APPROVED", f"אושרה החשבונית בפנייה {ticket.ticket_ref} של {ticket.client.full_name}",
                  entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))
@@ -125,8 +140,7 @@ def approve(ticket_id: int, request: Request, body: TicketNote | None = None, db
 def reject(ticket_id: int, body: TicketReject, request: Request, db: Session = Depends(get_db),
            user: User = Depends(require_user)):
     ticket = get_ticket_or_404(db, ticket_id)
-    if ticket.status == TicketStatus.RESOLVED:
-        raise HTTPException(409, "הפנייה כבר טופלה — יש לפתוח אותה מחדש לפני דחיית החשבונית")
+    lock_ticket(db, ticket, OPEN_STATUSES, body.expected_status)
     reject_invoice(db, ticket, user, body.reason)
     log_activity(db, user, "TICKET_REJECTED",
                  f"נדחתה החשבונית בפנייה {ticket.ticket_ref} של {ticket.client.full_name}: {body.reason.strip()}",
@@ -139,6 +153,7 @@ def reject(ticket_id: int, body: TicketReject, request: Request, db: Session = D
 def resolve(ticket_id: int, request: Request, body: TicketNote | None = None, db: Session = Depends(get_db),
             user: User = Depends(require_user)):
     ticket = get_ticket_or_404(db, ticket_id)
+    lock_ticket(db, ticket, OPEN_STATUSES, body.expected_status if body else None)
     resolve_ticket(db, ticket, body.note if body else "")
     log_activity(db, user, "TICKET_RESOLVED", f"נסגרה הפנייה {ticket.ticket_ref} של {ticket.client.full_name}",
                  entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))
@@ -147,8 +162,10 @@ def resolve(ticket_id: int, request: Request, body: TicketNote | None = None, db
 
 
 @router.post("/{ticket_id}/reopen", response_model=TicketDetail)
-def reopen(ticket_id: int, request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
+def reopen(ticket_id: int, request: Request, body: TicketNote | None = None, db: Session = Depends(get_db),
+           user: User = Depends(require_user)):
     ticket = get_ticket_or_404(db, ticket_id)
+    lock_ticket(db, ticket, REOPENABLE_STATUSES, body.expected_status if body else None)
     reopen_ticket(db, ticket)
     log_activity(db, user, "TICKET_REOPENED", f"נפתחה מחדש הפנייה {ticket.ticket_ref} של {ticket.client.full_name}",
                  entity_type="ticket", entity_id=ticket.id, ip_address=client_ip(request))

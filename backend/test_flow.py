@@ -747,8 +747,9 @@ def main() -> None:
         quiet_client = c.post("/api/clients", headers=M, json={"full_name": "רינה שקטה", "company_name": "שקטה מסמכים", "tax_id": "517011951",
                                                                "whatsapp_phone": "0521119051", "assigned_worker_id": worker["id"]}).json()
 
-        def doc_send(document_type: str | None):
-            variables = {"supplier_name": "Check Supplier", "amount": "700", "invoice_date": "2026-10-03"}
+        def doc_send(document_type: str | None, amount: str = "700"):
+            # An identical request sent again within 2 minutes is refused as a double send, so repeats change the amount.
+            variables = {"supplier_name": "Check Supplier", "amount": amount, "invoice_date": "2026-10-03"}
             if document_type is not None:
                 variables["document_type"] = document_type
             return c.post("/api/tickets/quick-send", json={"client_id": docs_client["id"], "template_slug": "missing_supplier_invoice",
@@ -761,7 +762,7 @@ def main() -> None:
         check(r.status_code == 201 and r.json()["ticket"]["context_variables_json"].get("document_type") == "צ׳ק" and "צ׳ק" in r.json()["rendered_text"],
               "a missing check is requested by name", r.text[:200])
         check_ticket = r.json()["ticket"] if r.status_code == 201 else {}
-        typed = doc_send("צ'ק")
+        typed = doc_send("צ'ק", amount="701")
         check(typed.status_code == 201 and typed.json()["ticket"]["context_variables_json"].get("document_type") == "צ׳ק",
               "an apostrophe is stored as a geresh (צ׳ק)", typed.text[:160])
         check(doc_send("תעודת זהות").status_code == 422, "an unknown document type is rejected")

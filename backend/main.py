@@ -17,7 +17,7 @@ from database import SessionLocal, init_db
 from routers import activity, auth, campaigns, core, files, scheduler as scheduler_router, tickets, webhook, whatsapp
 from seed import ensure_passwords, install_office_defaults, seed_if_empty, upgrade_templates
 from services.events import broker
-from services.activity import cleanup_legacy_activity
+from services.activity import cleanup_legacy_activity, describe_device, request_device
 from services.history import hebrewize_message_history
 from services.no_emoji import purge_emojis_from_db
 from services.scheduler import start_scheduler, stop_scheduler
@@ -67,6 +67,16 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+
+
+@app.middleware("http")
+async def remember_device(request: Request, call_next):
+    """Lets the activity log name the device ("Chrome · Windows") of whoever made this request."""
+    token = request_device.set(describe_device(request.headers.get("user-agent")))
+    try:
+        return await call_next(request)
+    finally:
+        request_device.reset(token)
 
 
 @app.exception_handler(EngineError)

@@ -374,6 +374,8 @@ export interface ActivityEntry {
   entity_id: number | null;
   details: Record<string, unknown> | null;
   ip_address: string;
+  /** "Chrome · Windows": tells the office's computers apart, which share one address on the internet */
+  device: string;
 }
 
 export interface ActivityPage {

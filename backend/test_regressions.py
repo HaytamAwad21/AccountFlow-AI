@@ -17,6 +17,7 @@ import sys
 import tempfile
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -294,6 +295,79 @@ def typed_detail_reminder_asks_for_the_detail(a: Api) -> None:
     check("9 ספרות" in text and "צילום" not in text, "a mistyped number is chased as a number, not a photo", text)
 
 
+def free_text_reply_reaches_the_office(a: Api) -> None:
+    client = a.client()
+    ticket = a.send(client, "tax_ready_to_pay")
+    a.c.post("/api/webhook/whatsapp-inbound", json={"client_id": client["id"], "type": "text", "text": "שילמתי אתמול"})
+    after = a.ticket(ticket)
+    check(after["status"] == "NEEDS_CLERK_REVIEW", "a typed reply moves the request to the clerk", after["status"])
+    check(after["next_reminder_at"] is None, "no more reminders after the client answered", after["next_reminder_at"])
+    sent = len(a.chat(client))
+    a.jump()
+    check(len(a.chat(client)) == sent, "the reminder cycle leaves the answered request alone", len(a.chat(client)) - sent)
+    r = a.c.post(f"/api/tickets/{ticket['id']}/reopen")
+    back = r.json()
+    check(r.status_code == 200 and back["status"] == "WAITING_FOR_CLIENT" and back["next_reminder_at"],
+          "the clerk can send it back to waiting", back.get("status"))
+
+
+def a_request_is_handled_once(a: Api) -> None:
+    client = a.client()
+    ticket = a.send(client, "missing_supplier_invoice")
+    url = f"/api/tickets/{ticket['id']}"
+    first, second = a.c.post(f"{url}/resolve", json={"note": ""}), a.c.post(f"{url}/resolve", json={"note": ""})
+    check(first.status_code == 200 and second.status_code == 409, "closing an already closed request is refused", second.status_code)
+    check(ticket["ticket_ref"] in second.json().get("detail", ""), "the refusal names the request", second.text)
+    closes = [x for x in a.c.get("/api/activity", params={"action": "TICKET_RESOLVED"}).json()["items"] if x["entity_id"] == ticket["id"]]
+    check(len(closes) == 1, "the activity log records the close once", len(closes))
+    check(a.c.post(f"{url}/approve").status_code == 409, "approving a closed request is refused")
+    check(a.c.post(f"{url}/reject", json={"reason": "הצילום לא ברור"}).status_code == 409, "rejecting a closed request is refused")
+    back, again = a.c.post(f"{url}/reopen"), a.c.post(f"{url}/reopen")
+    check(back.status_code == 200 and again.status_code == 409, "sending it back to waiting twice is refused", again.status_code)
+    stale = a.c.post(f"{url}/resolve", json={"note": "", "expected_status": "NEEDS_CLERK_REVIEW"})
+    check(stale.status_code == 409 and a.ticket(ticket)["status"] == "WAITING_FOR_CLIENT",
+          "an action from a screen that shows an old status is refused", stale.status_code)
+    check(a.c.post(f"{url}/resolve", json={"note": "", "expected_status": "WAITING_FOR_CLIENT"}).status_code == 200,
+          "the same action from an up-to-date screen goes through")
+
+
+def simultaneous_clicks_act_once(a: Api) -> None:
+    ticket = a.send(a.client(), "missing_supplier_invoice")
+    with ThreadPoolExecutor(4) as pool:
+        codes = sorted(pool.map(lambda _: a.c.post(f"/api/tickets/{ticket['id']}/resolve", json={"note": ""}).status_code, range(4)))
+    check(codes == [200, 409, 409, 409], "four clicks at the same moment: one closes, three are refused", codes)
+    client = a.client()
+    body = {"client_id": client["id"], "template_slug": "missing_supplier_invoice", "context_variables": VARS}
+    with ThreadPoolExecutor(3) as pool:
+        codes = sorted(pool.map(lambda _: a.c.post("/api/tickets/quick-send", json=body).status_code, range(3)))
+    check(codes == [201, 409, 409], "the same request sent from three screens at once goes out once", codes)
+    check(len([t for t in a.c.get("/api/tickets", params={"client_id": client["id"]}).json()]) == 1, "only one request was created")
+
+
+def identical_request_is_refused(a: Api) -> None:
+    client = a.client()
+    body = {"client_id": client["id"], "template_slug": "missing_supplier_invoice", "context_variables": VARS}
+    first, second = a.c.post("/api/tickets/quick-send", json=body), a.c.post("/api/tickets/quick-send", json=body)
+    check(first.status_code == 201 and second.status_code == 409, "an identical request right after the first is refused", second.status_code)
+    check(first.json()["ticket"]["ticket_ref"] in second.json().get("detail", ""), "the refusal names the request already sent", second.text)
+    other = {**body, "context_variables": {**VARS, "amount": "2000"}}
+    check(a.c.post("/api/tickets/quick-send", json=other).status_code == 201, "a request with other details still goes out")
+
+
+def activity_names_the_device(a: Api) -> None:
+    manager = next(u for u in a.c.get("/api/auth/users").json() if u["role"] == "MANAGER")
+    devices = {
+        "Chrome · Windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+        "Safari · iPhone": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+        "Edge · Windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36 Edg/131.0",
+    }
+    for i, (label, agent) in enumerate(devices.items()):
+        ip = f"10.100.102.{20 + i}"
+        a.c.post("/api/auth/login", json={"user_id": manager["id"], "password": "maya1234"}, headers={"User-Agent": agent, "X-Forwarded-For": ip})
+        row = a.c.get("/api/activity", params={"action": "LOGIN"}).json()["items"][0]
+        check(row.get("device") == label and row["ip_address"] == ip, f"the log shows {label} at {ip}", (row.get("device"), row["ip_address"]))
+
+
 def urgent_label_clears_after_the_deadline(a: Api) -> None:
     client = a.client()
     ticket = a.send(client, "missing_supplier_invoice")
@@ -334,7 +408,8 @@ CASES = [
     old_button_cannot_touch_another_request, old_button_cannot_undo_clerk_review, bulk_prefers_the_active_client,
     invitation_is_repeated_after_the_interval, deactivated_clients_get_no_reminders, repeated_webhook_delivery_is_ignored,
     non_text_messages_reach_the_office, excel_dates_become_a_tax_period, bulk_rows_without_a_phone_are_reported, trunk_zero_is_removed,
-    typed_detail_reminder_asks_for_the_detail, urgent_label_clears_after_the_deadline, dashboard_counts,
+    typed_detail_reminder_asks_for_the_detail, free_text_reply_reaches_the_office, a_request_is_handled_once,
+    simultaneous_clicks_act_once, identical_request_is_refused, activity_names_the_device, urgent_label_clears_after_the_deadline, dashboard_counts,
 ]
 
 

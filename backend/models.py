@@ -316,6 +316,7 @@ class ActivityLog(Base):
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[str] = mapped_column(String(64), default="")
+    device: Mapped[str] = mapped_column(String(80), default="")  # "Chrome · Windows"
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
     user: Mapped[User | None] = relationship()

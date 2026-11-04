@@ -222,10 +222,15 @@ export const api = {
     return request<Ticket[]>(`/api/tickets?${qs.toString()}`);
   },
   ticket: (id: number) => request<TicketDetail>(`/api/tickets/${id}`),
-  approveTicket: (id: number, note = "") => request<TicketDetail>(`/api/tickets/${id}/approve`, { method: "POST", ...json({ note }) }),
-  rejectTicket: (id: number, reason: string) => request<TicketDetail>(`/api/tickets/${id}/reject`, { method: "POST", ...json({ reason }) }),
-  resolveTicket: (id: number, note = "") => request<TicketDetail>(`/api/tickets/${id}/resolve`, { method: "POST", ...json({ note }) }),
-  reopenTicket: (id: number) => request<TicketDetail>(`/api/tickets/${id}/reopen`, { method: "POST" }),
+  // `seen` is the status the screen showed: if a colleague acted on the request meanwhile, the server answers 409.
+  approveTicket: (id: number, seen?: TicketStatus, note = "") =>
+    request<TicketDetail>(`/api/tickets/${id}/approve`, { method: "POST", ...json({ note, expected_status: seen }) }),
+  rejectTicket: (id: number, reason: string, seen?: TicketStatus) =>
+    request<TicketDetail>(`/api/tickets/${id}/reject`, { method: "POST", ...json({ reason, expected_status: seen }) }),
+  resolveTicket: (id: number, seen?: TicketStatus, note = "") =>
+    request<TicketDetail>(`/api/tickets/${id}/resolve`, { method: "POST", ...json({ note, expected_status: seen }) }),
+  reopenTicket: (id: number, seen?: TicketStatus) =>
+    request<TicketDetail>(`/api/tickets/${id}/reopen`, { method: "POST", ...json({ expected_status: seen }) }),
   editOcr: (id: number, body: Record<string, string | number | null>) =>
     request<TicketDetail>(`/api/tickets/${id}/ocr`, { method: "PATCH", ...json(body) }),
 

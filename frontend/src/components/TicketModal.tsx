@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { api, mediaUrl } from "../lib/api";
+import { api, ApiError, mediaUrl } from "../lib/api";
 import { cx, fullDateTime, ils, isTaxDocument, relativeTime } from "../lib/format";
 import type { OcrResult, TemplateCategory, TicketDetail } from "../lib/types";
 import { Button, inputClass, Ltr, Modal, PriorityLabel, Spinner, StatusBadge } from "./ui";
@@ -161,7 +161,10 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
       toast({ tone: "success", title: done, body: t.ticket_ref });
       return t;
     } catch (e) {
-      toast({ tone: "error", title: "הפעולה נכשלה", body: e instanceof Error ? e.message : String(e) });
+      // 409: a colleague already acted on this request; show who, and load what it looks like now.
+      const conflict = e instanceof ApiError && e.status === 409;
+      toast({ tone: conflict ? "warning" : "error", title: conflict ? "מישהו כבר טיפל בפנייה" : "הפעולה נכשלה", body: e instanceof Error ? e.message : String(e) }, conflict ? 8000 : 5000);
+      if (conflict && ticket) api.ticket(ticket.id).then(setTicket).catch(() => undefined);
       return null;
     } finally {
       setBusy(null);
@@ -183,7 +186,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
   const reject = async () => {
     if (!ticket || rejectReason.trim().length < 3) return;
     const done = taxChecks ? "החשבונית נדחתה — הלקוח התבקש לשלוח צילום חדש" : "המסמך נדחה — הלקוח התבקש לשלוח צילום חדש";
-    const t = await act("reject", () => api.rejectTicket(ticket.id, rejectReason.trim()), done);
+    const t = await act("reject", () => api.rejectTicket(ticket.id, rejectReason.trim(), ticket.status), done);
     if (t) {
       setRejecting(false);
       setRejectReason("");
@@ -268,7 +271,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   icon={<Phone className="h-4 w-4" />}
                   loading={busy === "call"}
                   onClick={() =>
-                    act("call", () => api.resolveTicket(ticket.id, "השיחה עם הלקוח בוצעה והפנייה נסגרה."), "השיחה סומנה כבוצעה והפנייה נסגרה")
+                    act("call", () => api.resolveTicket(ticket.id, ticket.status, "השיחה עם הלקוח בוצעה והפנייה נסגרה."), "השיחה סומנה כבוצעה והפנייה נסגרה")
                   }
                 >
                   השיחה בוצעה - סגור פנייה
@@ -279,7 +282,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   variant="accent"
                   icon={<Check className="h-4 w-4" />}
                   loading={busy === "approve"}
-                  onClick={() => act("approve", () => api.approveTicket(ticket.id), "המסמך אושר והפנייה נסגרה")}
+                  onClick={() => act("approve", () => api.approveTicket(ticket.id, ticket.status), "המסמך אושר והפנייה נסגרה")}
                 >
                   אישור מסמך וסגירה
                 </Button>
@@ -289,8 +292,18 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   {taxChecks ? "דחיית החשבונית" : "דחיית המסמך"}
                 </Button>
               )}
+              {ticket.status === "NEEDS_CLERK_REVIEW" && (
+                <Button
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  loading={busy === "wait"}
+                  onClick={() => act("wait", () => api.reopenTicket(ticket.id, ticket.status), "הפנייה חזרה להמתנה ללקוח, והתזכורות ימשיכו")}
+                  title="למשל כשהלקוח כתב שישלח מחר: התזכורות האוטומטיות יתחדשו"
+                >
+                  החזרה להמתנה ללקוח
+                </Button>
+              )}
               {ticket.status === "RESOLVED" ? (
-                <Button icon={<RotateCcw className="h-4 w-4" />} loading={busy === "reopen"} onClick={() => act("reopen", () => api.reopenTicket(ticket.id), "הפנייה נפתחה מחדש")}>
+                <Button icon={<RotateCcw className="h-4 w-4" />} loading={busy === "reopen"} onClick={() => act("reopen", () => api.reopenTicket(ticket.id, ticket.status), "הפנייה נפתחה מחדש")}>
                   פתיחה מחדש
                 </Button>
               ) : (
@@ -298,7 +311,7 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   <Button
                     icon={<FileX2 className="h-4 w-4" />}
                     loading={busy === "resolve"}
-                    onClick={() => act("resolve", () => api.resolveTicket(ticket.id), "הפנייה נסגרה ללא מסמך")}
+                    onClick={() => act("resolve", () => api.resolveTicket(ticket.id, ticket.status), "הפנייה נסגרה ללא מסמך")}
                   >
                     סגירה ללא מסמך
                   </Button>
@@ -506,8 +519,9 @@ export function TicketModal({ ticketId, onClose }: { ticketId: number | null; on
                   {ctxEntries.map(([k, v]) => (
                     <div key={k} className="min-w-0">
                       <dt className="text-ink-400">{CONTEXT_LABELS[k] ?? k.replace(/_/g, " ")}</dt>
-                      <dd dir="auto" className="truncate font-medium text-ink-800" title={String(v)}>
-                        {VALUE_LABELS[String(v)] ?? String(v)}
+                      {/* the value keeps the label's right alignment; bdi only isolates its own direction (numbers, English) */}
+                      <dd className="truncate font-medium text-ink-800" title={String(v)}>
+                        <bdi>{VALUE_LABELS[String(v)] ?? String(v)}</bdi>
                       </dd>
                     </div>
                   ))}

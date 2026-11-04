@@ -147,7 +147,7 @@ export function ActivityLog() {
                   <th className="px-3 py-2.5 text-start">עובד/ת</th>
                   <th className="px-3 py-2.5 text-start">פעולה</th>
                   <th className="px-3 py-2.5 text-start">תיאור</th>
-                  <th className="px-3 py-2.5 text-start">כתובת IP</th>
+                  <th className="px-3 py-2.5 text-start">מכשיר וכתובת IP</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-200">
@@ -169,8 +169,9 @@ export function ActivityLog() {
                     <td className="px-3 py-2.5 text-ink-700" dir="auto">
                       {e.description}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-ink-400">
-                      <Ltr>{e.ip_address || "—"}</Ltr>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      {e.device && <span className="block text-ink-700">{e.device}</span>}
+                      <Ltr className="tabular-nums text-ink-400">{e.ip_address || "—"}</Ltr>
                     </td>
                   </tr>
                 ))}

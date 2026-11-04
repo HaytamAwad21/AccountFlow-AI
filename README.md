@@ -155,7 +155,7 @@ Older databases stored the name and title together, as `"שם - תפקיד"` in 
 
 ### Activity log (יומן פעילות)
 
-The `activity_log` table records real operational events only: who did what, when, and from which IP.
+The `activity_log` table records real operational events only: who did what, when, from which device and which IP.
 
 | Group | Events (label in the tab) |
 | --- | --- |
@@ -167,6 +167,15 @@ The `activity_log` table records real operational events only: who did what, whe
 | Management | Client added, edited or deactivated; template and office settings changes, with old and new values (e.g. the VAT rate); worker accounts added, edited or reset; password changes |
 
 Each row is written in the same database transaction as the change it describes.
+
+Each row also names the device, for example `Chrome · Windows`, read from the browser. On an internet server every computer in the office arrives from the office's one public address, so the address alone cannot tell them apart. In development the Vite proxy passes each device's own address on (`xfwd`). Docker Desktop on Windows or Mac hides visitors' addresses and shows its own (`172.18.0.1`); a Linux server shows the real one.
+
+### Two people, one request
+
+Several screens may act on the same request at the same moment. Only the first action counts:
+
+- **Approve, reject, close, reopen and "back to waiting":** the dashboard sends the status it was showing. The server takes the request's row lock with a conditional update (`lock_ticket`). If the request has moved on, or another click got there first, the answer is `409`, for example `הפנייה TCK-1007 כבר במצב ”טופל“: רונית לוי ביצע/ה ”סגירת פנייה“`. Nothing is done twice, and the ticket window reloads.
+- **Sending:** requests to one client are sent one at a time (the client's row lock). An identical request (same type, same details) to the same client within 2 minutes is refused with `409`, naming the request already sent and who sent it.
 
 **Not logged:** failed logins and mistyped passwords, phone-simulator demo receipts, and automatic cycles that sent nothing. On startup, older `LOGIN_FAILED` and `SIMULATOR_RECEIPT` rows are deleted, and older `SCHEDULER_RUN` rows are renamed to **שליחת תזכורות**. The cleanup is idempotent.
 
@@ -329,8 +338,12 @@ quick-send ──► WAITING_FOR_CLIENT ──(interval, ≤ max)──► remin
                      └──pass──► NEEDS_CLERK_REVIEW ──Approve──► RESOLVED
    typed מספר הקצאה / ח.פ ──not 9 digits──► NEEDS_CORRECTION (Tax Authority reply)
                           └──9 digits────► NEEDS_CLERK_REVIEW
+   any other typed reply ("paid yesterday") ──► NEEDS_CLERK_REVIEW (reminders stop)
+                     └── "החזרה להמתנה ללקוח" ──► WAITING_FOR_CLIENT (fresh reminder cycle)
    buttons: Paid / Business / Personal expense ──► RESOLVED     Call me ──► ESCALATED
 ```
+
+A client who types anything while a request waits is told a person will read it, so the request goes to **ממתין לבדיקת פקיד** and the reminders stop. If the answer was "I'll send it tomorrow", the clerk presses **החזרה להמתנה ללקוח** in the ticket window and the chase starts again.
 
 ### Vision AI
 
