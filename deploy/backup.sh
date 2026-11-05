@@ -18,7 +18,7 @@ backup_once() {
 		echo "$(date '+%Y-%m-%d %H:%M') NO BACKUP: BACKUP_PASSPHRASE is not set in .env" >&2
 		return 1
 	fi
-	stamp=$(date +%Y-%m-%d_%H%M)
+	stamp=$(date +%Y-%m-%d_%H%M%S)
 	db="db_$stamp.dump.enc"
 	files="uploads_$stamp.tar.gz.enc"
 	# Write to a temporary name first, so a half-written file is never mistaken for a backup.

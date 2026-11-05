@@ -1,12 +1,12 @@
 #!/bin/sh
 # Restores one backup made by backup.sh: the database, and the documents into /restore-uploads.
-#   restore.sh 2026-11-04_0200      (the date and time in the backup's file names)
+#   restore.sh 2026-11-04_020000    (the date and time in the backup's file names)
 # A backup that is not in /backups is fetched from BACKUP_REMOTE first (a new server after losing the old one).
 # Needs the same BACKUP_PASSPHRASE the backup was made with. Stop the API first: DEPLOY.md, "Restore a backup".
 set -eu
 set -o pipefail
 
-stamp="${1:?give the backup to restore, for example 2026-11-04_0200}"
+stamp="${1:?give the backup to restore, for example 2026-11-04_020000}"
 db="db_$stamp.dump.enc"
 files="uploads_$stamp.tar.gz.enc"
 : "${BACKUP_PASSPHRASE:?BACKUP_PASSPHRASE is not set in .env: without it the backup cannot be opened}"

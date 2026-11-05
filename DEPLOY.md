@@ -165,14 +165,14 @@ docker compose -f docker-compose.prod.yml exec backup sh /usr/local/bin/backup.s
 
 ### Restore a backup
 
-The backup's name is the date and time in its file names, for example `2026-11-04_0200` for `db_2026-11-04_0200.dump.enc`. Stop the API, restore, start it again:
+The backup's name is the date and time in its file names, for example `2026-11-04_020000` for `db_2026-11-04_020000.dump.enc`. Stop the API, restore, start it again:
 
 ```bash
 docker compose -f docker-compose.prod.yml stop backend
 ```
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm --no-deps -v accountflow_uploads:/restore-uploads --entrypoint sh backup /usr/local/bin/restore.sh 2026-11-04_0200
+docker compose -f docker-compose.prod.yml run --rm --no-deps -v accountflow_uploads:/restore-uploads --entrypoint sh backup /usr/local/bin/restore.sh 2026-11-04_020000
 ```
 
 ```bash
@@ -185,11 +185,39 @@ A wrong passphrase stops the restore before anything is changed.
 
 ## 9. Updating to a new version
 
+Changes are made once, on your computer: tested, committed and pushed to GitHub. Every firm runs the same code; a firm that needs something different gets an office setting, not its own copy of the code.
+
+**One server:** log in and run:
+
 ```bash
-docker compose -f docker-compose.prod.yml exec backup sh /usr/local/bin/backup.sh
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
+cd AccountFlow-AI && bash deploy/update.sh
 ```
+
+`deploy/update.sh` lists what is new and asks before it changes anything. Then:
+
+1. It makes an encrypted backup, also copied off the server when that is set up. If the backup fails, it stops without updating.
+2. It installs the new version and rebuilds. The app is down for about a minute, so update in the evening or before the office opens.
+3. It checks the whole chain, the way a browser reaches it: HTTPS, the dashboard and the API.
+4. **If the new version is not healthy within 150 seconds, it puts the previous version back** and rebuilds it. It then prints the restore command for the backup from step 1, in case the data needs it.
+
+`bash deploy/update.sh --check` only lists what is new. The script refuses to run if files of the app were edited on the server, because the update would overwrite them.
+
+**All firms at once, from your computer:** list the servers in a file, one per line, for example `servers.txt`:
+
+```text
+ubuntu@app.levi-cpa.co.il
+ubuntu@app.cohen-cpa.co.il
+```
+
+```bash
+bash deploy/update-all.sh servers.txt --check
+```
+
+```bash
+bash deploy/update-all.sh servers.txt
+```
+
+The first command shows what each server would get. The second updates them one after another, with no questions. A server that fails is rolled back by itself and listed as `FAILED` in the summary, and the others are still updated. It logs in with your SSH key (step 3).
 
 Updating from a version whose backups were not encrypted: run `bash deploy/setup.sh` on a copy, or add a `BACKUP_PASSPHRASE` line to `.env` yourself (letters, digits and dashes, at least 24 characters), and save it outside the server. Then delete the old unencrypted `backups/db_*.dump` and `backups/uploads_*.tar.gz` files.
 
